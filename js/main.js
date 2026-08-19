@@ -45,11 +45,7 @@ game.logMsg(cameBack ? "Welcome back. Your training continues." : "You leave hom
 game.updatePotential();
 
 const ui = initUI(game, {
-  onReset() {
-    localStorage.removeItem(SAVE_KEY);
-    localStorage.removeItem(GHOST_KEY);
-    location.reload();
-  },
+  onReset() {},
 });
 
 // Debug handle (dev console access; harmless in production).
