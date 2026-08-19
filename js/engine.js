@@ -462,7 +462,7 @@ export function createGame(state, opts = {}) {
       foeName = foe.name;
       bet = foe.bet;
       if (num(state.Money) < bet) {
-        logMsg(`The Inside demands a ${bet} Cash wager. You can't afford it.`), "fight";
+        logMsg(`The Inside demands a ${bet} Cash wager. You can't afford it.`, "fight");
         return null;
       }
       state.Money = num(state.Money) - bet;
@@ -491,11 +491,11 @@ export function createGame(state, opts = {}) {
         applyFightGains(true);
         captureGhost();
         if (learned) {
-          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds! You learned ${STYLES[extra.style].name}!`), "fight";
+          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds! You learned ${STYLES[extra.style].name}!`, "fight");
         } else if (idx === MAX_RIVAL) {
-          logMsg(`THE MASTER FALLS in ${result.rounds} rounds! The Inside opens its doors. +${moneyGain} Cash.`), "fight";
+          logMsg(`THE MASTER FALLS in ${result.rounds} rounds! The Inside opens its doors. +${moneyGain} Cash.`, "fight");
         } else {
-          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds — landed ${result.playerSkill || "a clean hit"}! +${moneyGain} Cash. Next: ${RIVALS[idx].name}.`), "fight";
+          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds — landed ${result.playerSkill || "a clean hit"}! +${moneyGain} Cash. Next: ${RIVALS[idx].name}.`, "fight");
         }
       } else if (mode === "inside") {
         state.Money = num(state.Money) + extra.pay;
@@ -504,9 +504,9 @@ export function createGame(state, opts = {}) {
         applyFightGains(true);
         if (idx < MAX_TOTAL) {
           state.RivalIdx = idx + 1;
-          logMsg(`INSIDE VICTORY over ${extra.name}! +${extra.pay} Cash. Next monster: ${INSIDE[idx - MAX_RIVAL].name}.`), "fight";
+          logMsg(`INSIDE VICTORY over ${extra.name}! +${extra.pay} Cash. Next monster: ${INSIDE[idx - MAX_RIVAL].name}.`, "fight");
         } else {
-          logMsg(`KURE REIKO FALLS! You conquered The Inside. Champion of the district. +${extra.pay} Cash.`), "fight";
+          logMsg(`KURE REIKO FALLS! You conquered The Inside. Champion of the district. +${extra.pay} Cash.`, "fight");
         }
       } else if (mode === "ghost") {
         const moneyGain = 10 + Math.floor((extra.potential || pot) / 50);
@@ -514,7 +514,7 @@ export function createGame(state, opts = {}) {
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 4 + Math.floor((extra.potential || 0) / 100));
         applyFightGains(true);
-        logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`), "fight";
+        logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`, "fight");
       } else if (mode === "roamer") {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
@@ -526,7 +526,7 @@ export function createGame(state, opts = {}) {
         state.Money = num(state.Money) + moneyGain;
         addStyleXp(activeStyle(), 3 + Math.floor(pot / 50));
         applyFightGains(true);
-        logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Cash.`), "fight";
+        logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Cash.`, "fight");
       }
       updatePotential();
     } else {
@@ -535,15 +535,15 @@ export function createGame(state, opts = {}) {
       if (mode === "inside") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
-        logMsg(`The Inside eats you alive — ${extra.name} takes the ${bet} Cash pot. You took ${dmg} damage.`), "fight";
+        logMsg(`The Inside eats you alive — ${extra.name} takes the ${bet} Cash pot. You took ${dmg} damage.`, "fight");
       } else if (mode === "encounter") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
-        logMsg(`DEFEAT by a street fighter after ${result.rounds} rounds. You took ${dmg} damage. Tou trained from the beating.`), "fight", "fight";
+        logMsg(`DEFEAT by a street fighter after ${result.rounds} rounds. You took ${dmg} damage. Tou trained from the beating.`, "fight");
       } else if (mode === "ghost") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
-        logMsg(`The ghost of ${extra.name || "a fighter"} was too much. ${result.rounds} rounds in, you took ${dmg} damage. Their echo still stands.`), "fight";
+        logMsg(`The ghost of ${extra.name || "a fighter"} was too much. ${result.rounds} rounds in, you took ${dmg} damage. Their echo still stands.`, "fight");
       } else if (mode === "roamer") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
@@ -551,7 +551,7 @@ export function createGame(state, opts = {}) {
       } else {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
-        logMsg(`DEFEAT by ${extra.name} after ${result.rounds} rounds. You took ${dmg} damage. Train and try again.`), "fight";
+        logMsg(`DEFEAT by ${extra.name} after ${result.rounds} rounds. You took ${dmg} damage. Train and try again.`, "fight");
       }
       if (num(state.Health) <= 0) {
         reincarnate("you succumbed to your wounds");
@@ -925,7 +925,7 @@ export function createGame(state, opts = {}) {
     concludeFight(battle.mode, battle.extra, battle.idx, battle.pot, battle.bet, result);
     battle = null;
     state.InFight = false;
-    logMsg("You forfeited the bout. The hub awaits — train and come back stronger."), "fight";
+    logMsg("You forfeited the bout. The hub awaits — train and come back stronger.", "fight");
   }
 
   // ---- simple actions ----

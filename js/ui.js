@@ -182,6 +182,7 @@ export function initUI(game, opts = {}) {
   };
 
   // ------------------------------------------------------------ build static grids --
+  const styleName = (id) => (STYLES[id] ? STYLES[id].name : id);
   const activityButtons = {};
   ACTIVITY_LIST.forEach((act) => {
     const b = document.createElement("button");
@@ -255,8 +256,6 @@ export function initUI(game, opts = {}) {
     const d = Math.floor(days % 365);
     return `Age ${y} y ${d} d`;
   };
-
-  const styleName = (id) => (STYLES[id] ? STYLES[id].name : id);
 
   const fmtStats = (stats) => {
     if (!stats) return "";
