@@ -253,8 +253,46 @@ header {
   max-height: 200px;
   overflow-y: auto;
 }
-.logentry { margin-bottom: 4px; }
+.logentry { margin-bottom: 4px; display: flex; align-items: baseline; gap: 6px; }
 .logentry:last-child { margin-bottom: 0; }
+.logtag {
+  flex: none;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+/* kind colors */
+.k-rank .logtag { color: var(--gold); border-color: var(--gold-dim); }
+.k-fight .logtag { color: var(--red); border-color: rgba(224,90,78,.5); }
+.k-train .logtag { color: var(--green); border-color: rgba(94,194,123,.5); }
+.k-money .logtag { color: var(--gold); border-color: var(--gold-dim); }
+.k-life .logtag { color: var(--purple); border-color: rgba(180,138,224,.5); }
+.k-eat .logtag { color: var(--gold); border-color: var(--gold-dim); }
+.k-store .logtag { color: var(--gold); border-color: var(--gold-dim); }
+.k-skill .logtag { color: var(--purple); border-color: rgba(180,138,224,.5); }
+.k-loc .logtag, .k-act .logtag { color: var(--muted); }
+
+/* ---------- logger overlay ---------- */
+.logmodal { width: min(760px, 96vw); max-height: 86vh; display: flex; flex-direction: column; }
+.loghead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.logfull {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  background: #0d1015;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 240px;
+}
+.logrow { display: flex; gap: 8px; align-items: baseline; padding: 1px 0; }
+.logage { flex: none; color: var(--muted); opacity: .65; font-size: 11px; width: 46px; }
+.logtxt { flex: 1; color: var(--text); }
 
 /* ---------- footer ---------- */
 footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }

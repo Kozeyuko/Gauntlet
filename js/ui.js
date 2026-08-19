@@ -65,6 +65,9 @@ export function initUI(game, opts = {}) {
     btnOptions: $("btnOptions"), optionsOverlay: $("optionsOverlay"),
     btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
     btnOptionsClose: $("btnOptionsClose"),
+    // logger
+    btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
+    logStats: $("logStats"), btnLogClear: $("btnLogClear"), btnLogClose: $("btnLogClose"),
     // combat
     combatOverlay: $("combatOverlay"),
     roundLbl: $("roundLbl"), modeLbl: $("modeLbl"),
@@ -254,13 +257,26 @@ export function initUI(game, opts = {}) {
     el.btnFight.textContent = info.fightLabel;
   }
 
+  const LOG_KIND_LABEL = {
+    sys: "", rank: "RANK", fight: "FIGHT", train: "TRAIN", money: "MONEY",
+    life: "LIFE", eat: "NUTRI", store: "STORE", skill: "MASTERY", loc: "MOVE", act: "ACT",
+  };
+
   function renderLog() {
     const entries = Array.isArray(state.Log) ? state.Log : (state.LastMsg ? [state.LastMsg] : []);
     el.logLine.innerHTML = "";
-    for (const m of entries) {
+    for (const raw of entries) {
+      const e = typeof raw === "string" ? { t: raw, k: "sys", d: 0 } : raw;
       const d = document.createElement("div");
-      d.className = "logentry";
-      d.textContent = m;
+      d.className = "logentry k-" + (e.k || "sys");
+      const tag = LOG_KIND_LABEL[e.k] || "";
+      if (tag) {
+        const s = document.createElement("span");
+        s.className = "logtag";
+        s.textContent = tag;
+        d.appendChild(s);
+      }
+      d.appendChild(document.createTextNode(e.t ?? ""));
       el.logLine.appendChild(d);
     }
     el.logLine.scrollTop = el.logLine.scrollHeight;
@@ -269,6 +285,54 @@ export function initUI(game, opts = {}) {
       lastRankMsg = msg;
       audio.rankup();
     }
+  }
+
+  // ------------------------------------------------------------ logger overlay --
+  function logEntryAge(e) {
+    const days = num(e.d);
+    if (!days) return "";
+    const y = Math.floor(days / 365);
+    const d = Math.floor(days % 365);
+    return `y${y}·d${d}`;
+  }
+
+  function renderLogger() {
+    const entries = Array.isArray(state.Log) ? state.Log : [];
+    const kinds = {};
+    for (const raw of entries) {
+      const e = typeof raw === "string" ? { t: raw, k: "sys", d: 0 } : raw;
+      kinds[e.k || "sys"] = (kinds[e.k || "sys"] || 0) + 1;
+    }
+    const stats = `${entries.length} entries · ${Object.keys(kinds).length} kinds`;
+    el.logStats.textContent = stats;
+    el.logFull.innerHTML = "";
+    for (const raw of entries) {
+      const e = typeof raw === "string" ? { t: raw, k: "sys", d: 0 } : raw;
+      const row = document.createElement("div");
+      row.className = "logrow k-" + (e.k || "sys");
+      const age = document.createElement("span");
+      age.className = "logage";
+      age.textContent = logEntryAge(e);
+      row.appendChild(age);
+      const tag = LOG_KIND_LABEL[e.k] || "";
+      if (tag) {
+        const s = document.createElement("span");
+        s.className = "logtag";
+        s.textContent = tag;
+        row.appendChild(s);
+      }
+      const tx = document.createElement("span");
+      tx.className = "logtxt";
+      tx.textContent = e.t ?? "";
+      row.appendChild(tx);
+      el.logFull.appendChild(row);
+    }
+    el.logFull.scrollTop = el.logFull.scrollHeight;
+  }
+
+  function openLogger() {
+    renderLogger();
+    el.logOverlay.classList.add("show");
   }
 
   function renderLooking() {
@@ -287,6 +351,9 @@ export function initUI(game, opts = {}) {
     renderRival();
     renderLog();
     renderLooking();
+    const cost = game.reincarnateCost ? game.reincarnateCost() : 0;
+    el.btnReincarnate.textContent = `REINCARNATE (${cost} Cash)`;
+    if (el.logOverlay.classList.contains("show")) renderLogger();
   }
 
   // ------------------------------------------------------------ activity auto-run --
@@ -656,7 +723,7 @@ export function initUI(game, opts = {}) {
   el.btnGhostClose.addEventListener("click", () => el.ghostOverlay.classList.remove("show"));
 
   el.btnReincarnate.addEventListener("click", () => {
-    game.reincarnate("you chose to begin a new life");
+    game.reincarnate("you chose to begin a new life", { manual: true });
     render();
   });
 
@@ -743,6 +810,22 @@ export function initUI(game, opts = {}) {
   el.btnStoreClose.addEventListener("click", () => el.storeOverlay.classList.remove("show"));
   el.storeOverlay.addEventListener("click", (e) => {
     if (e.target === el.storeOverlay) el.storeOverlay.classList.remove("show");
+  });
+
+  // logger
+  el.btnLog.addEventListener("click", () => {
+    if (el.logOverlay.classList.contains("show")) el.logOverlay.classList.remove("show");
+    else openLogger();
+  });
+  el.btnLogClose.addEventListener("click", () => el.logOverlay.classList.remove("show"));
+  el.logOverlay.addEventListener("click", (e) => {
+    if (e.target === el.logOverlay) el.logOverlay.classList.remove("show");
+  });
+  el.btnLogClear.addEventListener("click", () => {
+    state.Log = [];
+    state.LastMsg = "Log cleared.";
+    render();
+    if (el.logOverlay.classList.contains("show")) renderLogger();
   });
 
   // options

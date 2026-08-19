@@ -22,6 +22,7 @@
     <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
     <button class="btn small-btn" id="btnStore">STORE</button>
+    <button class="btn small-btn" id="btnLog">LOG</button>
   </div>
 </header>
 
@@ -200,6 +201,21 @@
     </div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOGGER OVERLAY ============ -->
+<div class="overlay" id="logOverlay">
+  <div class="modal logmodal">
+    <div class="loghead">
+      <h2>Logger</h2>
+      <span class="sub" id="logStats"></span>
+    </div>
+    <div class="logfull" id="logFull"></div>
+    <div class="acts">
+      <button class="btn small-btn" id="btnLogClear">Clear</button>
+      <button class="btn" id="btnLogClose">Close</button>
     </div>
   </div>
 </div>
