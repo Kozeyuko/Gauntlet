@@ -104,6 +104,7 @@ export function initUI(game, opts = {}) {
     const b = document.createElement("button");
     b.className = "btn";
     b.textContent = loc.label;
+    if (loc.desc) b.setAttribute("data-tip", loc.desc);
     b.addEventListener("click", () => { game.setLocation(loc.key); render(); });
     locationButtons[loc.key] = b;
     el.locationsGrid.appendChild(b);
@@ -745,6 +746,21 @@ export function initUI(game, opts = {}) {
   });
   el.btnThemeDark.addEventListener("click", () => applyTheme("dark"));
   el.btnThemeLight.addEventListener("click", () => applyTheme("light"));
+
+  // tap-to-show tooltips on touch devices (hover doesn't exist there)
+  let activeTip = null;
+  document.addEventListener("pointerdown", (e) => {
+    const tipEl = e.target.closest("[data-tip]");
+    if (activeTip && (!tipEl || activeTip !== tipEl)) {
+      activeTip.classList.remove("show");
+      activeTip = null;
+    }
+    if (tipEl) {
+      e.preventDefault();
+      tipEl.classList.add("show");
+      activeTip = tipEl;
+    }
+  });
 
   // short blip on any button-like click (hub + combat + ghosts)
   document.addEventListener("click", (e) => {
