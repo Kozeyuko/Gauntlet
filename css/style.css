@@ -341,6 +341,7 @@ header {
   z-index: 0;
 }
 /* combat HP fill drops instantly; the ghost tail carries the delayed drain */
+.fighter .bar { flex: none; height: 14px; }
 .fighter .bar.hp > i:not(.bartail) { transition: none; }
 .bar.hp > i { background: linear-gradient(90deg, #3f8f52, var(--green)); }
 .bar.hp > i.bartail { background: linear-gradient(90deg, rgba(224,90,78,.5), rgba(224,90,78,.78)); }
