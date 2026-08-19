@@ -92,6 +92,10 @@ export function initUI(game, opts = {}) {
     const b = document.createElement("button");
     b.className = "btn";
     b.textContent = loc.label;
+    if (loc.desc) {
+      b.setAttribute("title", loc.desc);
+      b.setAttribute("data-tip", loc.desc);
+    }
     b.addEventListener("click", () => { game.setLocation(loc.key); render(); });
     locationButtons[loc.key] = b;
     el.locationsGrid.appendChild(b);
