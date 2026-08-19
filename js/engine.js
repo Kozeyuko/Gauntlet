@@ -41,6 +41,8 @@ import {
   MAX_GHOSTS,
   MAX_RIVAL,
   MAX_TOTAL,
+  ROAMERS,
+  ROAMER_COOLDOWN_MS,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -112,7 +114,7 @@ export const PERSISTENT_KEYS = [
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
   "InFight", "AutoBattle",
   "StoreBuffs", "TempBoosts",
-  "Log",
+  "Log", "Roamers",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -127,6 +129,7 @@ export function freshState() {
     StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     AutoRun: false,
+    Roamers: {},
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -162,6 +165,8 @@ export function createGame(state, opts = {}) {
   const R = opts.rng || Math.random;
   const loadGhosts = opts.loadGhosts || (() => []);
   const saveGhosts = opts.saveGhosts || (() => {});
+  const getNow = opts.now || Date.now;
+  const roamerCooldownMs = opts.roamerCooldownMs || ROAMER_COOLDOWN_MS;
 
   let battle = null;
   let ghostCache = null;
@@ -510,6 +515,12 @@ export function createGame(state, opts = {}) {
         addStyleXp(activeStyle(), 4 + Math.floor((extra.potential || 0) / 100));
         applyFightGains(true);
         logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`), "fight";
+      } else if (mode === "roamer") {
+        const reward = num(extra.reward);
+        state.Money = num(state.Money) + reward;
+        addStyleXp(activeStyle(), num(extra.styleXp) || 4);
+        applyFightGains(true);
+        logMsg(`You beat ${extra.name}, a roaming fighter. +${reward} Cash.`, "fight");
       } else { // encounter
         const moneyGain = 5 + Math.floor(pot / 20);
         state.Money = num(state.Money) + moneyGain;
@@ -533,6 +544,10 @@ export function createGame(state, opts = {}) {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
         logMsg(`The ghost of ${extra.name || "a fighter"} was too much. ${result.rounds} rounds in, you took ${dmg} damage. Their echo still stands.`), "fight";
+      } else if (mode === "roamer") {
+        addStyleXp(activeStyle(), STYLEXP_LOSS);
+        applyFightGains(false);
+        logMsg(`DEFEAT by ${extra.name}, a roaming fighter. You took ${dmg} damage.`, "fight");
       } else {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
@@ -545,6 +560,7 @@ export function createGame(state, opts = {}) {
       }
       updatePotential();
     }
+    if (mode === "roamer" && extra && extra.key) markRoamerDefeated(extra.key);
   }
 
   // ---- ghosts (single-player: local self-echoes) ----
@@ -676,6 +692,98 @@ export function createGame(state, opts = {}) {
     view.foeName = foeLabel + " (IMAGINED)";
     view.round = 0;
     view.auto = state.AutoBattle === true;
+    return view;
+  }
+
+  // ---- roaming fighters (free-roaming city NPCs) ----
+  function buildRoamer(r) {
+    const pot = potential();
+    const cur = currentStats();
+    const m = r.mult || 1.0;
+    return {
+      key: r.key,
+      name: r.name,
+      district: r.district,
+      zone: r.zone,
+      style: r.style,
+      stats: {
+        Str: Math.max(1, Math.floor(cur.Str * m)),
+        Tou: Math.max(1, Math.floor(cur.Tou * m)),
+        Spd: Math.max(1, Math.floor(cur.Spd * m)),
+        Int: Math.max(1, Math.floor(cur.Int * m)),
+        Cha: 1,
+      },
+      reward: Math.max(1, Math.round((r.reward || 0) + Math.floor(pot / 20))),
+      styleXp: 4 + Math.floor(pot / 100),
+    };
+  }
+
+  function getRoamer(key) {
+    return ROAMERS.find((r) => r.key === key) || null;
+  }
+
+  function getRoamerDefeat(key) {
+    const map = state.Roamers || {};
+    const v = map[key];
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  function markRoamerDefeated(key) {
+    if (!state.Roamers) state.Roamers = {};
+    state.Roamers[key] = getNow();
+  }
+
+  function roamerStatus(key) {
+    const def = getRoamerDefeat(key);
+    if (def == null) return "ready";
+    return getNow() >= def + roamerCooldownMs ? "ready" : "defeated";
+  }
+
+  function roamerRemaining(key) {
+    const def = getRoamerDefeat(key);
+    if (def == null) return 0;
+    return Math.max(0, Math.ceil((def + roamerCooldownMs - getNow()) / 1000));
+  }
+
+  function spawnRoamers() {
+    return ROAMERS.map(buildRoamer);
+  }
+
+  function fightRoamer(key) {
+    if (num(state.Health) <= 0) return null;
+    if (battle) return null;
+    if (typeof key !== "string") return null;
+    const roamer = getRoamer(key);
+    if (!roamer) return null;
+    if (roamerStatus(key) !== "ready") return null;
+    const built = buildRoamer(roamer);
+    const result = resolveFight(built.stats, built.style);
+    concludeFight("roamer", built, 0, potential(), 0, result);
+    return { result, mode: "roamer" };
+  }
+
+  function beginRoamerFight(key) {
+    if (num(state.Health) <= 0) return null;
+    if (battle) return null;
+    if (typeof key !== "string") return null;
+    const roamer = getRoamer(key);
+    if (!roamer) return null;
+    if (roamerStatus(key) !== "ready") return null;
+    const built = buildRoamer(roamer);
+    const me = makeCombatant(currentStats(), activeStyle());
+    const foe = makeCombatant(built.stats, built.style);
+    battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0 };
+    state.InFight = true;
+    const view = combatantToView(me, foe);
+    view.foeName = built.name;
+    view.foeStyleName = STYLES[built.style] ? STYLES[built.style].name : built.style;
+    view.playerStyleName = STYLES[activeStyle()].name;
+    view.mode = "roamer";
+    view.round = 0;
+    view.auto = state.AutoBattle === true;
+    view.events = [];
     return view;
   }
 
@@ -1019,11 +1127,13 @@ export function createGame(state, opts = {}) {
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, reincarnateCost,
     hardReset,
-    setAutoBattle, buyItem,
+    setAutoBattle, buyItem, locationMult,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
     // ghosts
     listGhosts, fightGhost,
+    // roamers
+    spawnRoamers, roamerStatus, roamerRemaining, fightRoamer, beginRoamerFight,
     // day
     doDay,
   };

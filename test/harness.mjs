@@ -1,7 +1,7 @@
 // test/harness.mjs — Node test harness for gauntlet-web.
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
-import { freshState, snapshot, createGame, eventToString } from "../js/engine.js";
+import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
 import { RIVALS, INSIDE } from "../js/data.js";
 
 let failures = 0;
@@ -271,6 +271,77 @@ console.log("== Both paths produce structured events ==");
     res.result.events.length > 0 && res.result.events.every((e) => e && typeof e === "object" && "who" in e && "damage" in e),
     "auto fight events are structured objects"
   );
+}
+
+console.log("== Roaming fighters: spawn shape ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const roster = g.spawnRoamers();
+  assert(Array.isArray(roster), "spawnRoamers returns an array");
+  assert(roster.length >= 12 && roster.length <= 19, `roster size in 12..19 (got ${roster.length})`);
+  const r = roster[0];
+  assert(typeof r.key === "string" && r.key.length > 0, "roamer has key");
+  assert(typeof r.name === "string" && r.name.length > 0, "roamer has name");
+  assert(r.stats && typeof r.stats.Str === "number" && typeof r.stats.Tou === "number", "roamer has stats object");
+  assert(typeof r.reward === "number" && r.reward > 0, "roamer has positive reward");
+}
+
+console.log("== Roaming fighters: status / cooldown ==");
+{
+  let nowMs = 1000000;
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1), now: () => nowMs });
+  const key = "r_thug";
+  assert(g.roamerStatus(key) === "ready", "ready before defeat");
+  const res = g.fightRoamer(key);
+  assert(!!res, "fightRoamer returns a result");
+  assert(g.roamerStatus(key) === "defeated", "defeated right after the fight");
+  nowMs += 3 * 60 * 1000 + 1;
+  assert(g.roamerStatus(key) === "ready", "ready again after the cooldown elapses");
+}
+
+console.log("== Roaming fighters: win pays Cash, no ladder advance ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: () => 0.5 });
+  const moneyBefore = state.Money;
+  const rivalBefore = state.RivalIdx;
+  const winsBefore = state.Wins;
+  const res = g.fightRoamer("r_thug");
+  assert(res && res.result.win === true, "won the roamer fight");
+  assert(state.Money > moneyBefore, `Cash increased (${moneyBefore} -> ${state.Money})`);
+  assert(state.RivalIdx === rivalBefore, "RivalIdx unchanged");
+  assert(state.Wins === winsBefore, "Wins unchanged");
+}
+
+console.log("== Roaming fighters: loss with death reincarnates, no softlock ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: () => 1 });
+  state.InFight = true;
+  state.AutoBattle = true;
+  state.Health = 1;
+  const res = g.fightRoamer("r_thug");
+  assert(res && res.result.win === false, "lost the roamer fight");
+  assert(state.Lives === 1, "reincarnated on death");
+  assert(state.InFight === false, "InFight cleared");
+  assert(state.AutoBattle === false, "AutoBattle cleared");
+}
+
+console.log("== Roaming fighters: persist across snapshot/restore ==");
+{
+  let nowMs = 2000000;
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1), now: () => nowMs });
+  g.fightRoamer("r_thug");
+  const snap = snapshot(state);
+  assert(snap.Roamers && snap.Roamers["r_thug"], "Roamers captured in snapshot");
+  const state2 = freshState();
+  restore(state2, snap);
+  assert(state2.Roamers && state2.Roamers["r_thug"], "Roamers restored into a fresh state");
+  const g2 = createGame(state2, { now: () => nowMs });
+  assert(g2.roamerStatus("r_thug") === "defeated", "restored roamer still counts as defeated");
 }
 
 console.log("");

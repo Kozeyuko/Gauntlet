@@ -8,6 +8,8 @@ import {
   RIVALS,
   INSIDE,
   STORE_ITEMS,
+  ROAMERS,
+  MASTERY_TIERS,
   MAX_RIVAL,
   MAX_TOTAL,
 } from "./data.js";
@@ -15,6 +17,9 @@ import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
 
 const $ = (id) => document.getElementById(id);
+
+const SAVE_KEY = "gauntlet-save-v1";
+const GHOST_KEY = "gauntlet-ghosts-v1";
 
 const num = (v) => {
   const n = Number(v);
@@ -25,6 +30,82 @@ const reducedMotion =
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------------------------------------------------------------- map layout --
+const MAP_W = 1000;
+const MAP_H = 850;
+
+// Building centers (in the 1000×850 map space).
+const MAP_POS = {
+  // West district
+  home: [75, 60], spar: [225, 60], wat: [375, 60],
+  tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
+  clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
+  arena: [225, 540],
+  // East district
+  foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
+  sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
+  kaiwan: [600, 210], silat: [700, 210], hunt: [820, 210], sword: [930, 210],
+  xiyi: [600, 360], kyoku: [700, 360], shotokan: [820, 360], taekwon: [930, 360],
+  wrestling: [600, 450], kickbox: [700, 450], kungfu: [820, 450], aikido: [930, 450],
+  kali: [600, 540], ironbox: [700, 540], boran: [820, 540], guihun: [930, 540],
+  ultra: [700, 630],
+  // The Inside (special locked zone)
+  inside: [500, 790],
+};
+
+// Roamer dots sit on road segments.
+const ROAMER_SPOTS = {
+  "w-top": [225, 120], "w-top2": [300, 120],
+  "w-mid": [225, 300], "w-bottom": [225, 480],
+  "w-conn": [150, 210],
+  "bridge": [500, 300],
+  "e-top": [760, 120], "e-top2": [880, 120],
+  "e-mid": [700, 300], "e-mid2": [820, 300],
+  "e-bottom": [700, 480], "e-bottom2": [820, 480],
+  "e-conn": [640, 390], "e-conn2": [880, 210],
+};
+
+const LOC_DESC = {};
+LOCATION_LIST.forEach((l) => { LOC_DESC[l.key] = l.desc; });
+
+const pct = (v, dim) => ((v / dim) * 100).toFixed(4) + "%";
+
+function fmtCountdown(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function mapSvgMarkup() {
+  const hTop = 120, hMid = 300, hBot = 480;
+  return `
+    <rect class="m-land" x="0" y="0" width="1000" height="850"/>
+    <rect class="m-river" x="460" y="0" width="80" height="720"/>
+    <!-- roads: 3 horizontal (only middle crosses the river) -->
+    <rect class="m-road" x="0" y="${hTop - 7}" width="460" height="14"/>
+    <rect class="m-road" x="540" y="${hTop - 7}" width="460" height="14"/>
+    <rect class="m-road" x="0" y="${hMid - 7}" width="1000" height="14"/>
+    <rect class="m-road" x="0" y="${hBot - 7}" width="460" height="14"/>
+    <rect class="m-road" x="540" y="${hBot - 7}" width="460" height="14"/>
+    <!-- vertical connector roads -->
+    <rect class="m-road" x="143" y="0" width="14" height="720"/>
+    <rect class="m-road" x="303" y="0" width="14" height="720"/>
+    <rect class="m-road" x="633" y="0" width="14" height="720"/>
+    <rect class="m-road" x="753" y="0" width="14" height="720"/>
+    <rect class="m-road" x="873" y="0" width="14" height="720"/>
+    <!-- the one bridge -->
+    <rect class="m-bridge" x="440" y="${hMid - 9}" width="120" height="18"/>
+    <!-- The Inside: gated approach at the map edge -->
+    <rect class="m-road" x="493" y="${hBot - 7}" width="14" height="245"/>
+    <rect class="m-inside" x="320" y="725" width="360" height="112"/>
+    <rect class="m-gate" id="insideGate" x="468" y="720" width="64" height="8"/>
+    <text class="m-insidetext" x="500" y="742" text-anchor="middle">THE INSIDE</text>
+    <text class="m-district" x="160" y="695" text-anchor="middle">WEST</text>
+    <text class="m-district" x="840" y="695" text-anchor="middle">EAST</text>
+    <text class="m-rivername" x="500" y="100" text-anchor="middle" transform="rotate(90 500 100)">RIVER</text>
+  `;
+}
 
 export function initUI(game, opts = {}) {
   const onReset = opts.onReset || (() => {});
@@ -37,6 +118,7 @@ export function initUI(game, opts = {}) {
   let lastRound = 0;      // last rendered round (for banner pop)
   let lastRankMsg = "";   // last POTENTIAL UP message (for rankup ding)
   let autoRunTimer = null; // activity auto-run setTimeout handle
+  let encounterShown = false; // rival overlay auto-open dedupe
 
   // ------------------------------------------------------------ element refs --
   const el = {
@@ -50,7 +132,6 @@ export function initUI(game, opts = {}) {
     activitiesGrid: $("activitiesGrid"),
     stylesGrid: $("stylesGrid"),
     activeStyleInfo: $("activeStyleInfo"),
-    locationsGrid: $("locationsGrid"),
     rivalName: $("rivalName"), rivalStyle: $("rivalStyle"), rivalLine: $("rivalLine"),
     rivalStats: $("rivalStats"),
     btnFight: $("btnFight"), btnAutoFight: $("btnAutoFight"),
@@ -65,6 +146,15 @@ export function initUI(game, opts = {}) {
     btnOptions: $("btnOptions"), optionsOverlay: $("optionsOverlay"),
     btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
     btnOptionsClose: $("btnOptionsClose"),
+    // city map
+    citymap: $("citymap"),
+    // stats overlay
+    btnStats: $("btnStats"), statsOverlay: $("statsOverlay"), btnStatsClose: $("btnStatsClose"),
+    // rival overlay
+    btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
+    // location overlay
+    locOverlay: $("locOverlay"), locName: $("locName"), locFlavor: $("locFlavor"),
+    locStyles: $("locStyles"), btnLocClose: $("btnLocClose"),
     // logger
     btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
     logStats: $("logStats"), btnLogClear: $("btnLogClear"), btnLogClose: $("btnLogClose"),
@@ -102,15 +192,61 @@ export function initUI(game, opts = {}) {
     el.activitiesGrid.appendChild(b);
   });
 
-  const locationButtons = {};
+  // ------------------------------------------------------------ build city map --
+  const buildingEls = {};
+  const roamerEls = {};
+
+  function clickBuilding(key) {
+    const loc = LOCATIONS[key];
+    if (!loc) return;
+    if (isLocked(key)) {
+      game.logMsg("Locked — beat more rivals.");
+      render();
+      return;
+    }
+    game.setLocation(key);
+    openLocationOverlay(key);
+  }
+
+  el.citymap.innerHTML = `
+    <div class="map-wrap">
+      <svg class="map-svg" viewBox="0 0 ${MAP_W} ${MAP_H}" preserveAspectRatio="xMidYMid meet">${mapSvgMarkup()}</svg>
+      <div class="map-layer" id="mapLayer"></div>
+    </div>`;
+  const mapLayer = $("mapLayer");
+
   LOCATION_LIST.forEach((loc) => {
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = loc.label;
-    if (loc.desc) b.setAttribute("data-tip", loc.desc);
-    b.addEventListener("click", () => { game.setLocation(loc.key); render(); });
-    locationButtons[loc.key] = b;
-    el.locationsGrid.appendChild(b);
+    const pos = MAP_POS[loc.key];
+    if (!pos) return;
+    const b = document.createElement("div");
+    b.className = "bldg";
+    b.style.left = pct(pos[0], MAP_W);
+    b.style.top = pct(pos[1], MAP_H);
+    b.innerHTML = `<span class="pin"></span><span class="lock"></span><span class="blbl">${loc.label}</span>`;
+    b.setAttribute("data-tip", buildingBaseTip(loc.key));
+    b.addEventListener("click", () => clickBuilding(loc.key));
+    buildingEls[loc.key] = b;
+    mapLayer.appendChild(b);
+  });
+
+  ROAMERS.forEach((r) => {
+    const spot = ROAMER_SPOTS[r.zone];
+    if (!spot) return;
+    const d = document.createElement("div");
+    d.className = "roamer";
+    d.style.left = pct(spot[0], MAP_W);
+    d.style.top = pct(spot[1], MAP_H);
+    d.innerHTML = `<span class="rdot"></span><span class="rname">${r.name}</span><span class="rcount"></span>`;
+    d.setAttribute("data-tip", `${r.name} — roaming ${styleName(r.style)}. Click to fight.`);
+    d.addEventListener("click", () => {
+      if (game.roamerStatus(r.key) !== "ready") return;
+      pauseAutoRun();
+      const view = game.beginRoamerFight(r.key);
+      if (view) openCombat(view);
+      else render();
+    });
+    roamerEls[r.key] = d;
+    mapLayer.appendChild(d);
   });
 
   // ------------------------------------------------------------ render helpers --
@@ -126,6 +262,20 @@ export function initUI(game, opts = {}) {
     if (!stats) return "";
     return `Str ${stats.Str} · Tou ${stats.Tou} · Spd ${stats.Spd} · Int ${stats.Int} · Cha ${stats.Cha}`;
   };
+
+  const clampRivalIdx = () => Math.min(Math.max(Number(state.RivalIdx) || 1, 1), MAX_TOTAL);
+
+  function isLocked(key) {
+    const loc = LOCATIONS[key];
+    if (!loc) return true;
+    return clampRivalIdx() <= loc.unlock;
+  }
+
+  function buildingBaseTip(key) {
+    const loc = LOCATIONS[key];
+    const d = LOC_DESC[key] || "";
+    return d ? `${loc.label}. ${d}` : loc.label;
+  }
 
   function renderHeader() {
     el.hMoney.textContent = String(Math.floor(Number(state.Money) || 0));
@@ -202,14 +352,41 @@ export function initUI(game, opts = {}) {
     }
   }
 
-  function renderLocations() {
-    const rivalIdx = Math.min(Math.max(Number(state.RivalIdx) || 1, 1), MAX_TOTAL);
-    for (const loc of LOCATION_LIST) {
-      const b = locationButtons[loc.key];
-      const l = LOCATIONS[loc.key];
-      const locked = rivalIdx <= l.unlock;
+  function renderMap() {
+    const rivalIdx = clampRivalIdx();
+    for (const key of Object.keys(buildingEls)) {
+      const b = buildingEls[key];
+      const loc = LOCATIONS[key];
+      const locked = rivalIdx <= loc.unlock;
       b.classList.toggle("locked", locked);
-      b.classList.toggle("here", loc.key === state.Location);
+      b.classList.toggle("here", key === state.Location);
+      if (locked) {
+        b.setAttribute("data-tip",
+          key === "inside"
+            ? "The Inside — locked. Opens after the Master (Rival 8)."
+            : `${loc.label} — locked. Unlocks at Rival ${loc.unlock + 1}.`);
+      } else {
+        b.setAttribute("data-tip", buildingBaseTip(key));
+      }
+    }
+    const gate = $("insideGate");
+    if (gate) gate.classList.toggle("open", rivalIdx > MAX_RIVAL);
+    renderRoamers();
+  }
+
+  function renderRoamers() {
+    for (const key of Object.keys(roamerEls)) {
+      const elR = roamerEls[key];
+      const status = game.roamerStatus(key);
+      elR.classList.toggle("ready", status === "ready");
+      elR.classList.toggle("defeated", status === "defeated");
+      const cnt = elR.querySelector(".rcount");
+      if (status === "defeated") {
+        cnt.textContent = fmtCountdown(game.roamerRemaining(key));
+        cnt.style.display = "";
+      } else {
+        cnt.style.display = "none";
+      }
     }
   }
 
@@ -225,7 +402,7 @@ export function initUI(game, opts = {}) {
         mode: "encounter",
       };
     }
-    const idx = Math.min(Math.max(Number(state.RivalIdx) || 1, 1), MAX_TOTAL);
+    const idx = clampRivalIdx();
     if (idx <= MAX_RIVAL) {
       const r = RIVALS[idx - 1];
       return {
@@ -264,8 +441,9 @@ export function initUI(game, opts = {}) {
 
   function renderLog() {
     const entries = Array.isArray(state.Log) ? state.Log : (state.LastMsg ? [state.LastMsg] : []);
+    const recent = entries.slice(-4);
     el.logLine.innerHTML = "";
-    for (const raw of entries) {
+    for (const raw of recent) {
       const e = typeof raw === "string" ? { t: raw, k: "sys", d: 0 } : raw;
       const d = document.createElement("div");
       d.className = "logentry k-" + (e.k || "sys");
@@ -279,7 +457,6 @@ export function initUI(game, opts = {}) {
       d.appendChild(document.createTextNode(e.t ?? ""));
       el.logLine.appendChild(d);
     }
-    el.logLine.scrollTop = el.logLine.scrollHeight;
     const msg = String(state.LastMsg ?? "");
     if (msg.includes("POTENTIAL UP") && msg !== lastRankMsg) {
       lastRankMsg = msg;
@@ -347,13 +524,26 @@ export function initUI(game, opts = {}) {
     renderAttrs();
     renderActivities();
     renderStyles();
-    renderLocations();
+    renderMap();
     renderRival();
     renderLog();
     renderLooking();
+    maybeOpenRivalForEncounter();
     const cost = game.reincarnateCost ? game.reincarnateCost() : 0;
     el.btnReincarnate.textContent = `REINCARNATE (${cost} Cash)`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
+  }
+
+  function maybeOpenRivalForEncounter() {
+    if (num(state.Encounter) >= 1) {
+      if (!encounterShown) {
+        encounterShown = true;
+        el.locOverlay.classList.remove("show");
+        el.rivalOverlay.classList.add("show");
+      }
+    } else {
+      encounterShown = false;
+    }
   }
 
   // ------------------------------------------------------------ activity auto-run --
@@ -400,6 +590,50 @@ export function initUI(game, opts = {}) {
       game.doDay();
       render();
     }
+  }
+
+  // ------------------------------------------------------------ location overlay --
+  function renderLocActivities() {
+    for (const act of ACTIVITY_LIST) {
+      const b = activityButtons[act.key];
+      const mult = game.locationMult(act.key);
+      b.textContent = `${act.label} ×${mult.toFixed(1)}`;
+    }
+  }
+
+  function renderLocStyles(key) {
+    const loc = LOCATIONS[key];
+    el.locStyles.innerHTML = "";
+    if (!loc.styleGym) {
+      el.locStyles.innerHTML = `<div class="small">No style taught here.</div>`;
+      return;
+    }
+    const styleId = loc.styleGym;
+    const st = STYLES[styleId];
+    const learned = game.learnedStyles()[styleId];
+    const xp = game.styleXpMap()[styleId] || 0;
+    let tier = 0;
+    for (let i = 0; i < MASTERY_TIERS.length; i++) if (xp >= MASTERY_TIERS[i]) tier = i + 1;
+    const next = MASTERY_TIERS[tier] || null;
+    const row = document.createElement("div");
+    row.className = "ghostrow";
+    row.innerHTML = `
+      <div class="gmain">
+        <div class="gnm">${st ? st.name : styleId}</div>
+        <div class="gsub">${learned ? "Learned" : "Not yet learned"} · mastery ${xp}${next ? " / " + next : " (max)"}</div>
+      </div>
+      <span class="tag ${learned ? "echo" : "shadow"}">${learned ? "LEARNED" : "LOCKED"}</span>`;
+    el.locStyles.appendChild(row);
+  }
+
+  function openLocationOverlay(key) {
+    const loc = LOCATIONS[key];
+    if (!loc) return;
+    el.locName.textContent = loc.name;
+    el.locFlavor.textContent = LOC_DESC[key] || "";
+    renderLocActivities();
+    renderLocStyles(key);
+    el.locOverlay.classList.add("show");
   }
 
   // ------------------------------------------------------------ store overlay --
@@ -812,6 +1046,32 @@ export function initUI(game, opts = {}) {
     if (e.target === el.storeOverlay) el.storeOverlay.classList.remove("show");
   });
 
+  // stats overlay
+  el.btnStats.addEventListener("click", () => {
+    if (el.statsOverlay.classList.contains("show")) el.statsOverlay.classList.remove("show");
+    else { render(); el.statsOverlay.classList.add("show"); }
+  });
+  el.btnStatsClose.addEventListener("click", () => el.statsOverlay.classList.remove("show"));
+  el.statsOverlay.addEventListener("click", (e) => {
+    if (e.target === el.statsOverlay) el.statsOverlay.classList.remove("show");
+  });
+
+  // rival overlay
+  el.btnRival.addEventListener("click", () => {
+    if (el.rivalOverlay.classList.contains("show")) el.rivalOverlay.classList.remove("show");
+    else { el.locOverlay.classList.remove("show"); renderRival(); el.rivalOverlay.classList.add("show"); }
+  });
+  el.btnRivalClose.addEventListener("click", () => el.rivalOverlay.classList.remove("show"));
+  el.rivalOverlay.addEventListener("click", (e) => {
+    if (e.target === el.rivalOverlay) el.rivalOverlay.classList.remove("show");
+  });
+
+  // location overlay
+  el.btnLocClose.addEventListener("click", () => el.locOverlay.classList.remove("show"));
+  el.locOverlay.addEventListener("click", (e) => {
+    if (e.target === el.locOverlay) el.locOverlay.classList.remove("show");
+  });
+
   // logger
   el.btnLog.addEventListener("click", () => {
     if (el.logOverlay.classList.contains("show")) el.logOverlay.classList.remove("show");
@@ -855,10 +1115,10 @@ export function initUI(game, opts = {}) {
     }
   });
 
-  // short blip on any button-like click (hub + combat + ghosts)
+  // short blip on any button-like click (hub + combat + ghosts + map)
   document.addEventListener("click", (e) => {
     if (e.target.closest("#btnSound, #btnOptSound")) return;
-    if (e.target.closest(".btn, .movebtn, .ghostrow")) {
+    if (e.target.closest(".btn, .movebtn, .ghostrow, .bldg, .roamer")) {
       audio.init();
       audio.click();
     }
@@ -870,6 +1130,9 @@ export function initUI(game, opts = {}) {
   syncSoundBtn();
   syncAutoRunBtn();
   el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
+
+  // roamer countdown refresh while the map is up
+  setInterval(renderRoamers, 1000);
 
   return { render };
 }

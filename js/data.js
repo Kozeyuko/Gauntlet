@@ -29,6 +29,7 @@ export const MASTERY_TIERS = [25, 75, 150];
 
 export const DATA_VERSION = 2;
 export const MAX_GHOSTS = 50;
+export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 
 // ------------------------------------------------------------------ ATTRIBUTES --
 export const ATTRIBUTES = [
@@ -461,3 +462,24 @@ export const IMAGINED_NPCS = [
 
 // ------------------------------------------------------------------ ENCOUNTER NAMES --
 export const ENCOUNTER_NAMES = ["Street Fighter", "Drifter", "Bouncer", "Thug", "Rival in the Crowd"];
+
+// ------------------------------------------------------------------ ROAMERS --
+// Free-roaming NPCs on the city map. Separate from RIVALS/INSIDE/ghosts.
+// `mult` scales their stats against the player's current stats (like ghosts);
+// `reward` is a base Cash payout, boosted by the player's potential at fight time.
+export const ROAMERS = [
+  { key: "r_thug", name: "Alley Thug", district: "west", zone: "w-bottom", style: "Brawling", mult: 0.7, reward: 4 },
+  { key: "r_runner", name: "Park Runner", district: "west", zone: "w-top", style: "Taekwondo", mult: 0.75, reward: 5 },
+  { key: "r_rookie", name: "Gym Rookie", district: "west", zone: "w-mid", style: "Boxer", mult: 0.7, reward: 5 },
+  { key: "r_vagrant", name: "River Vagrant", district: "west", zone: "w-conn", style: "Brawling", mult: 0.8, reward: 6 },
+  { key: "r_kure", name: "Kure Straggler", district: "west", zone: "w-top2", style: "KureStyle", mult: 1.1, reward: 12 },
+  { key: "r_bridge", name: "Bridge Tough", district: "east", zone: "bridge", style: "MuayThai", mult: 0.9, reward: 8 },
+  { key: "r_bouncer", name: "Dock Bouncer", district: "east", zone: "e-bottom", style: "Wrestling", mult: 0.85, reward: 7 },
+  { key: "r_kickboxer", name: "Street Kickboxer", district: "east", zone: "e-mid", style: "Kickboxing", mult: 0.9, reward: 8 },
+  { key: "r_karateka", name: "Wandering Karateka", district: "east", zone: "e-top", style: "Shotokan", mult: 0.85, reward: 7 },
+  { key: "r_grappler", name: "Back-alley Grappler", district: "east", zone: "e-conn", style: "Judo", mult: 0.95, reward: 9 },
+  { key: "r_blade", name: "Stick Fighter", district: "east", zone: "e-conn2", style: "KaliArnis", mult: 0.9, reward: 9 },
+  { key: "r_monk", name: "Itinerant Monk", district: "east", zone: "e-mid2", style: "KungFu", mult: 1.0, reward: 10 },
+  { key: "r_brute", name: "Foundry Brute", district: "east", zone: "e-bottom2", style: "M2Cross", mult: 1.0, reward: 10 },
+  { key: "r_silat", name: "Pencak Drifter", district: "east", zone: "e-top2", style: "Silat", mult: 1.05, reward: 11 },
+];

@@ -22,54 +22,62 @@
     <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
     <button class="btn small-btn" id="btnStore">STORE</button>
+    <button class="btn small-btn" id="btnStats">STATS</button>
+    <button class="btn small-btn" id="btnRival">RIVAL</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
   </div>
 </header>
 
-<main id="hub">
+<!-- ============ CITY MAP (default view) ============ -->
+<section id="citymap" aria-label="City map"></section>
 
-  <section class="panel">
-    <h3>Vitals</h3>
-    <div class="barrow">
-      <span class="barlbl" data-tip="Health — reaches 0 when you die.">HP</span>
-      <div class="bar hp"><i id="barHealth"></i><span id="barHealthTxt">100 / 100</span></div>
+<!-- ============ FOOTER (slim log strip + life/save) ============ -->
+<footer id="footer">
+  <div class="logstrip" id="logLine"></div>
+  <div class="footbtns">
+    <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
+    <button class="btn small-btn" id="btnReset">RESET SAVE</button>
+  </div>
+</footer>
+
+<!-- ============ STATS / CAREER OVERLAY ============ -->
+<div class="overlay" id="statsOverlay">
+  <div class="modal statsmodal">
+    <h2>Career</h2>
+    <section class="panel">
+      <h3>Vitals</h3>
+      <div class="barrow">
+        <span class="barlbl" data-tip="Health — reaches 0 when you die.">HP</span>
+        <div class="bar hp"><i id="barHealth"></i><span id="barHealthTxt">100 / 100</span></div>
+      </div>
+      <div class="barrow">
+        <span class="barlbl" data-tip="Stamina — spent on attacks and movement.">STA</span>
+        <div class="bar stam"><i id="barStamina"></i><span id="barStaminaTxt">100 / 100</span></div>
+      </div>
+      <div class="barrow">
+        <span class="barlbl" data-tip="Nutrition — decays over time.">NUT</span>
+        <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>Attributes</h3>
+      <div id="attrsBody"></div>
+    </section>
+    <section class="panel">
+      <h3>Styles</h3>
+      <div class="grid stygrid" id="stylesGrid"></div>
+      <div class="small" id="activeStyleInfo"></div>
+    </section>
+    <div class="acts">
+      <button class="btn" id="btnStatsClose">Close</button>
     </div>
-    <div class="barrow">
-      <span class="barlbl" data-tip="Stamina — spent on attacks and movement.">STA</span>
-      <div class="bar stam"><i id="barStamina"></i><span id="barStaminaTxt">100 / 100</span></div>
-    </div>
-    <div class="barrow">
-      <span class="barlbl" data-tip="Nutrition — decays over time.">NUT</span>
-      <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
-    </div>
-  </section>
+  </div>
+</div>
 
-  <section class="panel">
-    <h3>Attributes</h3>
-    <div id="attrsBody"></div>
-  </section>
-
-  <section class="panel">
-    <div class="panelhead">
-      <h3>Activities</h3>
-      <button class="btn small-btn" id="btnAutoRun">AUTO: OFF</button>
-    </div>
-    <div class="grid actgrid" id="activitiesGrid"></div>
-  </section>
-
-  <section class="panel">
-    <h3>Styles</h3>
-    <div class="grid stygrid" id="stylesGrid"></div>
-    <div class="small" id="activeStyleInfo"></div>
-  </section>
-
-  <section class="panel">
-    <h3>Locations</h3>
-    <div class="grid locgrid" id="locationsGrid"></div>
-  </section>
-
-  <section class="panel">
-    <h3>Rival</h3>
+<!-- ============ RIVAL OVERLAY ============ -->
+<div class="overlay" id="rivalOverlay">
+  <div class="modal">
+    <h2>Rival</h2>
     <div class="rivalname" id="rivalName">—</div>
     <div class="rivalstyle" id="rivalStyle">Style: —</div>
     <div class="rivalline" id="rivalLine">—</div>
@@ -82,22 +90,33 @@
       <button class="btn" id="btnLooking">Looking: OFF</button>
       <button class="btn" id="btnGhosts">Ghosts</button>
     </div>
-  </section>
-
-  <section class="panel">
-    <h3>Log</h3>
-    <div class="loglist" id="logLine"></div>
-    <div class="btnrow">
-      <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
+    <div class="acts">
+      <button class="btn" id="btnRivalClose">Close</button>
     </div>
-  </section>
+  </div>
+</div>
 
-  <footer>
-    <p class="howto">Training raises stats · fights pay better · die to reincarnate and your aptitude grows · styles persist across lives.</p>
-    <button class="btn small-btn" id="btnReset">RESET SAVE</button>
-  </footer>
-
-</main>
+<!-- ============ LOCATION OVERLAY ============ -->
+<div class="overlay" id="locOverlay">
+  <div class="modal">
+    <h2 id="locName">Location</h2>
+    <p id="locFlavor"></p>
+    <section class="panel">
+      <div class="panelhead">
+        <h3>Activities</h3>
+        <button class="btn small-btn" id="btnAutoRun">AUTO: OFF</button>
+      </div>
+      <div class="grid actgrid" id="activitiesGrid"></div>
+    </section>
+    <section class="panel">
+      <h3>Train Here</h3>
+      <div id="locStyles"></div>
+    </section>
+    <div class="acts">
+      <button class="btn" id="btnLocClose">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ COMBAT OVERLAY ============ -->
 <div class="overlay" id="combatOverlay">
