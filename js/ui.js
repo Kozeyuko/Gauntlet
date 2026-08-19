@@ -661,7 +661,13 @@ export function initUI(game, opts = {}) {
   });
 
   el.btnReset.addEventListener("click", () => {
-    if (confirm("Hard reset? This wipes your save and ghosts.")) onReset();
+    if (!confirm("Hard reset? This wipes your save and ghosts.")) return;
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(GHOST_KEY);
+    game.hardReset();
+    game.clampVitals();
+    game.logMsg("You leave home at 18. Train, fight, and learn.");
+    render();
   });
 
   el.btnUlt.addEventListener("click", () => {

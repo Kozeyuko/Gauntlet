@@ -287,6 +287,14 @@ export function createGame(state, opts = {}) {
     }
   }
 
+  // ---- hard reset ----
+  function hardReset() {
+    for (const k of PERSISTENT_KEYS) delete state[k];
+    for (const k of TRANSIENT_KEYS) delete state[k];
+    Object.assign(state, freshState());
+    ghostCache = [];
+  }
+
   // ---- reincarnation ----
   function reincarnate(cause) {
     const totalLivesSoFar = num(state.Lives);
@@ -995,6 +1003,7 @@ export function createGame(state, opts = {}) {
     maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate,
+    hardReset,
     setAutoBattle, buyItem,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
