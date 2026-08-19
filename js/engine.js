@@ -38,6 +38,13 @@ import {
   STYLEXP_TRAIN,
   STYLEXP_LOSS,
   MASTERY_TIERS,
+  KNOWLEDGE_UNMASTERED,
+  KNOWLEDGE_LEARNED,
+  UNMASTERED_DMG,
+  UNMASTERED_SKILL,
+  CUSTOM_SKILL_PENALTY,
+  CUSTOM_MAX_SKILLS,
+  SELF_TRAIN_MULT,
   DATA_VERSION,
   MAX_GHOSTS,
   MAX_RIVAL,
@@ -113,6 +120,7 @@ export const PERSISTENT_KEYS = [
   "Health", "Stamina", "Nutrition", "Money", "AgeDays",
   "Lives", "Wins", "RivalIdx", "Location", "Activity",
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
+  "StyleKnowledge", "KnownSkills", "Build",
   "InFight", "AutoBattle",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
@@ -128,6 +136,7 @@ export function freshState() {
     RivalIdx: 1, Location: "home", Activity: "Rest",
     Looking: false, Styles: "Brawling", ActiveStyle: "Brawling",
     StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
+    StyleKnowledge: "", KnownSkills: "", Build: "",
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     AutoRun: false,
     Roamers: {},
@@ -244,6 +253,12 @@ export function createGame(state, opts = {}) {
   // ---- styles ----
   function learnedStyles() {
     const out = {};
+    // Knowledge-derived: a style is "learned/switchable" at >= 25%.
+    const km = knowledgeMap();
+    for (const id of Object.keys(km)) {
+      if (km[id] >= KNOWLEDGE_UNMASTERED) out[id] = true;
+    }
+    // Backward-compat: old saves' state.Styles contents count as fully known.
     const raw = String(state.Styles ?? "");
     for (const part of raw.split(",")) {
       if (part !== "") out[part] = true;
@@ -258,13 +273,142 @@ export function createGame(state, opts = {}) {
     state.Styles = raw === "" ? styleId : raw + "," + styleId;
   }
 
+  // ---- style knowledge ----
+  function knowledgeMap() {
+    const out = {};
+    const raw = String(state.StyleKnowledge ?? "");
+    for (const pair of raw.split(";")) {
+      if (pair === "") continue;
+      const eq = pair.indexOf("=");
+      if (eq < 0) continue;
+      out[pair.slice(0, eq)] = Number(pair.slice(eq + 1)) || 0;
+    }
+    return out;
+  }
+
+  function styleKnowledge(styleId) {
+    const raw = String(state.Styles ?? "");
+    for (const part of raw.split(",")) {
+      if (part !== "" && part === styleId) return KNOWLEDGE_LEARNED;
+    }
+    return knowledgeMap()[styleId] || 0;
+  }
+
+  function addKnowledge(styleId, amt) {
+    const map = knowledgeMap();
+    const before = styleKnowledge(styleId);
+    const after = Math.min(KNOWLEDGE_LEARNED, before + amt);
+    map[styleId] = after;
+    state.StyleKnowledge = Object.entries(map).map(([k, v]) => `${k}=${v}`).join(";");
+    const label = STYLES[styleId] ? STYLES[styleId].name : styleId;
+    if (before < KNOWLEDGE_UNMASTERED && after >= KNOWLEDGE_UNMASTERED)
+      logMsg(`${label} — you can now use this style (unmastered).`, "skill");
+    if (before < KNOWLEDGE_LEARNED && after >= KNOWLEDGE_LEARNED)
+      logMsg(`${label} fully learned!`, "skill");
+  }
+
+  function knownSkillList() {
+    const raw = String(state.KnownSkills ?? "");
+    return raw === "" ? [] : raw.split(",").filter(Boolean);
+  }
+
+  function knownSkillSet() {
+    return new Set(knownSkillList());
+  }
+
+  function learnSkill(styleId, skillName) {
+    const key = styleId + "|" + skillName;
+    if (knownSkillSet().has(key)) return false;
+    state.KnownSkills = (state.KnownSkills ? state.KnownSkills + "," : "") + key;
+    return true;
+  }
+
+  // Called when a foe lands a skill on the player: learn the move and the style.
+  function onPlayerHit(styleId, skill, dmg) {
+    if (!styleId) return 0;
+    if (skill && skill.name) learnSkill(styleId, skill.name);
+    const gain = Math.min(30, 2 + dmg * 0.5);
+    addKnowledge(styleId, gain);
+    return gain;
+  }
+
+  // Fighting WITH an unmastered style trains it faster than passive learning.
+  function selfTrainTick(styleId) {
+    const k = styleKnowledge(styleId);
+    if (k >= KNOWLEDGE_UNMASTERED && k < KNOWLEDGE_LEARNED) {
+      addKnowledge(styleId, 4 * SELF_TRAIN_MULT); // 6% per round
+    }
+  }
+
+  // ---- custom builds ----
+  function lookupSkill(key) {
+    const pipe = key.indexOf("|");
+    if (pipe < 0) return null;
+    const stId = key.slice(0, pipe);
+    const skName = key.slice(pipe + 1);
+    const st = STYLES[stId];
+    if (!st || !st.skills) return null;
+    return st.skills.find((s) => s.name === skName) || null;
+  }
+
+  function activeBuild() {
+    const raw = String(state.Build ?? "");
+    if (raw === "" || raw === "nil") return null;
+    const baseMatch = /^base=([^;]+)/.exec(raw);
+    if (!baseMatch) return null;
+    const base = baseMatch[1];
+    if (!STYLES[base]) return null;
+    let skills = [];
+    const skillsMatch = /skills=(.*)$/.exec(raw);
+    if (skillsMatch && skillsMatch[1]) {
+      skills = skillsMatch[1].split(",").filter(Boolean);
+    }
+    return { base, skills };
+  }
+
+  function buildStyleId() {
+    const b = activeBuild();
+    return b ? b.base : null;
+  }
+
+  function saveBuild(baseStyleId, skillKeys) {
+    if (!STYLES[baseStyleId]) return false;
+    if (styleKnowledge(baseStyleId) < KNOWLEDGE_UNMASTERED) return false;
+    const keys = (skillKeys || []).slice(0, CUSTOM_MAX_SKILLS);
+    const known = knownSkillSet();
+    for (const k of keys) {
+      if (!known.has(k)) return false;
+    }
+    state.Build = `base=${baseStyleId};skills=${keys.join(",")}`;
+    publishStyleSkills();
+    return true;
+  }
+
+  function clearBuild() {
+    state.Build = "";
+    publishStyleSkills();
+  }
+
   function activeStyle() {
+    const b = buildStyleId();
+    if (b) return b;
     const s = String(state.ActiveStyle ?? "");
     if (s === "" || s === "nil") return "Brawling";
     return s;
   }
 
   function publishStyleSkills() {
+    const build = activeBuild();
+    if (build) {
+      const names = build.skills.map((key) => {
+        const sk = lookupSkill(key);
+        return sk ? sk.name : key;
+      });
+      state.StyleSkills = names.join(",");
+      const st = STYLES[build.base];
+      state.StyleUltName = st && st.ult && st.ult.name ? st.ult.name : "Berserk";
+      return;
+    }
     const st = STYLES[activeStyle()];
     if (!st) return;
     const names = st.skills ? st.skills.map((s) => s.name) : [];
@@ -349,16 +493,37 @@ export function createGame(state, opts = {}) {
   }
 
   // ---- combat construction ----
-  function makeCombatant(stats, styleId) {
+  function makeCombatant(stats, styleId, opts = {}) {
+    const isPlayer = opts.isPlayer === true;
+    const build = isPlayer ? activeBuild() : null;
     const style = STYLES[styleId] || STYLES.Brawling;
     const hp = HP_BASE + stats.Tou * HP_PER_TOU;
-    const dmg = (stats.Str + stats.Int * 0.2) * style.dmg;
+
+    let skills;
+    if (build) {
+      skills = build.skills.map((key) => lookupSkill(key)).filter(Boolean);
+      if (skills.length === 0) {
+        skills = [{ name: "Haymaker", mult: 1.0, crit: 0.0, dodge: 0.0, weight: 1 }];
+      }
+    } else {
+      skills = (style.skills && style.skills.length > 0) ? style.skills
+        : [{ name: "Haymaker", mult: 1.0, crit: 0.0, dodge: 0.0, weight: 1 }];
+    }
+
+    const k = styleKnowledge(styleId);
+    const isCustom = !!build;
+    let styleDmg = style.dmg;
+    if (isPlayer && !isCustom && k < KNOWLEDGE_LEARNED) styleDmg *= UNMASTERED_DMG;
+    if (isCustom) styleDmg *= 1 - CUSTOM_SKILL_PENALTY * build.skills.length;
+    if (isPlayer && !isCustom && k < KNOWLEDGE_LEARNED) {
+      skills = skills.map((s) => ({ ...s, mult: (s.mult || 1) * UNMASTERED_SKILL }));
+    }
+
+    const dmg = (stats.Str + stats.Int * 0.2) * styleDmg;
     const crit = 0.08 + stats.Int * 0.004 + style.crit;
     const dodge = Math.min(0.45, stats.Spd * 0.01 + style.dodge);
     const stam = COMBAT_STAM_BASE + stats.Tou;
     const drain = 6 * (1 + stats.Str / STR_DRAIN_DIV) * Math.pow(0.75, stats.Tou / TOU_EFF_DIV);
-    const skills = (style.skills && style.skills.length > 0) ? style.skills
-      : [{ name: "Haymaker", mult: 1.0, crit: 0.0, dodge: 0.0, weight: 1 }];
     return {
       hp, maxHp: hp, dmg, crit, dodge, spd: stats.Spd, stam, maxStam: stam, drain, int: stats.Int,
       skills, skillName: null, ultCharge: 0, modeRounds: 0,
@@ -382,7 +547,7 @@ export function createGame(state, opts = {}) {
   }
 
   function resolveFight(foeStats, foeStyle) {
-    const me = makeCombatant(currentStats(), activeStyle());
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
     let round = 0;
     const MAX_ROUNDS = 15;
@@ -407,10 +572,19 @@ export function createGame(state, opts = {}) {
       const strike = (att, def) => {
         const skill = pickSkill(att);
         att.skillName = skill.name;
-        events.push(strikeEvent(att, def, skill, att === me, R));
+        const ev = strikeEvent(att, def, skill, att === me, R);
+        if (att !== me) {
+          const gain = onPlayerHit(foeStyle, skill, ev.damage);
+          if (gain > 0) {
+            ev.knowledgeGain = Math.round(gain);
+            ev.knowledgeStyle = STYLES[foeStyle] ? STYLES[foeStyle].name : foeStyle;
+          }
+        }
+        events.push(ev);
       };
       strike(first, second);
       if (second.hp > 0) strike(second, first);
+      selfTrainTick(activeStyle());
       stampEvents(events, roundStart, round, me, foe);
     }
     return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName, events };
@@ -488,8 +662,7 @@ export function createGame(state, opts = {}) {
         const moneyGain = extra.rewardMoney + Math.floor(attrValue("Cha") * 0.5);
         state.Money = num(state.Money) + moneyGain;
         state.Wins = num(state.Wins) + 1;
-        let learned = false;
-        if (!learnedStyles()[extra.style]) { learnStyle(extra.style); learned = true; }
+        const learned = styleKnowledge(extra.style) >= KNOWLEDGE_LEARNED;
         if (idx < MAX_RIVAL) state.RivalIdx = idx + 1;
         addStyleXp(activeStyle(), 6 + idx * 2);
         applyFightGains(true);
@@ -688,8 +861,9 @@ export function createGame(state, opts = {}) {
       return null;
     }
 
-    const me = makeCombatant(currentStats(), activeStyle());
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
+    if (!extra.style) extra.style = foeStyle;
     battle = { me, foe, mode: "ghost", extra, idx: 0, bet: 0, pot: potential(), round: 0 };
     state.InFight = true;
     const view = combatantToView(me, foe);
@@ -776,7 +950,7 @@ export function createGame(state, opts = {}) {
     if (!roamer) return null;
     if (roamerStatus(key) !== "ready") return null;
     const built = buildRoamer(roamer);
-    const me = makeCombatant(currentStats(), activeStyle());
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(built.stats, built.style);
     battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0 };
     state.InFight = true;
@@ -816,9 +990,11 @@ export function createGame(state, opts = {}) {
     if (battle) return null;
     const setup = setupFoe();
     if (!setup) return null;
-    const me = makeCombatant(currentStats(), activeStyle());
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(setup.foeStats, setup.foeStyle);
-    battle = { me, foe, mode: setup.mode, extra: setup.extra, idx: setup.idx, bet: setup.bet, pot: potential(), round: 0 };
+    const extra = setup.extra;
+    if (!extra.style) extra.style = setup.foeStyle;
+    battle = { me, foe, mode: setup.mode, extra, idx: setup.idx, bet: setup.bet, pot: potential(), round: 0 };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = setup.foeName;
@@ -886,7 +1062,16 @@ export function createGame(state, opts = {}) {
 
     const events = [];
     const doStrike = (att, def, skill, isPlayer) => {
-      events.push(strikeEvent(att, def, skill, isPlayer, R));
+      const ev = strikeEvent(att, def, skill, isPlayer, R);
+      if (!isPlayer) {
+        const foeStyleId = battle.extra.style || "Brawling";
+        const gain = onPlayerHit(foeStyleId, skill, ev.damage);
+        if (gain > 0) {
+          ev.knowledgeGain = Math.round(gain);
+          ev.knowledgeStyle = STYLES[foeStyleId] ? STYLES[foeStyleId].name : foeStyleId;
+        }
+      }
+      events.push(ev);
     };
 
     const foeSkill = pickSkill(foe);
@@ -897,6 +1082,8 @@ export function createGame(state, opts = {}) {
       doStrike(foe, me, foeSkill, false);
       if (me.hp > 0) doStrike(me, foe, chosen, true);
     }
+
+    selfTrainTick(activeStyle());
 
     const MAX_COMBAT_ROUNDS = 15;
     const roundNum = battle.round;
@@ -963,6 +1150,10 @@ export function createGame(state, opts = {}) {
   }
 
   function setStyle(styleId) {
+    if (activeBuild()) {
+      state.Build = "";
+      publishStyleSkills();
+    }
     if (STYLES[styleId] && learnedStyles()[styleId]) {
       const st = STYLES[styleId];
       state.ActiveStyle = styleId;
@@ -1157,6 +1348,11 @@ export function createGame(state, opts = {}) {
     // helpers exposed for tests/UI
     attrValue, attrApt, potential, rankIndexFor, updatePotential,
     learnedStyles, activeStyle, styleXpMap,
+    knowledgeMap, styleKnowledge, addKnowledge,
+    knownSkillList, knownSkillSet, learnSkill,
+    onPlayerHit, selfTrainTick,
+    makeCombatant,
+    saveBuild, clearBuild, activeBuild, buildStyleId,
     logMsg, snapshot: () => snapshot(state),
     maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions

@@ -418,6 +418,43 @@ header {
 .locgrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .stygrid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 
+/* ---------- style knowledge panel ---------- */
+.knowgrid { display: flex; flex-direction: column; gap: 6px; }
+.stybtn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; transition: all .12s ease;
+  color: var(--text); font-size: 12px; text-align: left; width: 100%;
+  touch-action: manipulation; user-select: none;
+}
+.stybtn:hover:not(:disabled) { border-color: var(--gold); }
+.stybtn:disabled { opacity: .45; cursor: default; }
+.stybtn .sname { font-weight: 600; flex: none; min-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stybtn .sbar { flex: 1; height: 8px; border-radius: 4px; background: #101318; border: 1px solid var(--line); overflow: hidden; }
+.stybtn .sbar i { display: block; height: 100%; background: linear-gradient(90deg, #a5733a, var(--gold)); border-radius: 3px; }
+.stybtn .sstat { flex: none; font-size: 10px; color: var(--muted); width: 74px; text-align: right; }
+.stybtn.active-style { border-color: var(--gold); background: rgba(232,184,75,.12); }
+.stybtn.active-style .sname { color: var(--gold); }
+.knowncount { margin-top: 6px; }
+.buildbtn { margin-top: 8px; width: 100%; }
+
+/* ---------- custom build editor ---------- */
+.buildbase { display: flex; flex-direction: column; gap: 4px; }
+.buildbase label {
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+}
+.buildbase label:hover { border-color: var(--gold); }
+.buildbase label input { accent-color: var(--gold); }
+.buildskills { display: flex; flex-direction: column; gap: 6px; }
+.skillgroup { display: flex; flex-direction: column; gap: 2px; }
+.skillgroup-name { font-size: 11px; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.skillopt { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 6px; cursor: pointer; }
+.skillopt:hover { color: var(--gold); }
+.skillopt input { accent-color: var(--gold); }
+.skillopt .smult { color: var(--muted); font-size: 11px; margin-left: auto; }
+.buildprev { font-size: 12px; color: var(--text); line-height: 1.55; }
+
 /* ---------- buttons ---------- */
 .btn {
   background: var(--panel2);
@@ -845,6 +882,21 @@ header {
 }
 .critlabel { color: var(--gold); }
 .dodgelabel { color: var(--blue); font-size: 16px; }
+
+/* floating knowledge gain text (shown when the player is hit) */
+@keyframes kfKnowFloat {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); }
+  15% { opacity: 1; transform: translate(-50%, -4px) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -32px) scale(1); }
+}
+.knowfloat {
+  position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+  font-weight: 800; font-size: 15px; color: var(--gold);
+  text-shadow: 0 0 8px var(--gold-dim), 0 1px 3px #000;
+  pointer-events: none; z-index: 7;
+  animation: kfKnowFloat 1s ease-out forwards;
+  white-space: nowrap;
+}
 
 /* reduce motion: skip shakes/floats, keep text + bars */
 @media (prefers-reduced-motion: reduce) {

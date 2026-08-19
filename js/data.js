@@ -27,6 +27,14 @@ export const STYLEXP_TRAIN = 2;
 export const STYLEXP_LOSS = 2;
 export const MASTERY_TIERS = [25, 75, 150];
 
+export const KNOWLEDGE_UNMASTERED = 25;   // % where unmastered becomes usable
+export const KNOWLEDGE_LEARNED = 100;     // % where fully learned
+export const UNMASTERED_DMG = 0.75;       // damage mult when using unmastered
+export const UNMASTERED_SKILL = 0.85;     // per-skill mult scale when unmastered
+export const CUSTOM_SKILL_PENALTY = 0.10; // dmg penalty per extra skill
+export const CUSTOM_MAX_SKILLS = 3;
+export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
+
 export const DATA_VERSION = 2;
 export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;

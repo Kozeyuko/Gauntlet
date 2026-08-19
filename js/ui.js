@@ -11,6 +11,10 @@ import {
   CLINIC_ITEMS,
   ROAMERS,
   MASTERY_TIERS,
+  KNOWLEDGE_UNMASTERED,
+  KNOWLEDGE_LEARNED,
+  CUSTOM_SKILL_PENALTY,
+  CUSTOM_MAX_SKILLS,
   MAX_RIVAL,
   MAX_TOTAL,
 } from "./data.js";
@@ -136,6 +140,15 @@ export function initUI(game, opts = {}) {
     activitiesGrid: $("activitiesGrid"),
     stylesGrid: $("stylesGrid"),
     activeStyleInfo: $("activeStyleInfo"),
+    knownSkillCount: $("knownSkillCount"),
+    btnBuild: $("btnBuild"),
+    buildOverlay: $("buildOverlay"),
+    buildBaseList: $("buildBaseList"),
+    buildSkillList: $("buildSkillList"),
+    buildPreview: $("buildPreview"),
+    btnBuildSave: $("btnBuildSave"),
+    btnBuildClear: $("btnBuildClear"),
+    btnBuildClose: $("btnBuildClose"),
     rivalName: $("rivalName"), rivalStyle: $("rivalStyle"), rivalLine: $("rivalLine"),
     rivalStats: $("rivalStats"), rivalLearn: $("rivalLearn"),
     rivalQuickName: $("rivalQuickName"), rivalQuickLearn: $("rivalQuickLearn"),
@@ -191,6 +204,16 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ build static grids --
   const styleName = (id) => (STYLES[id] ? STYLES[id].name : id);
+
+  const lookupSkill = (key) => {
+    const pipe = key.indexOf("|");
+    if (pipe < 0) return null;
+    const stId = key.slice(0, pipe);
+    const skName = key.slice(pipe + 1);
+    const st = STYLES[stId];
+    if (!st || !st.skills) return null;
+    return st.skills.find((s) => s.name === skName) || null;
+  };
 
   // ------------------------------------------------------------ build city map --
   const buildingEls = {};
@@ -316,29 +339,29 @@ export function initUI(game, opts = {}) {
     el.attrsBody.innerHTML = html;
   }
 
-  let lastStylesKey = "";
-  const styleButtons = {};
   function renderStyles() {
-    const learned = String(state.Styles ?? "").split(",").filter(Boolean).sort();
-    const key = learned.join(",");
-    if (key !== lastStylesKey) {
-      lastStylesKey = key;
-      el.stylesGrid.innerHTML = "";
-      for (const k of Object.keys(styleButtons)) delete styleButtons[k];
-      for (const id of learned) {
-        const b = document.createElement("button");
-        b.className = "btn";
-        b.textContent = styleName(id);
+    // Every style with knowledge > 0 OR already known (>= 25%) gets a row.
+    const list = Object.keys(STYLES)
+      .filter((id) => game.styleKnowledge(id) > 0 || game.learnedStyles()[id])
+      .sort();
+    el.stylesGrid.innerHTML = "";
+    for (const id of list) {
+      const k = game.styleKnowledge(id);
+      const status = k >= KNOWLEDGE_LEARNED ? "Learned" : (k >= KNOWLEDGE_UNMASTERED ? "Unmastered" : "—");
+      const b = document.createElement("button");
+      b.className = "btn stybtn";
+      b.setAttribute("data-tip", `${styleName(id)} — ${Math.round(k)}% known`);
+      b.innerHTML = `<span class="sname">${styleName(id)}</span><span class="sbar"><i style="width:${Math.round(k)}%"></i></span><span class="sstat">${status}</span>`;
+      b.disabled = k < KNOWLEDGE_UNMASTERED;
+      if (k >= KNOWLEDGE_UNMASTERED) {
         b.addEventListener("click", () => { game.setStyle(id); render(); });
-        styleButtons[id] = b;
-        el.stylesGrid.appendChild(b);
       }
+      b.classList.toggle("active-style", id === game.activeStyle());
+      el.stylesGrid.appendChild(b);
     }
-    for (const id of learned) {
-      const b = styleButtons[id];
-      if (b) b.classList.toggle("active-style", id === state.ActiveStyle);
-    }
-    const st = STYLES[state.ActiveStyle];
+    el.knownSkillCount.textContent = `${game.knownSkillList().length} moves learned`;
+    const active = game.activeStyle();
+    const st = STYLES[active];
     if (st) {
       const b = [];
       if (st.dmg > 1) b.push(`dmg +${Math.round((st.dmg - 1) * 100)}%`);
@@ -426,8 +449,8 @@ export function initUI(game, opts = {}) {
 
   function learnLine(info) {
     if (!info.learnStyleId) return "";
-    const learned = game.learnedStyles()[info.learnStyleId];
-    return learned ? "Style mastered" : `Learn: ${styleName(info.learnStyleId)}`;
+    const k = game.styleKnowledge(info.learnStyleId);
+    return `Learn: ${styleName(info.learnStyleId)} — ${Math.round(k)}% known`;
   }
 
   function renderRival() {
@@ -790,6 +813,116 @@ export function initUI(game, opts = {}) {
     el.optionsOverlay.classList.add("show");
   }
 
+  // ------------------------------------------------------------ custom build editor --
+  function renderBuildPreview() {
+    const radio = el.buildBaseList.querySelector("input:checked");
+    if (!radio) {
+      el.buildPreview.textContent = "Pick a base style to preview your build.";
+      return;
+    }
+    const base = radio.value;
+    const checked = Array.from(el.buildSkillList.querySelectorAll("input:checked")).map((cb) => cb.value);
+    const extras = checked.slice(0, CUSTOM_MAX_SKILLS);
+    const baseStyle = STYLES[base];
+    const dmgMult = baseStyle.dmg * (1 - CUSTOM_SKILL_PENALTY * extras.length);
+    const moves = extras.length
+      ? extras.map((key) => {
+          const sk = lookupSkill(key);
+          return sk ? `${sk.name} ×${(sk.mult || 1).toFixed(2)}` : key;
+        }).join(", ")
+      : "base style moves";
+    el.buildPreview.textContent = `${styleName(base)} — dmg ×${dmgMult.toFixed(2)} · moves: ${moves}`;
+  }
+
+  function openBuildEditor() {
+    const build = game.activeBuild();
+    const learned = game.learnedStyles();
+    const bases = Object.keys(STYLES).filter((id) => learned[id]).sort();
+
+    el.buildBaseList.innerHTML = "";
+    for (const id of bases) {
+      const label = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "buildbase";
+      radio.value = id;
+      if (build && build.base === id) radio.checked = true;
+      if (!build && id === game.activeStyle()) radio.checked = true;
+      const span = document.createElement("span");
+      span.textContent = `${styleName(id)} (${Math.round(game.styleKnowledge(id))}%)`;
+      label.appendChild(radio);
+      label.appendChild(span);
+      label.addEventListener("change", renderBuildPreview);
+      el.buildBaseList.appendChild(label);
+    }
+
+    const knownKeys = game.knownSkillList();
+    const byStyle = {};
+    for (const key of knownKeys) {
+      const pipe = key.indexOf("|");
+      if (pipe < 0) continue;
+      const stId = key.slice(0, pipe);
+      if (!byStyle[stId]) byStyle[stId] = [];
+      byStyle[stId].push(key);
+    }
+    el.buildSkillList.innerHTML = "";
+    for (const stId of Object.keys(byStyle).sort()) {
+      const group = document.createElement("div");
+      group.className = "skillgroup";
+      const ghead = document.createElement("div");
+      ghead.className = "skillgroup-name";
+      ghead.textContent = styleName(stId);
+      group.appendChild(ghead);
+      for (const key of byStyle[stId]) {
+        const sk = lookupSkill(key);
+        const label = document.createElement("label");
+        label.className = "skillopt";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = key;
+        if (build && build.skills.includes(key)) cb.checked = true;
+        const span = document.createElement("span");
+        span.textContent = sk ? sk.name : key;
+        const mult = document.createElement("span");
+        mult.className = "smult";
+        mult.textContent = sk ? `×${(sk.mult || 1).toFixed(2)}` : "";
+        label.appendChild(cb);
+        label.appendChild(span);
+        label.appendChild(mult);
+        label.addEventListener("change", renderBuildPreview);
+        group.appendChild(label);
+      }
+      el.buildSkillList.appendChild(group);
+    }
+
+    renderBuildPreview();
+    el.buildOverlay.classList.add("show");
+  }
+
+  function saveBuildFromEditor() {
+    const radio = el.buildBaseList.querySelector("input:checked");
+    if (!radio) return;
+    const base = radio.value;
+    const checked = Array.from(el.buildSkillList.querySelectorAll("input:checked")).map((cb) => cb.value).slice(0, CUSTOM_MAX_SKILLS);
+    if (game.saveBuild(base, checked)) {
+      state.ActiveStyle = base; // reverting/clearing the build falls back to the base style
+      el.buildOverlay.classList.remove("show");
+      render();
+    }
+  }
+
+  el.btnBuild.addEventListener("click", () => openBuildEditor());
+  el.btnBuildSave.addEventListener("click", saveBuildFromEditor);
+  el.btnBuildClear.addEventListener("click", () => {
+    game.clearBuild();
+    el.buildOverlay.classList.remove("show");
+    render();
+  });
+  el.btnBuildClose.addEventListener("click", () => el.buildOverlay.classList.remove("show"));
+  el.buildOverlay.addEventListener("click", (e) => {
+    if (e.target === el.buildOverlay) el.buildOverlay.classList.remove("show");
+  });
+
   // ------------------------------------------------------------ result overlay --
   function learnStyleFromMsg(msg) {
     const m = /You learned ([^!]+)!/.exec(String(msg ?? ""));
@@ -865,6 +998,9 @@ export function initUI(game, opts = {}) {
         } else {
           audio.hit();
         }
+      }
+      if (defenderIsYou && ev.knowledgeGain && ev.knowledgeStyle) {
+        spawnFloater(el.youHitbox, "knowfloat", `+${ev.knowledgeGain}% ${ev.knowledgeStyle}`, 1000);
       }
     }, reducedMotion ? 0 : 130);
   }

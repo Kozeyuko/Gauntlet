@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -101,12 +101,12 @@ console.log("== Ladder win ==");
   assert(r1 && r1.result.win === true, "beat Street Brawler");
   assert(state.RivalIdx === 2, "RivalIdx advanced to 2");
   assert(state.Wins === 1, "Wins is 1");
-  // Fight #2: Boz the Boxer (rung 2) — learn Boxer on win.
+  // Fight #2: Boz the Boxer (rung 2) — style learned via knowledge, not victory.
   const r2 = g.fight();
   assert(r2 && r2.result.win === true, "beat Boz the Boxer");
   assert(state.RivalIdx === 3, "RivalIdx advanced to 3");
   assert(state.Wins === 2, "Wins is 2");
-  assert(state.Styles.split(",").includes("Boxer"), "Styles contains 'Boxer'");
+  assert(!state.Styles.split(",").includes("Boxer"), "victory no longer writes Boxer into Styles (knowledge-based now)");
 }
 
 console.log("== Loss path ==");
@@ -495,6 +495,131 @@ console.log("== Player name in combat view ==");
   const view = g.beginFight();
   assert(!!view, "beginFight returns a view");
   assert(view.playerName === "Koze", "view.playerName is set from state.Name");
+}
+
+console.log("== Knowledge: addKnowledge increments, clamps, announces crossings ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Boxer", 20);
+  assertClose(g.styleKnowledge("Boxer"), 20, "knowledge 20 after adding 20");
+  assert(!String(state.LastMsg).includes("unmastered"), "no announcement below 25%");
+  g.addKnowledge("Boxer", 10); // 20 -> 30, crosses 25
+  assertClose(g.styleKnowledge("Boxer"), 30, "knowledge 30 after crossing 25");
+  assert(String(state.LastMsg).includes("unmastered"), "25% crossing announced");
+  g.addKnowledge("Boxer", 100); // 30 -> 100, clamped
+  assertClose(g.styleKnowledge("Boxer"), KNOWLEDGE_LEARNED, "knowledge clamps at 100");
+  assert(String(state.LastMsg).includes("fully learned"), "100% crossing announced");
+}
+
+console.log("== Knowledge: being hit teaches the foe's style + move ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(11) });
+  state.RivalIdx = 2; // Boz the Boxer
+  const v = g.beginFight();
+  assert(!!v, "beginFight vs Boxer");
+  const start = g.styleKnowledge("Boxer");
+  let r = v;
+  let guard = 0;
+  while (r && !r.finished && guard < 15 && g.styleKnowledge("Boxer") === start) {
+    r = g.fightMove(r.skills[0].name);
+    guard++;
+  }
+  assert(g.styleKnowledge("Boxer") > start, "knowledge of Boxer increased from being hit");
+  const known = g.knownSkillSet();
+  const hasFoeSkill = Array.from(known).some((k) => k.startsWith("Boxer|"));
+  assert(hasFoeSkill, "KnownSkills contains a Boxer move");
+}
+
+console.log("== Knowledge: unmastered styles run at reduced power ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Boxer", 30);
+  const stats = { Str: 10, Tou: 10, Spd: 10, Int: 10, Cha: 1 };
+  const c = g.makeCombatant(stats, "Boxer", { isPlayer: true });
+  assertClose(c.dmg, (10 + 10 * 0.2) * STYLES.Boxer.dmg * UNMASTERED_DMG, "unmastered dmg is style.dmg × 0.75");
+  assertClose(c.skills[0].mult, STYLES.Boxer.skills[0].mult * UNMASTERED_SKILL, "unmastered skill mult × 0.85");
+}
+
+console.log("== Knowledge: learned styles run at full power ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Boxer", KNOWLEDGE_LEARNED);
+  const c = g.makeCombatant({ Str: 10, Tou: 10, Spd: 10, Int: 10, Cha: 1 }, "Boxer", { isPlayer: true });
+  assertClose(c.dmg, (10 + 10 * 0.2) * STYLES.Boxer.dmg, "learned dmg is full style.dmg");
+  assertClose(c.skills[0].mult, STYLES.Boxer.skills[0].mult, "learned skill mult unscaled");
+}
+
+console.log("== Custom build: damage penalty + build skills ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Boxer", KNOWLEDGE_LEARNED);
+  g.addKnowledge("Judo", KNOWLEDGE_LEARNED);
+  g.addKnowledge("MuayThai", KNOWLEDGE_LEARNED);
+  g.learnSkill("Boxer", "Jab");
+  g.learnSkill("Judo", "Ippon Seoi");
+  g.learnSkill("MuayThai", "Knee");
+  const ok = g.saveBuild("Boxer", ["Boxer|Jab", "Judo|Ippon Seoi", "MuayThai|Knee"]);
+  assert(ok === true, "saveBuild succeeds");
+  assert(g.buildStyleId() === "Boxer", "build base is Boxer");
+  const c = g.makeCombatant({ Str: 10, Tou: 10, Spd: 10, Int: 10, Cha: 1 }, "Boxer", { isPlayer: true });
+  const expected = (10 + 10 * 0.2) * STYLES.Boxer.dmg * (1 - CUSTOM_SKILL_PENALTY * 3);
+  assertClose(c.dmg, expected, "build dmg is base.dmg × (1 − 0.10×3)");
+  assert(c.skills.length === 3, "build combatant has 3 skills");
+  const names = c.skills.map((s) => s.name).sort();
+  assert(names.join() === ["Jab", "Ippon Seoi", "Knee"].sort().join(), "build skills are the picked skills");
+}
+
+console.log("== Custom build: setStyle clears an active build ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Boxer", KNOWLEDGE_LEARNED);
+  g.learnSkill("Boxer", "Jab");
+  g.saveBuild("Boxer", ["Boxer|Jab"]);
+  assert(!!g.activeBuild(), "build is active");
+  g.setStyle("Brawling");
+  assert(!g.activeBuild(), "setStyle clears the build");
+  assert(state.Build === "", "state.Build reset to empty");
+}
+
+console.log("== Knowledge: learnedStyles derives from knowledge ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addKnowledge("Judo", 10);
+  assert(!g.learnedStyles()["Judo"], "Judo not switchable below 25%");
+  g.addKnowledge("Judo", 15); // 25
+  assert(g.learnedStyles()["Judo"] === true, "Judo switchable at 25%");
+  assert(g.learnedStyles()["Brawling"] === true, "Brawling switchable via back-compat Styles");
+  assert(g.styleKnowledge("Brawling") === KNOWLEDGE_LEARNED, "back-compat Styles treated as 100% known");
+}
+
+console.log("== Knowledge: self-training with an unmastered style ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(11) });
+  g.addKnowledge("Boxer", 30);
+  g.setStyle("Boxer");
+  const before = g.styleKnowledge("Boxer");
+  const v = g.beginFight();
+  g.fightMove(v.skills[0].name);
+  assertClose(g.styleKnowledge("Boxer"), before + 4 * SELF_TRAIN_MULT, "self-train added 4 × 1.5 = 6% per round");
+}
+
+console.log("== Knowledge: ladder victory no longer instantly learns ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(7) });
+  g.fight(); // beat Street Brawler, advance to rung 2
+  const res = g.fight(); // beat Boz the Boxer
+  assert(res && res.result.win === true, "beat Boz");
+  assert(g.styleKnowledge("Boxer") > 0, "knowledge grew from hit-based gains");
+  assert(g.styleKnowledge("Boxer") < KNOWLEDGE_LEARNED, "single victory did NOT jump knowledge to 100");
 }
 
 console.log("");

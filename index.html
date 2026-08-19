@@ -51,10 +51,12 @@
       <div id="attrsBody"></div>
     </section>
     <section class="panel">
-      <h3>Styles</h3>
-      <div class="grid stygrid" id="stylesGrid"></div>
+      <h3>Style Knowledge</h3>
+      <div class="knowgrid" id="stylesGrid"></div>
+      <div class="small knowncount" id="knownSkillCount"></div>
+      <button class="btn small-btn buildbtn" id="btnBuild">BUILD CUSTOM</button>
       <div class="small" id="activeStyleInfo"></div>
-      <div class="small stylenote">Styles are learned by defeating the fighters who use them.</div>
+      <div class="small stylenote">Knowledge grows when you get hit. Fight to master styles.</div>
     </section>
   </aside>
 
@@ -198,6 +200,31 @@
     <div class="resultlearn" id="resultLearn"></div>
     <div class="acts">
       <button class="btn gold" id="btnResultClose">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BUILD EDITOR OVERLAY ============ -->
+<div class="overlay" id="buildOverlay">
+  <div class="modal">
+    <h2>Custom Build</h2>
+    <div class="sub">Pick a base style, then add up to 3 extra skills you've learned. Each extra skill costs −10% damage.</div>
+    <section class="panel">
+      <h3>1 · Base Style</h3>
+      <div class="buildbase" id="buildBaseList"></div>
+    </section>
+    <section class="panel">
+      <h3>2 · Extra Skills</h3>
+      <div class="buildskills" id="buildSkillList"></div>
+    </section>
+    <section class="panel">
+      <h3>Preview</h3>
+      <div class="buildprev" id="buildPreview"></div>
+    </section>
+    <div class="acts">
+      <button class="btn gold" id="btnBuildSave">SAVE BUILD</button>
+      <button class="btn orange" id="btnBuildClear">CLEAR BUILD</button>
+      <button class="btn" id="btnBuildClose">Close</button>
     </div>
   </div>
 </div>
