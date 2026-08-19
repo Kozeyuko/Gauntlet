@@ -122,7 +122,7 @@ console.log("== Inside gating ==");
   assert(String(state.LastMsg).includes("wager"), "log set with wager message");
 }
 
-console.log("== Manual combat ==");
+console.log("== Manual combat ==\n");
 {
   const state = boostedState();
   const g = createGame(state, { rng: makeRng(11) });
@@ -142,6 +142,26 @@ console.log("== Manual combat ==");
   assert(!!v && v.finished === true, "fight finished");
   assert(!!v && v.round <= 15, `finished within 15 rounds (round ${v && v.round})`);
   assert(v && v.win === (v.playerHp > v.foeHp), "winner is the side with higher HP at cap");
+}
+
+console.log("== Ultimate = click-triggered for player, auto for foe ==\n");
+{
+  // Weak attacks so the fight lasts long enough to fill the charge meter.
+  const state = freshState();
+  state.Str = 10; state.Tou = 10; state.Spd = 10; state.Int = 50; state.Cha = 10;
+  const g = createGame(state, { rng: () => 0 }); // deterministic
+  let v = g.beginFight();
+  let rounds = 0;
+  // Drive rounds until the player's charge is full (ULT_MAX = 60).
+  while (v && !v.finished && rounds < 15 && v.ultCharge < 60) {
+    v = g.fightMove(v.skills[0].name);
+    rounds++;
+  }
+  assert(!!v && v.ultCharge >= 60, `player charge reaches full (got ${v && v.ultCharge})`);
+  assert(v.modeRounds === 0, "player ult does NOT auto-fire (modeRounds 0)");
+  const after = g.activateUlt();
+  assert(!!after && after.modeRounds > 0, "player ult fires via activateUlt()");
+  assert(after.ultCharge === 0, "charge spent after activating");
 }
 
 console.log("== Encounter roll ==");

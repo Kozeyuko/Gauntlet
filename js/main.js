@@ -51,6 +51,9 @@ const ui = initUI(game, {
   },
 });
 
+// Debug handle (dev console access; harmless in production).
+window.__game = game;
+
 // The day loop: one in-game day every DAY_SECONDS real seconds.
 setInterval(() => {
   game.doDay();

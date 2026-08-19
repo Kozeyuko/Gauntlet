@@ -665,11 +665,13 @@ export function createGame(state, opts = {}) {
     for (const c of [me, foe]) {
       if (c.modeRounds > 0) {
         c.modeRounds -= 1;
-      } else if (c.ultCharge >= ULT_MAX) {
+      } else if (c === foe && c.ultCharge >= ULT_MAX) {
+        // Foe's awakening auto-fires at full charge (matches Lua).
         c.modeRounds = Math.min(MODE_DUR_BASE + Math.floor(c.int / MODE_DUR_PER_INT), MODE_DUR_CAP);
         c.ultCharge = 0;
       } else {
-        c.ultCharge += ULT_CHARGE_BASE + c.int * ULT_CHARGE_PER_INT;
+        // Player accumulates charge; the ULTIMATE button triggers it (web UX).
+        c.ultCharge = Math.min(ULT_MAX, c.ultCharge + ULT_CHARGE_BASE + c.int * ULT_CHARGE_PER_INT);
       }
     }
 
