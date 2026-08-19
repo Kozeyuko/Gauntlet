@@ -9,7 +9,8 @@ import {
   LOCATIONS,
   TRAINING,
   STYLES,
-  STORE_ITEMS,
+  CSTORE_ITEMS,
+  CLINIC_ITEMS,
   RIVALS,
   INSIDE,
   RANKS,
@@ -114,7 +115,7 @@ export const PERSISTENT_KEYS = [
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
   "InFight", "AutoBattle",
   "StoreBuffs", "TempBoosts",
-  "Log", "Roamers",
+  "Log", "Roamers", "Name",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -130,6 +131,7 @@ export function freshState() {
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     AutoRun: false,
     Roamers: {},
+    Name: "You",
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -170,6 +172,8 @@ export function createGame(state, opts = {}) {
 
   let battle = null;
   let ghostCache = null;
+
+  const ALL_STORE_ITEMS = CSTORE_ITEMS.concat(CLINIC_ITEMS);
 
   function getGhosts() {
     if (ghostCache === null) ghostCache = loadGhosts() || [];
@@ -790,6 +794,7 @@ export function createGame(state, opts = {}) {
   // ---- manual combat ----
   function combatantToView(me, foe) {
     return {
+      playerName: String(state.Name || "You"),
       playerHp: Math.max(0, Math.floor(me.hp)),
       playerMaxHp: Math.floor(me.maxHp),
       playerStam: Math.max(0, Math.floor(me.stam)),
@@ -929,6 +934,11 @@ export function createGame(state, opts = {}) {
   }
 
   // ---- simple actions ----
+  function setName(name) {
+    const n = String(name ?? "").trim();
+    state.Name = n === "" ? "You" : n;
+  }
+
   function setActivity(key) {
     if (ACTIVITIES[key]) {
       state.Activity = key;
@@ -972,26 +982,38 @@ export function createGame(state, opts = {}) {
   }
 
   function buyItem(key) {
-    const item = STORE_ITEMS.find((i) => i.key === key);
+    const item = ALL_STORE_ITEMS.find((i) => i.key === key);
     if (!item) return false;
     if (num(state.Money) < item.price) {
       logMsg("Not enough Cash.");
       return false;
     }
     state.Money = num(state.Money) - item.price;
+    const effects = [];
     if (item.nutrition) {
       state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
-      logMsg(`Bought ${item.name}. +${item.nutrition} Nutrition.`);
-    } else if (item.stat) {
+      effects.push(`+${item.nutrition} Nutrition`);
+    }
+    if (item.health) {
+      state.Health = clamp(num(state.Health) + item.health, 0, maxHealth());
+      effects.push(`+${item.health} Health`);
+    }
+    if (item.stamina) {
+      state.Stamina = clamp(num(state.Stamina) + item.stamina, 0, maxStamina());
+      effects.push(`+${item.stamina} Stamina`);
+    }
+    if (item.stat) {
       if (!state.TempBoosts) state.TempBoosts = {};
       state.TempBoosts[item.stat] = num(state.TempBoosts[item.stat]) + item.amount;
       const attrName = ATTRIBUTES.find((a) => a.id === item.stat).name;
-      logMsg(`Bought ${item.name}. +${item.amount} ${attrName} for this life.`);
-    } else if (item.buff) {
+      effects.push(`+${item.amount} ${attrName} for this life`);
+    }
+    if (item.buff) {
       if (!state.StoreBuffs) state.StoreBuffs = [];
       state.StoreBuffs.push({ name: item.buff, daysLeft: item.days });
-      logMsg(`Bought ${item.name}. Training gains doubled for ${item.days} days.`);
+      effects.push(`Training gains doubled for ${item.days} days`);
     }
+    logMsg(`Bought ${item.name} for ${item.price} Cash.${effects.length ? " " + effects.join(", ") + "." : ""}`, "store");
     clampVitals();
     updatePotential();
     return true;
@@ -1139,7 +1161,7 @@ export function createGame(state, opts = {}) {
     maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, reincarnateCost,
-    hardReset,
+    setName, hardReset,
     setAutoBattle, buyItem, trainingAt,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,

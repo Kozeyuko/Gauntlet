@@ -46,6 +46,7 @@ game.updatePotential();
 
 const ui = initUI(game, {
   onReset() {},
+  firstLaunch: !cameBack,
 });
 
 // Debug handle (dev console access; harmless in production).

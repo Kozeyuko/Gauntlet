@@ -11,6 +11,7 @@
 <header id="topbar">
   <div class="logo">GAUNTLET<small>BIT · RISE OF STYLES</small></div>
   <div class="vitals">
+    <span class="vital"><span class="lbl">Name</span><b id="hName" class="gold">You</b></span>
     <span class="vital" data-tip="Your cash. Spend it wisely."><span class="lbl">Money</span><b id="hMoney">30</b></span>
     <span class="vital" data-tip="You grow older every day."><span class="lbl">Age</span><b id="hAge">18 y 0 d</b></span>
     <span class="vital" data-tip="Each reincarnation grows your aptitude."><span class="lbl">Lives</span><b id="hLives">0</b></span>
@@ -21,29 +22,15 @@
   <div class="headerbtns">
     <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
-    <button class="btn small-btn" id="btnStore">STORE</button>
-    <button class="btn small-btn" id="btnStats">STATS</button>
     <button class="btn small-btn" id="btnRival">RIVAL</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
   </div>
 </header>
 
-<!-- ============ CITY MAP (default view) ============ -->
-<section id="citymap" aria-label="City map"></section>
-
-<!-- ============ FOOTER (slim log strip + life/save) ============ -->
-<footer id="footer">
-  <div class="logstrip" id="logLine"></div>
-  <div class="footbtns">
-    <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
-    <button class="btn small-btn" id="btnReset">RESET SAVE</button>
-  </div>
-</footer>
-
-<!-- ============ STATS / CAREER OVERLAY ============ -->
-<div class="overlay" id="statsOverlay">
-  <div class="modal statsmodal">
-    <h2>Career</h2>
+<!-- ============ THREE-COLUMN GAME SCREEN ============ -->
+<div class="gamecols">
+  <!-- LEFT: stats / career panel -->
+  <aside class="col-left">
     <section class="panel">
       <h3>Vitals</h3>
       <div class="barrow">
@@ -67,11 +54,30 @@
       <h3>Styles</h3>
       <div class="grid stygrid" id="stylesGrid"></div>
       <div class="small" id="activeStyleInfo"></div>
+      <div class="small stylenote">Styles are learned by defeating the fighters who use them.</div>
     </section>
-    <div class="acts">
-      <button class="btn" id="btnStatsClose">Close</button>
+  </aside>
+
+  <!-- CENTER: city map -->
+  <section id="citymap" aria-label="City map"></section>
+
+  <!-- RIGHT: news + rival quick card + life/save -->
+  <aside class="col-right">
+    <section class="panel">
+      <h3>News</h3>
+      <div class="loglist" id="logList"></div>
+    </section>
+    <section class="panel rivalcard">
+      <h3>Rival</h3>
+      <div class="rivalname" id="rivalQuickName">—</div>
+      <div class="small rivalquicklearn" id="rivalQuickLearn"></div>
+      <button class="btn red" id="btnQuickFight">FIGHT</button>
+    </section>
+    <div class="footbtns">
+      <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
+      <button class="btn small-btn" id="btnReset">RESET SAVE</button>
     </div>
-  </div>
+  </aside>
 </div>
 
 <!-- ============ RIVAL OVERLAY ============ -->
@@ -82,6 +88,7 @@
     <div class="rivalstyle" id="rivalStyle">Style: —</div>
     <div class="rivalline" id="rivalLine">—</div>
     <div class="rivalstats small" id="rivalStats"></div>
+    <div class="rivallearn" id="rivalLearn"></div>
     <div class="btnrow">
       <button class="btn red" id="btnFight">FIGHT</button>
       <button class="btn" id="btnAutoFight">AUTO FIGHT</button>
@@ -131,7 +138,7 @@
 
     <div class="vs">
       <div class="fighter" id="youFighter">
-        <div class="fhead"><span class="nm">You</span><span class="chip gold" id="youStyle">Brawling</span></div>
+        <div class="fhead"><span class="nm" id="youName">You</span><span class="chip gold" id="youStyle">Brawling</span></div>
         <div class="fighitbox" id="youHitbox"><span class="fhb">Y</span></div>
         <div class="small">HEALTH</div>
         <div class="bar hp"><i class="bartail" id="youHpTail"></i><i id="youHpBar"></i><span id="youHpTxt">100 / 100</span></div>
@@ -188,6 +195,7 @@
   <div class="modal">
     <h2 id="resultTitle">Victory</h2>
     <p id="resultBody"></p>
+    <div class="resultlearn" id="resultLearn"></div>
     <div class="acts">
       <button class="btn gold" id="btnResultClose">Continue</button>
     </div>
@@ -197,8 +205,9 @@
 <!-- ============ STORE OVERLAY ============ -->
 <div class="overlay" id="storeOverlay">
   <div class="modal">
-    <h2>Store</h2>
+    <h2 id="storeName">Store</h2>
     <div class="sub">Cash: <span id="storeCash">30</span></div>
+    <div class="small storenotice" id="storeNotice" style="display:none"></div>
     <div class="storelist" id="storeList"></div>
     <div class="acts">
       <button class="btn" id="btnStoreClose">Close</button>
@@ -213,6 +222,13 @@
     <div class="optrow">
       <span>Sound</span>
       <button class="btn small-btn" id="btnOptSound">SND ON</button>
+    </div>
+    <div class="optrow">
+      <span>Name</span>
+      <div class="optgroup">
+        <input type="text" id="optNameInput" maxlength="24" placeholder="Rookie">
+        <button class="btn small-btn" id="btnOptNameSave">Save</button>
+      </div>
     </div>
     <div class="optrow">
       <span>Theme</span>
@@ -238,6 +254,18 @@
     <div class="acts">
       <button class="btn small-btn" id="btnLogClear">Clear</button>
       <button class="btn" id="btnLogClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ NAME PROMPT (first launch) ============ -->
+<div class="overlay" id="nameOverlay">
+  <div class="modal">
+    <h2>Choose Your Name</h2>
+    <p>Every fighter in the district will know this name.</p>
+    <input type="text" id="nameInput" maxlength="24" placeholder="Rookie">
+    <div class="acts">
+      <button class="btn gold" id="btnNameBegin">BEGIN</button>
     </div>
   </div>
 </div>

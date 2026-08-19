@@ -7,7 +7,8 @@ import {
   STYLES,
   RIVALS,
   INSIDE,
-  STORE_ITEMS,
+  CSTORE_ITEMS,
+  CLINIC_ITEMS,
   ROAMERS,
   MASTERY_TIERS,
   MAX_RIVAL,
@@ -41,7 +42,7 @@ const MAP_POS = {
   home: [75, 60], spar: [225, 60], wat: [375, 60],
   tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
   clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
-  arena: [225, 540],
+  arena: [225, 540], cstore: [375, 540],
   // East district
   foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
   sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
@@ -109,6 +110,7 @@ function mapSvgMarkup() {
 
 export function initUI(game, opts = {}) {
   const onReset = opts.onReset || (() => {});
+  const firstLaunch = opts.firstLaunch === true;
   const state = game.state;
   let combatMeta = null; // foe name/style/mode captured at fight start
   let activeView = null; // current manual-combat view
@@ -123,6 +125,7 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ element refs --
   const el = {
+    hName: $("hName"),
     hMoney: $("hMoney"), hAge: $("hAge"), hLives: $("hLives"), hWins: $("hWins"),
     hRank: $("hRank"), hNext: $("hNext"),
     btnSound: $("btnSound"),
@@ -134,23 +137,24 @@ export function initUI(game, opts = {}) {
     stylesGrid: $("stylesGrid"),
     activeStyleInfo: $("activeStyleInfo"),
     rivalName: $("rivalName"), rivalStyle: $("rivalStyle"), rivalLine: $("rivalLine"),
-    rivalStats: $("rivalStats"),
+    rivalStats: $("rivalStats"), rivalLearn: $("rivalLearn"),
+    rivalQuickName: $("rivalQuickName"), rivalQuickLearn: $("rivalQuickLearn"),
+    btnQuickFight: $("btnQuickFight"),
     btnFight: $("btnFight"), btnAutoFight: $("btnAutoFight"),
     btnLooking: $("btnLooking"), btnGhosts: $("btnGhosts"),
-    logLine: $("logLine"),
+    logList: $("logList"),
     btnReincarnate: $("btnReincarnate"),
     btnReset: $("btnReset"),
     btnAutoRun: $("btnAutoRun"),
-    btnStore: $("btnStore"),
-    storeOverlay: $("storeOverlay"), storeCash: $("storeCash"), storeList: $("storeList"),
+    storeOverlay: $("storeOverlay"), storeName: $("storeName"), storeNotice: $("storeNotice"),
+    storeCash: $("storeCash"), storeList: $("storeList"),
     btnStoreClose: $("btnStoreClose"),
     btnOptions: $("btnOptions"), optionsOverlay: $("optionsOverlay"),
     btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
+    optNameInput: $("optNameInput"), btnOptNameSave: $("btnOptNameSave"),
     btnOptionsClose: $("btnOptionsClose"),
     // city map
     citymap: $("citymap"),
-    // stats overlay
-    btnStats: $("btnStats"), statsOverlay: $("statsOverlay"), btnStatsClose: $("btnStatsClose"),
     // rival overlay
     btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
     // location overlay
@@ -162,7 +166,7 @@ export function initUI(game, opts = {}) {
     // combat
     combatOverlay: $("combatOverlay"),
     roundLbl: $("roundLbl"), modeLbl: $("modeLbl"),
-    youStyle: $("youStyle"), youHpBar: $("youHpBar"), youHpTxt: $("youHpTxt"),
+    youName: $("youName"), youStyle: $("youStyle"), youHpBar: $("youHpBar"), youHpTxt: $("youHpTxt"),
     youHpTail: $("youHpTail"),
     youStamBar: $("youStamBar"), youStamTxt: $("youStamTxt"),
     youUltTxt: $("youUltTxt"), youUltBar: $("youUltBar"),
@@ -179,7 +183,10 @@ export function initUI(game, opts = {}) {
     btnGhostClose: $("btnGhostClose"),
     // result
     resultOverlay: $("resultOverlay"), resultTitle: $("resultTitle"), resultBody: $("resultBody"),
+    resultLearn: $("resultLearn"),
     btnResultClose: $("btnResultClose"),
+    // name prompt
+    nameOverlay: $("nameOverlay"), nameInput: $("nameInput"), btnNameBegin: $("btnNameBegin"),
   };
 
   // ------------------------------------------------------------ build static grids --
@@ -198,6 +205,8 @@ export function initUI(game, opts = {}) {
       return;
     }
     game.setLocation(key);
+    if (key === "cstore") { openStore("cstore"); return; }
+    if (key === "clinic") { openStore("clinic"); return; }
     openLocationOverlay(key);
   }
 
@@ -215,7 +224,8 @@ export function initUI(game, opts = {}) {
     b.className = "bldg";
     b.style.left = pct(pos[0], MAP_W);
     b.style.top = pct(pos[1], MAP_H);
-    b.innerHTML = `<span class="pin"></span><span class="lock"></span><span class="blbl">${loc.label}</span>`;
+    const pin = loc.glyph ? `<span class="pin glyph">${loc.glyph}</span>` : `<span class="pin"></span>`;
+    b.innerHTML = `${pin}<span class="lock"></span><span class="blbl">${loc.label}</span>`;
     b.setAttribute("data-tip", buildingBaseTip(loc.key));
     b.addEventListener("click", () => clickBuilding(loc.key));
     buildingEls[loc.key] = b;
@@ -269,6 +279,7 @@ export function initUI(game, opts = {}) {
   }
 
   function renderHeader() {
+    el.hName.textContent = String(state.Name || "You");
     el.hMoney.textContent = String(Math.floor(Number(state.Money) || 0));
     el.hAge.textContent = fmtAge(Number(state.AgeDays) || 0);
     el.hLives.textContent = String(Math.floor(Number(state.Lives) || 0));
@@ -295,7 +306,8 @@ export function initUI(game, opts = {}) {
     for (const a of ATTRIBUTES) {
       const val = Number(state[a.id]) || 0;
       const apt = Number(state[a.id + "Ap"]) || 0;
-      html += `<div class="attrrow">
+      const tip = `${a.name} — ${a.desc} Aptitude ×${apt.toFixed(2)} (multiplier applied to all gains).`;
+      html += `<div class="attrrow" data-tip="${tip}" title="${tip}">
         <span class="nm">${a.name}</span>
         <span class="val">${val.toFixed(2)}</span>
         <span class="apt">×${apt.toFixed(2)}</span>
@@ -384,6 +396,7 @@ export function initUI(game, opts = {}) {
         stats: "",
         fightLabel: "ACCEPT FIGHT",
         mode: "encounter",
+        learnStyleId: null,
       };
     }
     const idx = clampRivalIdx();
@@ -396,6 +409,7 @@ export function initUI(game, opts = {}) {
         stats: `${fmtStats(r.stats)} · Reward ${r.rewardMoney} Cash`,
         fightLabel: "FIGHT",
         mode: "ladder",
+        learnStyleId: r.style,
       };
     }
     const f = INSIDE[idx - MAX_RIVAL - 1];
@@ -406,7 +420,14 @@ export function initUI(game, opts = {}) {
       stats: `${fmtStats(f.stats)} · Bet ${f.bet} · Pay ${f.pay}`,
       fightLabel: "ENTER THE INSIDE",
       mode: "inside",
+      learnStyleId: f.style,
     };
+  }
+
+  function learnLine(info) {
+    if (!info.learnStyleId) return "";
+    const learned = game.learnedStyles()[info.learnStyleId];
+    return learned ? "Style mastered" : `Learn: ${styleName(info.learnStyleId)}`;
   }
 
   function renderRival() {
@@ -415,7 +436,15 @@ export function initUI(game, opts = {}) {
     el.rivalStyle.textContent = info.style;
     el.rivalLine.textContent = info.line;
     el.rivalStats.textContent = info.stats;
+    el.rivalLearn.textContent = learnLine(info);
     el.btnFight.textContent = info.fightLabel;
+  }
+
+  function renderQuickRival() {
+    const info = rivalInfo();
+    el.rivalQuickName.textContent = info.name;
+    el.rivalQuickLearn.textContent = learnLine(info);
+    el.btnQuickFight.textContent = info.fightLabel;
   }
 
   const LOG_KIND_LABEL = {
@@ -425,9 +454,8 @@ export function initUI(game, opts = {}) {
 
   function renderLog() {
     const entries = Array.isArray(state.Log) ? state.Log : (state.LastMsg ? [state.LastMsg] : []);
-    const recent = entries.slice(-4);
-    el.logLine.innerHTML = "";
-    for (const raw of recent) {
+    el.logList.innerHTML = "";
+    for (const raw of entries) {
       const e = typeof raw === "string" ? { t: raw, k: "sys", d: 0 } : raw;
       const d = document.createElement("div");
       d.className = "logentry k-" + (e.k || "sys");
@@ -439,8 +467,9 @@ export function initUI(game, opts = {}) {
         d.appendChild(s);
       }
       d.appendChild(document.createTextNode(e.t ?? ""));
-      el.logLine.appendChild(d);
+      el.logList.appendChild(d);
     }
+    el.logList.scrollTop = el.logList.scrollHeight;
     const msg = String(state.LastMsg ?? "");
     if (msg.includes("POTENTIAL UP") && msg !== lastRankMsg) {
       lastRankMsg = msg;
@@ -509,6 +538,7 @@ export function initUI(game, opts = {}) {
     renderStyles();
     renderMap();
     renderRival();
+    renderQuickRival();
     renderLog();
     renderLooking();
     maybeOpenRivalForEncounter();
@@ -690,10 +720,20 @@ export function initUI(game, opts = {}) {
   }
 
   // ------------------------------------------------------------ store overlay --
+  let storeType = "cstore";
   function renderStore() {
+    const items = storeType === "clinic" ? CLINIC_ITEMS : CSTORE_ITEMS;
+    el.storeName.textContent = storeType === "clinic" ? "Clinic" : "Convenience Store";
     el.storeCash.textContent = String(Math.floor(num(state.Money)));
+    if (storeType === "clinic") {
+      el.storeNotice.style.display = "";
+      el.storeNotice.textContent = "No training programs here. · No style taught here.";
+    } else {
+      el.storeNotice.style.display = "none";
+      el.storeNotice.textContent = "";
+    }
     el.storeList.innerHTML = "";
-    for (const item of STORE_ITEMS) {
+    for (const item of items) {
       const row = document.createElement("div");
       row.className = "storerow";
       const main = document.createElement("div");
@@ -720,7 +760,8 @@ export function initUI(game, opts = {}) {
     }
   }
 
-  function openStore() {
+  function openStore(type) {
+    storeType = type || "cstore";
     renderStore();
     el.storeOverlay.classList.add("show");
   }
@@ -745,13 +786,21 @@ export function initUI(game, opts = {}) {
   function openOptions() {
     syncSoundBtn();
     syncThemeBtns();
+    el.optNameInput.value = String(state.Name || "You");
     el.optionsOverlay.classList.add("show");
   }
 
   // ------------------------------------------------------------ result overlay --
+  function learnStyleFromMsg(msg) {
+    const m = /You learned ([^!]+)!/.exec(String(msg ?? ""));
+    return m ? m[1] : "";
+  }
+
   function showResult(win, body) {
     el.resultTitle.textContent = win ? "Victory" : "Defeat";
     el.resultBody.textContent = body || String(state.LastMsg ?? "");
+    const learned = learnStyleFromMsg(String(state.LastMsg ?? ""));
+    el.resultLearn.textContent = learned ? `NEW STYLE LEARNED: ${learned}` : "";
     el.resultOverlay.classList.add("show");
     if (win) audio.victory();
     else audio.defeat();
@@ -852,6 +901,8 @@ export function initUI(game, opts = {}) {
     }
     el.modeLbl.textContent = (view.mode || (combatMeta && combatMeta.mode) || "fight").toUpperCase();
     el.youStyle.textContent = view.playerStyleName || (combatMeta && combatMeta.playerStyleName) || state.ActiveStyle;
+    el.youName.textContent = view.playerName || state.Name || "You";
+    el.youHitbox.querySelector(".fhb").textContent = String(el.youName.textContent || "Y").charAt(0).toUpperCase();
     el.foeName.textContent = view.foeName || (combatMeta && combatMeta.foeName) || "Rival";
     el.foeStyle.textContent = view.foeStyleName || (combatMeta && combatMeta.foeStyleName) || "—";
     el.foeHitbox.querySelector(".fhb").textContent = String(el.foeName.textContent || "R").charAt(0).toUpperCase();
@@ -990,6 +1041,13 @@ export function initUI(game, opts = {}) {
     else render();
   });
 
+  el.btnQuickFight.addEventListener("click", () => {
+    pauseAutoRun();
+    const view = game.beginFight();
+    if (view) openCombat(view);
+    else render();
+  });
+
   el.btnAutoFight.addEventListener("click", () => {
     pauseAutoRun();
     const res = game.fight();
@@ -1089,24 +1147,10 @@ export function initUI(game, opts = {}) {
     syncAutoRunBtn();
   });
 
-  // store
-  el.btnStore.addEventListener("click", () => {
-    if (el.storeOverlay.classList.contains("show")) el.storeOverlay.classList.remove("show");
-    else openStore();
-  });
+  // store (opened by clicking the Convenience Store / Clinic map buildings)
   el.btnStoreClose.addEventListener("click", () => el.storeOverlay.classList.remove("show"));
   el.storeOverlay.addEventListener("click", (e) => {
     if (e.target === el.storeOverlay) el.storeOverlay.classList.remove("show");
-  });
-
-  // stats overlay
-  el.btnStats.addEventListener("click", () => {
-    if (el.statsOverlay.classList.contains("show")) el.statsOverlay.classList.remove("show");
-    else { render(); el.statsOverlay.classList.add("show"); }
-  });
-  el.btnStatsClose.addEventListener("click", () => el.statsOverlay.classList.remove("show"));
-  el.statsOverlay.addEventListener("click", (e) => {
-    if (e.target === el.statsOverlay) el.statsOverlay.classList.remove("show");
   });
 
   // rival overlay
@@ -1153,6 +1197,25 @@ export function initUI(game, opts = {}) {
   el.btnThemeDark.addEventListener("click", () => applyTheme("dark"));
   el.btnThemeLight.addEventListener("click", () => applyTheme("light"));
 
+  // options: name
+  el.btnOptNameSave.addEventListener("click", () => {
+    game.setName(el.optNameInput.value);
+    el.optNameInput.value = String(state.Name || "You");
+    render();
+  });
+
+  // name prompt (first launch)
+  function submitName() {
+    const raw = el.nameInput.value.trim();
+    game.setName(raw || "Rookie");
+    el.nameOverlay.classList.remove("show");
+    render();
+  }
+  el.btnNameBegin.addEventListener("click", submitName);
+  el.nameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitName();
+  });
+
   // tap-to-show tooltips on touch devices (hover doesn't exist there)
   let activeTip = null;
   document.addEventListener("pointerdown", (e) => {
@@ -1183,6 +1246,13 @@ export function initUI(game, opts = {}) {
   syncSoundBtn();
   syncAutoRunBtn();
   el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
+
+  // First launch: prompt for a name before play can begin.
+  if (firstLaunch) {
+    el.nameInput.value = "";
+    el.nameOverlay.classList.add("show");
+    setTimeout(() => el.nameInput.focus(), 0);
+  }
 
   // roamer countdown refresh while the map is up
   setInterval(renderRoamers, 1000);

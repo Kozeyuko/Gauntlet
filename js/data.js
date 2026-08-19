@@ -33,11 +33,11 @@ export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 
 // ------------------------------------------------------------------ ATTRIBUTES --
 export const ATTRIBUTES = [
-  { id: "Str", name: "Strength" },
-  { id: "Tou", name: "Toughness" },
-  { id: "Spd", name: "Speed" },
-  { id: "Int", name: "Intelligence" },
-  { id: "Cha", name: "Charisma" },
+  { id: "Str", name: "Strength", desc: "Raw power. Boosts damage in every fight." },
+  { id: "Tou", name: "Toughness", desc: "Soak hits and extend your lifespan." },
+  { id: "Spd", name: "Speed", desc: "Strike first and dodge more often. Raises stamina." },
+  { id: "Int", name: "Intelligence", desc: "Sharpens technique, crits, and ultimate charge." },
+  { id: "Cha", name: "Charisma", desc: "Earns more Cash from odd jobs and fights." },
 ];
 
 // ------------------------------------------------------------------ ACTIVITIES --
@@ -77,7 +77,8 @@ export const ACTIVITY_LIST = [
 ];
 
 // ------------------------------------------------------------------ STORE --
-export const STORE_ITEMS = [
+// Convenience store: food, drinks, and gear (the old general store inventory).
+export const CSTORE_ITEMS = [
   { key: "rice", name: "Rice bowl", desc: "Restores 20 Nutrition", price: 5, nutrition: 20 },
   { key: "protein", name: "Protein shake", desc: "+5 Strength for this life", price: 15, stat: "Str", amount: 5 },
   { key: "energy", name: "Energy drink", desc: "+5 Speed for this life", price: 15, stat: "Spd", amount: 5 },
@@ -85,6 +86,14 @@ export const STORE_ITEMS = [
   { key: "heart", name: "Heart tonic", desc: "+5 Toughness for this life", price: 20, stat: "Tou", amount: 5 },
   { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5 },
   { key: "weights", name: "Training weights", desc: "Double training gains for 3 days", price: 30, buff: "weights", days: 3 },
+];
+
+// Clinic: cheap medical/healing items.
+export const CLINIC_ITEMS = [
+  { key: "bandages", name: "Bandages", desc: "Restore 25 Health", price: 8, health: 25 },
+  { key: "medkit", name: "Medkit", desc: "Restore 60 Health", price: 20, health: 60 },
+  { key: "fullrecovery", name: "Full recovery", desc: "Restore 100 Health + 50 Stamina", price: 40, health: 100, stamina: 50 },
+  { key: "checkup", name: "Checkup", desc: "+2 Toughness for this life", price: 25, stat: "Tou", amount: 2 },
 ];
 
 // ------------------------------------------------------------------ LOCATIONS --
@@ -102,6 +111,7 @@ export const LOCATIONS = {
   sanctum: { name: "The Sanctum", unlock: 7, tier: 3, styleGym: "MastersSeal" },
   estate: { name: "Kure Estate", unlock: 11, tier: 4, styleGym: "KureStyle" },
   clinic: { name: "Clinic", unlock: 0, tier: 0, styleGym: null },
+  cstore: { name: "Convenience Store", unlock: 0, tier: 0, styleGym: null },
   arena: { name: "Bloody Arena", unlock: 0, tier: 0, styleGym: null },
   inside: { name: "The Inside", unlock: 7, tier: 0, styleGym: null },
   oldhouse: { name: "The Old House", unlock: 0, tier: 1, styleGym: null },
@@ -144,6 +154,7 @@ export const LOCATION_LIST = [
   { key: "sanctum", label: "Sanctum", desc: "Stone halls and silence. Pressure tests your mind." },
   { key: "estate", label: "Kure Estate", desc: "Polished grounds. High-standing opponents." },
   { key: "clinic", label: "Clinic", desc: "Surgical recovery. Heal fast, heal smart." },
+  { key: "cstore", label: "Convenience Store", desc: "Food, drinks, and gear. Cash only.", glyph: "$" },
   { key: "arena", label: "Arena", desc: "Raised ring, crowd noise, big payouts." },
   { key: "inside", label: "The Inside", desc: "They say this place changes you. Permanently." },
   { key: "oldhouse", label: "Old House", desc: "Creaking wood and hidden corners." },

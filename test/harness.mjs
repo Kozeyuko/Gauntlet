@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -444,6 +444,57 @@ console.log("== Elite gyms offer all five stats ==");
       assert(t && t[actKey] && t[actKey].cost > 0, `${key} offers ${actKey}`);
     }
   }
+}
+
+console.log("== Player name ==");
+{
+  const s = freshState();
+  assert(s.Name === "You", "freshState includes Name: 'You'");
+  const g = createGame(s, { rng: makeRng(1) });
+  g.setName("Koze");
+  assert(s.Name === "Koze", "setName('Koze') persists");
+  const snap = snapshot(s);
+  assert(snap.Name === "Koze", "snapshot round-trips Name");
+  const s2 = freshState();
+  restore(s2, snap);
+  assert(s2.Name === "Koze", "restore brings Name back");
+}
+
+console.log("== Store item tables ==");
+{
+  assert(CSTORE_ITEMS.length >= 5, "CSTORE_ITEMS has at least 5 items");
+  assert(CLINIC_ITEMS.length >= 4, "CLINIC_ITEMS has at least 4 items");
+  for (const it of CSTORE_ITEMS) {
+    assert(typeof it.price === "number" && it.price >= 0, `cstore item '${it.key}' has a price`);
+  }
+  for (const it of CLINIC_ITEMS) {
+    assert(typeof it.price === "number" && it.price >= 0, `clinic item '${it.key}' has a price`);
+  }
+}
+
+console.log("== Buying from cstore and clinic ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential(); // establish rank so buyItem's updatePotential adds nothing
+  const moneyBefore = state.Money;
+  assert(g.buyItem("rice") === true, "buyItem('rice') succeeds");
+  assert(state.Nutrition > 100, "rice restores Nutrition");
+  assert(state.Money === moneyBefore - 5, "rice costs 5 Cash");
+  const hpBefore = state.Health;
+  assert(g.buyItem("bandages") === true, "buyItem('bandages') succeeds");
+  assert(state.Health > hpBefore, "bandages restore Health");
+  assert(String(state.LastMsg).includes("Bought Bandages"), "bandages logged as bought");
+}
+
+console.log("== Player name in combat view ==");
+{
+  const state = freshState();
+  state.Name = "Koze";
+  const g = createGame(state, { rng: makeRng(11) });
+  const view = g.beginFight();
+  assert(!!view, "beginFight returns a view");
+  assert(view.playerName === "Koze", "view.playerName is set from state.Name");
 }
 
 console.log("");
