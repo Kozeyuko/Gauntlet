@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAUNTLET — Bit · Rise of Styles</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="logo">GAUNTLET<small>BIT · RISE OF STYLES</small></div>
+  <div class="vitals">
+    <span class="vital"><span class="lbl">Money</span><b id="hMoney">30</b></span>
+    <span class="vital"><span class="lbl">Age</span><b id="hAge">18 y 0 d</b></span>
+    <span class="vital"><span class="lbl">Lives</span><b id="hLives">0</b></span>
+    <span class="vital"><span class="lbl">Wins</span><b id="hWins">0</b></span>
+    <span class="vital"><span class="lbl">Rank</span><b id="hRank" class="gold">F-</b></span>
+    <span class="vital next"><span class="lbl" id="hNext">next F at 26 (+2)</span></span>
+  </div>
+</header>
+
+<main id="hub">
+
+  <section class="panel">
+    <h3>Vitals</h3>
+    <div class="barrow">
+      <span class="barlbl">HP</span>
+      <div class="bar hp"><i id="barHealth"></i><span id="barHealthTxt">100 / 100</span></div>
+    </div>
+    <div class="barrow">
+      <span class="barlbl">STA</span>
+      <div class="bar stam"><i id="barStamina"></i><span id="barStaminaTxt">100 / 100</span></div>
+    </div>
+    <div class="barrow">
+      <span class="barlbl">NUT</span>
+      <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Attributes</h3>
+    <div id="attrsBody"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Activities</h3>
+    <div class="grid actgrid" id="activitiesGrid"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Styles</h3>
+    <div class="grid stygrid" id="stylesGrid"></div>
+    <div class="small" id="activeStyleInfo"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Locations</h3>
+    <div class="grid locgrid" id="locationsGrid"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Rival</h3>
+    <div class="rivalname" id="rivalName">—</div>
+    <div class="rivalstyle" id="rivalStyle">Style: —</div>
+    <div class="rivalline" id="rivalLine">—</div>
+    <div class="rivalstats small" id="rivalStats"></div>
+    <div class="btnrow">
+      <button class="btn red" id="btnFight">FIGHT</button>
+      <button class="btn" id="btnAutoFight">AUTO FIGHT</button>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="btnLooking">Looking: OFF</button>
+      <button class="btn" id="btnGhosts">Ghosts</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Log</h3>
+    <div class="logline" id="logLine"></div>
+    <div class="btnrow">
+      <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
+    </div>
+  </section>
+
+  <footer>
+    <p class="howto">Training raises stats · fights pay better · die to reincarnate and your aptitude grows · styles persist across lives.</p>
+    <button class="btn small-btn" id="btnReset">RESET SAVE</button>
+  </footer>
+
+</main>
+
+<!-- ============ COMBAT OVERLAY ============ -->
+<div class="overlay" id="combatOverlay">
+  <div class="modal combat">
+    <div class="combathead">
+      <span class="roundbanner" id="roundLbl">ROUND 1</span>
+      <span class="winpct" id="modeLbl">FIGHT</span>
+    </div>
+
+    <div class="vs">
+      <div class="fighter">
+        <div class="fhead"><span class="nm">You</span><span class="chip gold" id="youStyle">Brawling</span></div>
+        <div class="small">HEALTH</div>
+        <div class="bar hp"><i id="youHpBar"></i><span id="youHpTxt">100 / 100</span></div>
+        <div class="small" style="margin-top:6px">STAMINA</div>
+        <div class="bar stam"><i id="youStamBar"></i><span id="youStamTxt">100 / 100</span></div>
+        <div class="ultline">
+          <span class="small" id="youUltTxt">ULT —</span>
+          <div class="bar ult"><i id="youUltBar"></i></div>
+        </div>
+      </div>
+      <div class="fighter">
+        <div class="fhead"><span class="nm" id="foeName">Rival</span><span class="chip" id="foeStyle">Brawling</span></div>
+        <div class="small">HEALTH</div>
+        <div class="bar hp"><i id="foeHpBar"></i><span id="foeHpTxt">100 / 100</span></div>
+        <div class="small" style="margin-top:6px">STAMINA</div>
+        <div class="bar stam"><i id="foeStamBar"></i><span id="foeStamTxt">100 / 100</span></div>
+      </div>
+    </div>
+
+    <div class="combatbottom">
+      <div class="logcol">
+        <h3>Fight Log</h3>
+        <div class="log" id="combatLog"></div>
+      </div>
+      <div class="movescol">
+        <h3>Your Moves</h3>
+        <div id="moveList"></div>
+        <button class="btn gold ultbtn" id="btnUlt">ULTIMATE</button>
+        <div class="btnrow">
+          <button class="btn" id="btnAuto">AUTO: OFF</button>
+          <button class="btn red" id="btnForfeit">FORFEIT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GHOST OVERLAY ============ -->
+<div class="overlay" id="ghostOverlay">
+  <div class="modal">
+    <h2>Ghosts</h2>
+    <div class="sub">Imagined shadows, scaled to you — and your own past echoes.</div>
+    <div class="ghostlist" id="ghostList"></div>
+    <div class="small ghostempty" id="ghostEmpty">The mat is empty...</div>
+    <div class="acts">
+      <button class="btn" id="btnGhostClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RESULT OVERLAY ============ -->
+<div class="overlay" id="resultOverlay">
+  <div class="modal">
+    <h2 id="resultTitle">Victory</h2>
+    <p id="resultBody"></p>
+    <div class="acts">
+      <button class="btn gold" id="btnResultClose">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
