@@ -108,6 +108,7 @@ export const PERSISTENT_KEYS = [
   "Lives", "Wins", "RivalIdx", "Location", "Activity",
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
   "InFight", "AutoBattle",
+  "Log",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -121,7 +122,7 @@ export function freshState() {
     Looking: false, Styles: "Brawling", ActiveStyle: "Brawling",
     StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
     // transient
-    LastMsg: "", Lifespan: BASE_LIFESPAN, Encounter: 0,
+    LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
   };
   const starter = STYLES.Brawling;
@@ -178,6 +179,7 @@ export function createGame(state, opts = {}) {
   }
   function logMsg(msg) {
     state.LastMsg = msg;
+    state.Log = (state.Log || []).concat([msg]).slice(-80);
   }
   function potential() {
     return attrValue("Str") + attrValue("Tou") + attrValue("Spd") + attrValue("Int");

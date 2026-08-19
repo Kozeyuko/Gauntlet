@@ -140,8 +140,8 @@ header {
 .btn:active { transform: translateY(1px); }
 
 /* ---------- tooltip ---------- */
-.btn[data-tip] { position: relative; overflow: visible !important; }
-.btn[data-tip]:hover::after {
+[data-tip] { position: relative; }
+[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute;
   bottom: calc(100% + 8px);
@@ -216,6 +216,21 @@ header {
   padding: 10px 12px;
   min-height: 46px;
 }
+.loglist {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  background: #101318;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 46px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.logentry { margin-bottom: 4px; }
+.logentry:last-child { margin-bottom: 0; }
 
 /* ---------- footer ---------- */
 footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }

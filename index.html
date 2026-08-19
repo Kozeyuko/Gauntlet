@@ -12,12 +12,12 @@
   <div class="logo">GAUNTLET<small>BIT · RISE OF STYLES</small></div>
   <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
   <div class="vitals">
-    <span class="vital"><span class="lbl">Money</span><b id="hMoney">30</b></span>
-    <span class="vital"><span class="lbl">Age</span><b id="hAge">18 y 0 d</b></span>
-    <span class="vital"><span class="lbl">Lives</span><b id="hLives">0</b></span>
-    <span class="vital"><span class="lbl">Wins</span><b id="hWins">0</b></span>
-    <span class="vital"><span class="lbl">Rank</span><b id="hRank" class="gold">F-</b></span>
-    <span class="vital next"><span class="lbl" id="hNext">next F at 26 (+2)</span></span>
+    <span class="vital" data-tip="Your cash. Used for travel, betting, and recovery."><span class="lbl">Money</span><b id="hMoney">30</b></span>
+    <span class="vital" data-tip="You grow older each day. Training, fighting, and resting all advance time. Death ends your current run."><span class="lbl">Age</span><b id="hAge">18 y 0 d</b></span>
+    <span class="vital" data-tip="The number of times you've reincarnated. Each life grows your aptitude — past builds echo back as ghosts."><span class="lbl">Lives</span><b id="hLives">0</b></span>
+    <span class="vital" data-tip="Rivals and Inside monsters defeated. Climb the ladder to prove your skill."><span class="lbl">Wins</span><b id="hWins">0</b></span>
+    <span class="vital" data-tip="Your standing on the ladder. Higher ranks pay more for fights."><span class="lbl">Rank</span><b id="hRank" class="gold">F-</b></span>
+    <span class="vital next" data-tip="When your potential exceeds the next rank's requirement, you'll advance automatically."><span class="lbl" id="hNext">next F at 26 (+2)</span></span>
   </div>
 </header>
 
@@ -26,15 +26,15 @@
   <section class="panel">
     <h3>Vitals</h3>
     <div class="barrow">
-      <span class="barlbl">HP</span>
+      <span class="barlbl" data-tip="Health — reaches 0 when you die. Restore at the Clinic or by reincarnating.">HP</span>
       <div class="bar hp"><i id="barHealth"></i><span id="barHealthTxt">100 / 100</span></div>
     </div>
     <div class="barrow">
-      <span class="barlbl">STA</span>
+      <span class="barlbl" data-tip="Stamina — spent on attacks and movement. Recovers each round in combat and by resting.">STA</span>
       <div class="bar stam"><i id="barStamina"></i><span id="barStaminaTxt">100 / 100</span></div>
     </div>
     <div class="barrow">
-      <span class="barlbl">NUT</span>
+      <span class="barlbl" data-tip="Nutrition — decays over time. Keep it high to avoid penalties. Eat and rest to restore.">NUT</span>
       <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
     </div>
   </section>
@@ -78,7 +78,7 @@
 
   <section class="panel">
     <h3>Log</h3>
-    <div class="logline" id="logLine"></div>
+    <div class="loglist" id="logLine"></div>
     <div class="btnrow">
       <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
     </div>

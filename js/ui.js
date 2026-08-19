@@ -245,8 +245,16 @@ export function initUI(game, opts = {}) {
   }
 
   function renderLog() {
+    const entries = Array.isArray(state.Log) ? state.Log : (state.LastMsg ? [state.LastMsg] : []);
+    el.logLine.innerHTML = "";
+    for (const m of entries) {
+      const d = document.createElement("div");
+      d.className = "logentry";
+      d.textContent = m;
+      el.logLine.appendChild(d);
+    }
+    el.logLine.scrollTop = el.logLine.scrollHeight;
     const msg = String(state.LastMsg ?? "");
-    el.logLine.textContent = msg;
     if (msg.includes("POTENTIAL UP") && msg !== lastRankMsg) {
       lastRankMsg = msg;
       audio.rankup();
