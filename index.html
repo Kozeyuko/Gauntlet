@@ -99,14 +99,17 @@
 <!-- ============ LOCATION OVERLAY ============ -->
 <div class="overlay" id="locOverlay">
   <div class="modal">
-    <h2 id="locName">Location</h2>
+    <div class="lochead">
+      <h2 id="locName">Location</h2>
+      <span id="locTier" class="tierbadge"></span>
+    </div>
     <p id="locFlavor"></p>
     <section class="panel">
       <div class="panelhead">
         <h3>Activities</h3>
         <button class="btn small-btn" id="btnAutoRun">AUTO: OFF</button>
       </div>
-      <div class="grid actgrid" id="activitiesGrid"></div>
+      <div class="loclist" id="activitiesGrid"></div>
     </section>
     <section class="panel">
       <h3>Train Here</h3>

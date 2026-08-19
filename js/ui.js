@@ -1,7 +1,7 @@
 // js/ui.js — DOM rendering + event wiring. Talks to the engine game object.
 import {
   ATTRIBUTES,
-  ACTIVITY_LIST,
+  ACTIVITIES,
   LOCATION_LIST,
   LOCATIONS,
   STYLES,
@@ -119,6 +119,7 @@ export function initUI(game, opts = {}) {
   let lastRankMsg = "";   // last POTENTIAL UP message (for rankup ding)
   let autoRunTimer = null; // activity auto-run setTimeout handle
   let encounterShown = false; // rival overlay auto-open dedupe
+  let openLocKey = null; // location key of the currently-open location overlay
 
   // ------------------------------------------------------------ element refs --
   const el = {
@@ -153,7 +154,7 @@ export function initUI(game, opts = {}) {
     // rival overlay
     btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
     // location overlay
-    locOverlay: $("locOverlay"), locName: $("locName"), locFlavor: $("locFlavor"),
+    locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"),
     locStyles: $("locStyles"), btnLocClose: $("btnLocClose"),
     // logger
     btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
@@ -183,15 +184,6 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ build static grids --
   const styleName = (id) => (STYLES[id] ? STYLES[id].name : id);
-  const activityButtons = {};
-  ACTIVITY_LIST.forEach((act) => {
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = act.label;
-    b.addEventListener("click", () => clickActivity(act.key));
-    activityButtons[act.key] = b;
-    el.activitiesGrid.appendChild(b);
-  });
 
   // ------------------------------------------------------------ build city map --
   const buildingEls = {};
@@ -310,13 +302,6 @@ export function initUI(game, opts = {}) {
       </div>`;
     }
     el.attrsBody.innerHTML = html;
-  }
-
-  function renderActivities() {
-    for (const act of ACTIVITY_LIST) {
-      const b = activityButtons[act.key];
-      b.classList.toggle("active", act.key === state.Activity);
-    }
   }
 
   let lastStylesKey = "";
@@ -521,7 +506,6 @@ export function initUI(game, opts = {}) {
     renderHeader();
     renderVitals();
     renderAttrs();
-    renderActivities();
     renderStyles();
     renderMap();
     renderRival();
@@ -531,6 +515,7 @@ export function initUI(game, opts = {}) {
     const cost = game.reincarnateCost ? game.reincarnateCost() : 0;
     el.btnReincarnate.textContent = `REINCARNATE (${cost} Cash)`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
+    if (el.locOverlay.classList.contains("show") && openLocKey) renderLocActivities(openLocKey);
   }
 
   function maybeOpenRivalForEncounter() {
@@ -592,12 +577,75 @@ export function initUI(game, opts = {}) {
   }
 
   // ------------------------------------------------------------ location overlay --
-  function renderLocActivities() {
-    for (const act of ACTIVITY_LIST) {
-      const b = activityButtons[act.key];
-      const mult = game.locationMult(act.key);
-      b.textContent = `${act.label} ×${mult.toFixed(1)}`;
+  function renderLocTier(key) {
+    const loc = LOCATIONS[key];
+    const tier = loc && loc.tier ? loc.tier : 0;
+    if (!tier) {
+      el.locTier.style.display = "none";
+      el.locTier.textContent = "";
+      return;
     }
+    el.locTier.style.display = "";
+    el.locTier.textContent = "Tier " + tier;
+    el.locTier.classList.toggle("elite", tier === 4);
+  }
+
+  function renderLocActivities(key) {
+    const table = game.trainingAt(key) || {};
+    el.activitiesGrid.innerHTML = "";
+    const money = num(state.Money);
+
+    function addRow(actKey) {
+      const act = ACTIVITIES[actKey];
+      if (!act) return;
+      const isGlobal = actKey === "Rest" || actKey === "OddJobs";
+      const entry = isGlobal ? null : table[actKey];
+      const isFree = !entry || entry.cost === 0;
+      const canAfford = isFree || money >= entry.cost;
+
+      const b = document.createElement("button");
+      b.className = "btn locrow";
+      if (!canAfford) b.classList.add("cantafford");
+      if (actKey === state.Activity) b.classList.add("active");
+
+      const statName = act.attr
+        ? (ATTRIBUTES.find((a) => a.id === act.attr) || {}).name
+        : (actKey === "Rest" ? "recover" : "earn Cash");
+
+      let meta = "";
+      if (entry) {
+        meta += `<span class="lr-gain">×${entry.gain.toFixed(1)}</span>`;
+        meta += `<span class="lr-cost${canAfford ? "" : " red"}">${entry.cost > 0 ? entry.cost + " Cash" : "Free"}</span>`;
+        meta += `<span class="lr-stam">${act.cost} STA</span>`;
+      } else if (actKey === "Rest") {
+        meta += `<span class="lr-cost">Free</span>`;
+        meta += `<span class="lr-stam">+35 STA</span>`;
+      } else {
+        meta += `<span class="lr-cost">Free</span>`;
+        meta += `<span class="lr-stam">${act.cost} STA</span>`;
+      }
+
+      b.innerHTML = `
+        <span class="lr-main">
+          <span class="lr-name">${act.name}</span>
+          <span class="lr-stat">${statName}</span>
+        </span>
+        <span class="lr-meta">${meta}</span>`;
+      b.addEventListener("click", () => clickActivity(actKey));
+      el.activitiesGrid.appendChild(b);
+    }
+
+    const programs = Object.keys(table);
+    if (programs.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "small locempty";
+      empty.textContent = "No training programs here.";
+      el.activitiesGrid.appendChild(empty);
+    } else {
+      for (const actKey of programs) addRow(actKey);
+    }
+    addRow("Rest");
+    addRow("OddJobs");
   }
 
   function renderLocStyles(key) {
@@ -628,9 +676,11 @@ export function initUI(game, opts = {}) {
   function openLocationOverlay(key) {
     const loc = LOCATIONS[key];
     if (!loc) return;
+    openLocKey = key;
     el.locName.textContent = loc.name;
     el.locFlavor.textContent = LOC_DESC[key] || "";
-    renderLocActivities();
+    renderLocTier(key);
+    renderLocActivities(key);
     renderLocStyles(key);
     el.locOverlay.classList.add("show");
   }

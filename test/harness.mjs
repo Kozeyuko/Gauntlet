@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -59,7 +59,7 @@ console.log("== Training day at Home (Pushups) ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.setActivity("Pushups");
   g.doDay();
-  assertClose(state.Str, 1.05, "Str ≈ 1.05 (0.10 × 0.5 × 1)");
+  assertClose(state.Str, 1.06, "Str ≈ 1.06 (0.10 × 0.6 × 1)");
   assertClose(state.Stamina, 90, "Stamina = 90 (100 − 10)");
 }
 
@@ -342,6 +342,108 @@ console.log("== Roaming fighters: persist across snapshot/restore ==");
   assert(state2.Roamers && state2.Roamers["r_thug"], "Roamers restored into a fresh state");
   const g2 = createGame(state2, { now: () => nowMs });
   assert(g2.roamerStatus("r_thug") === "defeated", "restored roamer still counts as defeated");
+}
+
+console.log("== TRAINING table: home basics ==");
+{
+  const home = TRAINING.home;
+  const keys = Object.keys(home).sort();
+  assert(keys.length === 2, "home has exactly 2 programs");
+  assert(keys.includes("Pushups") && keys.includes("Situps"), "home offers Pushups and Situps");
+  assert(home.Pushups.cost === 0 && home.Situps.cost === 0, "home basics are free (cost 0)");
+}
+
+console.log("== trainingAt helper ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const spar = g.trainingAt("spar");
+  assert(spar && spar.Pushups && spar.Pushups.cost === 2, "trainingAt('spar') returns its entry");
+  const clinic = g.trainingAt("clinic");
+  assert(clinic && Object.keys(clinic).length === 0, "trainingAt('clinic') returns {}");
+}
+
+console.log("== Iron Spar: Pushups charges Cash and trains Str ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential(); // establish rank so doDay doesn't pay a rank bonus
+  g.setLocation("spar");
+  g.setActivity("Pushups");
+  const moneyBefore = state.Money;
+  const strBefore = state.Str;
+  g.doDay();
+  assert(state.Money === moneyBefore - 2, `cash deducted for Pushups at Iron Spar (${moneyBefore} -> ${state.Money})`);
+  assert(state.Str > strBefore, "Str gained");
+  assert(String(state.LastMsg).includes("Cash"), "log shows cost");
+}
+
+console.log("== Iron Spar: unoffered activity falls back to Rest ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setLocation("spar");
+  g.setActivity("Squats");
+  const moneyBefore = state.Money;
+  const spdBefore = state.Spd;
+  const staminaBefore = state.Stamina;
+  g.doDay();
+  assert(state.Spd === spdBefore, "no stat gain");
+  assert(state.Money === moneyBefore, "no cash lost");
+  assert(state.Stamina > staminaBefore, "stamina restored (rested)");
+  assert(String(state.LastMsg).includes("can't train"), "log explains can't train here");
+}
+
+console.log("== Iron Spar: not enough Cash falls back to Rest ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setLocation("spar");
+  g.setActivity("Pushups");
+  state.Money = 0;
+  const strBefore = state.Str;
+  g.doDay();
+  assert(state.Str === strBefore, "no stat gain");
+  assert(state.Money === 0, "no cash lost (still 0)");
+  assert(String(state.LastMsg).includes("Not enough Cash"), "log explains not enough Cash");
+}
+
+console.log("== Home Pushups: free, Str grows ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setActivity("Pushups");
+  const moneyBefore = state.Money;
+  g.doDay();
+  assert(state.Str > 1, "Str grows");
+  assert(state.Money === moneyBefore, "cost 0 (no cash charged)");
+}
+
+console.log("== OddJobs still earns Cash everywhere ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setLocation("spar");
+  g.setActivity("OddJobs");
+  const moneyBefore = state.Money;
+  g.doDay();
+  assert(state.Money > moneyBefore, "money gained");
+  assert(String(state.LastMsg).includes("Odd jobs"), "log confirms odd jobs");
+}
+
+console.log("== Elite gyms offer all five stats ==");
+{
+  const all = ["Pushups", "Situps", "Squats", "ShadowBoxing", "Running", "HeavyBag", "Sparring", "Roadworks"];
+  for (const key of ["estate", "ultra"]) {
+    const t = TRAINING[key];
+    for (const actKey of all) {
+      assert(t && t[actKey] && t[actKey].cost > 0, `${key} offers ${actKey}`);
+    }
+  }
 }
 
 console.log("");

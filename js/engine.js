@@ -7,6 +7,7 @@ import {
   ACTIVITIES,
   ACTIVITY_ALIAS,
   LOCATIONS,
+  TRAINING,
   STYLES,
   STORE_ITEMS,
   RIVALS,
@@ -33,7 +34,6 @@ import {
   ENC_CHANCE,
   ENC_MIN,
   ENC_MAX,
-  HOME_MULT,
   STYLEXP_TRAIN,
   STYLEXP_LOSS,
   MASTERY_TIERS,
@@ -997,12 +997,8 @@ export function createGame(state, opts = {}) {
     return true;
   }
 
-  function locationMult(actKey) {
-    const loc = LOCATIONS[String(state.Location ?? "home")] || LOCATIONS.home;
-    if (loc.name === "Home") return HOME_MULT;
-    const m = loc.mults[actKey];
-    if (m) return m;
-    return 1.0;
+  function trainingAt(locKey) {
+    return TRAINING[locKey] || {};
   }
 
   // ---- the day ----
@@ -1036,8 +1032,24 @@ export function createGame(state, opts = {}) {
       actKey = "Rest";
       logMsg("Too tired to train — you rest instead.");
     }
-    const loc = LOCATIONS[String(state.Location ?? "home")] || LOCATIONS.home;
+    const locKey = String(state.Location ?? "home");
+    const loc = LOCATIONS[locKey] || LOCATIONS.home;
     const locName = loc.name;
+
+    // Location training economy: only programs offered at this location may be
+    // trained here. Rest / OddJobs stay globally available for free.
+    if (actKey !== "Rest" && actKey !== "OddJobs" && act.attr) {
+      const entry = trainingAt(locKey)[actKey];
+      if (!entry) {
+        logMsg(`You can't train ${actKey} here. Home has basics; gyms have programs.`);
+        actKey = "Rest";
+        act = ACTIVITIES.Rest;
+      } else if (num(state.Money) < entry.cost) {
+        logMsg(`Not enough Cash to train ${act.name} here (${entry.cost} Cash).`);
+        actKey = "Rest";
+        act = ACTIVITIES.Rest;
+      }
+    }
 
     if (actKey === "Rest") {
       state.Stamina = Math.min(maxStamina(), stamina + 35);
@@ -1048,9 +1060,10 @@ export function createGame(state, opts = {}) {
       state.Stamina = stamina - act.cost;
       logMsg(`Odd jobs: +${money} Cash.`, "money");
     } else if (act.attr) {
-      const mult = locationMult(actKey);
+      const entry = trainingAt(locKey)[actKey];
+      state.Money = num(state.Money) - entry.cost;
       const double = hasBuff("weights") ? 2 : 1;
-      const gain = act.gain * mult * attrApt(act.attr) * double;
+      const gain = act.gain * entry.gain * attrApt(act.attr) * double;
       state[act.attr] = num(state[act.attr]) + gain;
       let cost = act.cost;
       if (actKey === "Running") cost = Math.floor(cost * 1.5);
@@ -1062,7 +1075,7 @@ export function createGame(state, opts = {}) {
         addStyleXp(loc.styleGym, STYLEXP_TRAIN);
         sxp = ` — style mastery +${STYLEXP_TRAIN}`;
       }
-      logMsg(`Training: +${gain.toFixed(2)} ${attrName} at ${locName} (x${mult.toFixed(1)}).${sxp}`, "train");
+      logMsg(`Training: +${gain.toFixed(2)} ${attrName} at ${locName} (x${entry.gain.toFixed(1)}, ${entry.cost} Cash).${sxp}`, "train");
 
       if (state.Looking === true && locName !== "Home" && locName !== "Clinic" && R() < ENC_CHANCE) {
         state.Encounter = 1;
@@ -1127,7 +1140,7 @@ export function createGame(state, opts = {}) {
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, reincarnateCost,
     hardReset,
-    setAutoBattle, buyItem, locationMult,
+    setAutoBattle, buyItem, trainingAt,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
     // ghosts

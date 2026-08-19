@@ -601,6 +601,53 @@ header {
 .ghostrow .tag.echo { color: var(--blue); border-color: #3a5a7a; }
 .ghostempty { text-align: center; padding: 24px 0; display: none; }
 
+/* ---------- location overlay: tier badge + training programs ---------- */
+.lochead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.lochead h2 { margin-bottom: 0; }
+.tierbadge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--muted);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tierbadge.elite {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  background: rgba(232, 184, 75, .12);
+}
+.loclist { display: flex; flex-direction: column; gap: 6px; }
+.locempty { padding: 8px 2px; }
+.locrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.locrow .lr-main { display: flex; flex-direction: column; min-width: 0; }
+.locrow .lr-name { font-weight: 600; font-size: 14px; }
+.locrow .lr-stat { font-size: 11px; color: var(--muted); }
+.locrow .lr-meta { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.locrow .lr-gain { font-size: 11px; color: var(--blue); font-variant-numeric: tabular-nums; }
+.locrow .lr-cost { font-size: 11px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.locrow .lr-cost.red { color: var(--red); }
+.locrow .lr-stam { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.locrow.cantafford { opacity: .45; }
+.locrow.cantafford .lr-name,
+.locrow.cantafford .lr-stat { color: var(--muted); }
+.locrow.active { border-color: var(--green); }
+.locrow.active .lr-name { color: var(--green); }
+
+@media (max-width: 640px) {
+  .locrow { min-height: 40px; }
+}
+
 /* ---------- store ---------- */
 .storelist { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .storerow {

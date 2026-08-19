@@ -89,44 +89,44 @@ export const STORE_ITEMS = [
 
 // ------------------------------------------------------------------ LOCATIONS --
 export const LOCATIONS = {
-  home: { name: "Home", unlock: 0, mults: {}, styleGym: null },
-  spar: { name: "Iron Spar Gym", unlock: 0, mults: { Pushups: 1.5, HeavyBag: 1.5 }, styleGym: "Boxer" },
-  wat: { name: "Wat Chai Gym", unlock: 0, mults: { Situps: 1.5 }, styleGym: "MuayThai" },
-  tatami: { name: "Tatami Hall", unlock: 0, mults: { Squats: 1.5, ShadowBoxing: 1.5 }, styleGym: "Judo" },
-  roda: { name: "Roda Circle", unlock: 0, mults: { Squats: 1.5 }, styleGym: "Capoeira" },
-  dohyo: { name: "Dohyo Ring", unlock: 0, mults: { Situps: 2.0 }, styleGym: "Sumo" },
-  foundry: { name: "The Foundry", unlock: 0, mults: { Pushups: 2.0, HeavyBag: 2.0 }, styleGym: "M2Cross" },
-  mikazuki: { name: "Mikazuchi Dojo", unlock: 3, mults: { Squats: 1.5, ShadowBoxing: 1.5 }, styleGym: "Mikazuchi" },
-  stormpg: { name: "Storm Pagoda", unlock: 5, mults: { ShadowBoxing: 1.5, Pushups: 1.5 }, styleGym: "ThunderClap" },
-  lightning: { name: "Lightning Alley", unlock: 6, mults: { Squats: 2.0 }, styleGym: "LightningFlash" },
-  sanctum: { name: "The Sanctum", unlock: 7, mults: {}, styleGym: "MastersSeal" },
-  estate: { name: "Kure Estate", unlock: 11, mults: { Pushups: 1.5, Squats: 1.5 }, styleGym: "KureStyle" },
-  clinic: { name: "Clinic", unlock: 0, mults: {}, styleGym: null },
-  arena: { name: "Bloody Arena", unlock: 0, mults: {}, styleGym: null },
-  inside: { name: "The Inside", unlock: 7, mults: {}, styleGym: null },
-  oldhouse: { name: "The Old House", unlock: 0, mults: { ShadowBoxing: 2.0 }, styleGym: null },
+  home: { name: "Home", unlock: 0, tier: 0, styleGym: null },
+  spar: { name: "Iron Spar Gym", unlock: 0, tier: 1, styleGym: "Boxer" },
+  wat: { name: "Wat Chai Gym", unlock: 0, tier: 1, styleGym: "MuayThai" },
+  tatami: { name: "Tatami Hall", unlock: 0, tier: 1, styleGym: "Judo" },
+  roda: { name: "Roda Circle", unlock: 0, tier: 1, styleGym: "Capoeira" },
+  dohyo: { name: "Dohyo Ring", unlock: 0, tier: 1, styleGym: "Sumo" },
+  foundry: { name: "The Foundry", unlock: 0, tier: 1, styleGym: "M2Cross" },
+  mikazuki: { name: "Mikazuchi Dojo", unlock: 3, tier: 2, styleGym: "Mikazuchi" },
+  stormpg: { name: "Storm Pagoda", unlock: 5, tier: 2, styleGym: "ThunderClap" },
+  lightning: { name: "Lightning Alley", unlock: 6, tier: 2, styleGym: "LightningFlash" },
+  sanctum: { name: "The Sanctum", unlock: 7, tier: 3, styleGym: "MastersSeal" },
+  estate: { name: "Kure Estate", unlock: 11, tier: 4, styleGym: "KureStyle" },
+  clinic: { name: "Clinic", unlock: 0, tier: 0, styleGym: null },
+  arena: { name: "Bloody Arena", unlock: 0, tier: 0, styleGym: null },
+  inside: { name: "The Inside", unlock: 7, tier: 0, styleGym: null },
+  oldhouse: { name: "The Old House", unlock: 0, tier: 1, styleGym: null },
 
-  niko: { name: "Boundless Dojo", unlock: 6, mults: { ShadowBoxing: 2.0, Squats: 1.5 }, styleGym: "NikoStyle" },
-  raishin: { name: "Raishin Temple", unlock: 7, mults: { Squats: 2.0, Running: 1.5 }, styleGym: "Raishin" },
-  spirit: { name: "Blood Dojo", unlock: 8, mults: { Pushups: 1.5, HeavyBag: 1.5 }, styleGym: "Advance" },
-  kaiwan: { name: "Iron Hall", unlock: 5, mults: { Situps: 2.0, HeavyBag: 1.5 }, styleGym: "KaiwanStyle" },
-  silat: { name: "Pencak Hall", unlock: 7, mults: { Squats: 1.5, ShadowBoxing: 1.5 }, styleGym: "Silat" },
-  hunt: { name: "Deepwood Lodge", unlock: 9, mults: { Running: 2.0, Squats: 1.5 }, styleGym: "PredatorHunt" },
-  sword: { name: "Daidoji Manor", unlock: 10, mults: { ShadowBoxing: 1.5, Pushups: 1.5 }, styleGym: "DaidojiSchool" },
-  xiyi: { name: "Five-Element Gate", unlock: 8, mults: { HeavyBag: 2.0, Situps: 1.5 }, styleGym: "XingYi" },
+  niko: { name: "Boundless Dojo", unlock: 6, tier: 2, styleGym: "NikoStyle" },
+  raishin: { name: "Raishin Temple", unlock: 7, tier: 3, styleGym: "Raishin" },
+  spirit: { name: "Blood Dojo", unlock: 8, tier: 3, styleGym: "Advance" },
+  kaiwan: { name: "Iron Hall", unlock: 5, tier: 2, styleGym: "KaiwanStyle" },
+  silat: { name: "Pencak Hall", unlock: 7, tier: 3, styleGym: "Silat" },
+  hunt: { name: "Deepwood Lodge", unlock: 9, tier: 3, styleGym: "PredatorHunt" },
+  sword: { name: "Daidoji Manor", unlock: 10, tier: 4, styleGym: "DaidojiSchool" },
+  xiyi: { name: "Five-Element Gate", unlock: 8, tier: 3, styleGym: "XingYi" },
 
-  kyoku: { name: "Kyokushin Dojo", unlock: 5, mults: { HeavyBag: 1.5, Situps: 2.0 }, styleGym: "Kyokushin" },
-  shotokan: { name: "Shotokan Hall", unlock: 6, mults: { ShadowBoxing: 1.5, Squats: 1.5 }, styleGym: "Shotokan" },
-  taekwon: { name: "TKD Dojang", unlock: 5, mults: { Squats: 2.0, Roadworks: 1.5 }, styleGym: "Taekwondo" },
-  wrestling: { name: "The Wrestling Pit", unlock: 6, mults: { Pushups: 1.5, Situps: 1.5 }, styleGym: "Wrestling" },
-  kickbox: { name: "Kickbox Club", unlock: 5, mults: { HeavyBag: 1.5, Roadworks: 1.5 }, styleGym: "Kickboxing" },
-  kungfu: { name: "Shaolin Yard", unlock: 7, mults: { ShadowBoxing: 1.5, HeavyBag: 1.5 }, styleGym: "KungFu" },
-  aikido: { name: "Aiki Circle", unlock: 8, mults: { ShadowBoxing: 2.0, Squats: 1.5 }, styleGym: "Aikido" },
-  kali: { name: "Arnis Ring", unlock: 8, mults: { Squats: 1.5, ShadowBoxing: 1.5 }, styleGym: "KaliArnis" },
-  ironbox: { name: "Iron Foundry Gym", unlock: 9, mults: { Pushups: 2.0, HeavyBag: 2.0 }, styleGym: "IronBoxing" },
-  boran: { name: "Ancient Boran Camp", unlock: 10, mults: { HeavyBag: 1.5, Situps: 1.5 }, styleGym: "MuayBoran" },
-  guihun: { name: "Demon's Crucible", unlock: 11, mults: { HeavyBag: 1.5, Pushups: 1.5 }, styleGym: "Guihun" },
-  ultra: { name: "The Still Point", unlock: 12, mults: { ShadowBoxing: 2.0, Squats: 1.5 }, styleGym: "UltraInstinct" },
+  kyoku: { name: "Kyokushin Dojo", unlock: 5, tier: 2, styleGym: "Kyokushin" },
+  shotokan: { name: "Shotokan Hall", unlock: 6, tier: 2, styleGym: "Shotokan" },
+  taekwon: { name: "TKD Dojang", unlock: 5, tier: 2, styleGym: "Taekwondo" },
+  wrestling: { name: "The Wrestling Pit", unlock: 6, tier: 2, styleGym: "Wrestling" },
+  kickbox: { name: "Kickbox Club", unlock: 5, tier: 2, styleGym: "Kickboxing" },
+  kungfu: { name: "Shaolin Yard", unlock: 7, tier: 3, styleGym: "KungFu" },
+  aikido: { name: "Aiki Circle", unlock: 8, tier: 3, styleGym: "Aikido" },
+  kali: { name: "Arnis Ring", unlock: 8, tier: 3, styleGym: "KaliArnis" },
+  ironbox: { name: "Iron Foundry Gym", unlock: 9, tier: 3, styleGym: "IronBoxing" },
+  boran: { name: "Ancient Boran Camp", unlock: 10, tier: 4, styleGym: "MuayBoran" },
+  guihun: { name: "Demon's Crucible", unlock: 11, tier: 4, styleGym: "Guihun" },
+  ultra: { name: "The Still Point", unlock: 12, tier: 4, styleGym: "UltraInstinct" },
 };
 
 // Display order for the locations grid.
@@ -168,6 +168,62 @@ export const LOCATION_LIST = [
   { key: "guihun", label: "Demon's Crucible", desc: "Only the broken come out whole." },
   { key: "ultra", label: "Still Point", desc: "The quietest place. The loudest fights." },
 ];
+
+// ------------------------------------------------------------------ TRAINING --
+// Location training programs: keyed by location key. `cost` is the Cash charge
+// per session (0 = free), `gain` multiplies the activity's base stat gain.
+// Rest / OddJobs are NOT here — they stay globally available (free actions).
+export const TRAINING = {
+  // tier 0 — home: free basics + always-available actions
+  home: { Pushups: { cost: 0, gain: 0.6 }, Situps: { cost: 0, gain: 0.6 } },
+  // tier 1 — unlock 0, cheap (cost 2-3), gain ×1.0-1.1
+  spar:   { Pushups: { cost: 2, gain: 1.0 }, HeavyBag: { cost: 3, gain: 1.1 }, Sparring: { cost: 3, gain: 1.0 } },
+  wat:    { Situps: { cost: 2, gain: 1.0 }, Sparring: { cost: 3, gain: 1.0 }, HeavyBag: { cost: 3, gain: 1.0 } },
+  tatami: { Squats: { cost: 2, gain: 1.0 }, ShadowBoxing: { cost: 3, gain: 1.0 } },
+  roda:   { Squats: { cost: 2, gain: 1.0 }, Running: { cost: 3, gain: 1.1 } },
+  dohyo:  { Situps: { cost: 2, gain: 1.0 }, Squats: { cost: 3, gain: 1.1 } },
+  foundry:{ Pushups: { cost: 2, gain: 1.0 }, HeavyBag: { cost: 3, gain: 1.1 } },
+  oldhouse: { ShadowBoxing: { cost: 2, gain: 1.0 } },
+  // tier 2 — unlock 3-6, cost 5-8, gain ×1.5-1.6
+  mikazuki: { Squats: { cost: 5, gain: 1.5 }, ShadowBoxing: { cost: 6, gain: 1.5 } },
+  stormpg:  { ShadowBoxing: { cost: 6, gain: 1.5 }, Pushups: { cost: 5, gain: 1.5 } },
+  lightning: { Squats: { cost: 5, gain: 1.6 }, Running: { cost: 6, gain: 1.6 } },
+  niko:     { ShadowBoxing: { cost: 6, gain: 1.5 }, Squats: { cost: 5, gain: 1.5 }, Sparring: { cost: 8, gain: 1.6 } },
+  kaiwan:   { Situps: { cost: 5, gain: 1.5 }, HeavyBag: { cost: 6, gain: 1.5 } },
+  kyoku:    { HeavyBag: { cost: 6, gain: 1.5 }, Situps: { cost: 5, gain: 1.5 } },
+  shotokan: { ShadowBoxing: { cost: 6, gain: 1.5 }, Squats: { cost: 5, gain: 1.5 } },
+  taekwon:  { Squats: { cost: 5, gain: 1.5 }, Roadworks: { cost: 5, gain: 1.5 } },
+  wrestling:{ Pushups: { cost: 5, gain: 1.5 }, Situps: { cost: 5, gain: 1.5 } },
+  kickbox:  { HeavyBag: { cost: 6, gain: 1.5 }, Roadworks: { cost: 5, gain: 1.5 } },
+  // tier 3 — unlock 7-9, cost 10-14, gain ×2.0-2.1
+  sanctum: { Sparring: { cost: 12, gain: 2.0 }, ShadowBoxing: { cost: 10, gain: 2.0 } },
+  raishin: { Squats: { cost: 10, gain: 2.0 }, Running: { cost: 12, gain: 2.0 } },
+  spirit:  { Pushups: { cost: 10, gain: 2.0 }, HeavyBag: { cost: 12, gain: 2.1 } },
+  silat:   { Squats: { cost: 10, gain: 2.0 }, ShadowBoxing: { cost: 10, gain: 2.0 } },
+  hunt:    { Running: { cost: 12, gain: 2.1 }, Squats: { cost: 10, gain: 2.0 } },
+  xiyi:    { HeavyBag: { cost: 12, gain: 2.1 }, Situps: { cost: 10, gain: 2.0 } },
+  kungfu:  { ShadowBoxing: { cost: 10, gain: 2.0 }, HeavyBag: { cost: 12, gain: 2.0 } },
+  aikido:  { ShadowBoxing: { cost: 10, gain: 2.0 }, Squats: { cost: 10, gain: 2.0 } },
+  kali:    { Squats: { cost: 10, gain: 2.0 }, ShadowBoxing: { cost: 10, gain: 2.0 } },
+  ironbox: { Pushups: { cost: 10, gain: 2.0 }, HeavyBag: { cost: 12, gain: 2.1 } },
+  // tier 4 — unlock 10-12, elite: cost 16-24, gain ×2.6-2.8
+  sword:  { ShadowBoxing: { cost: 16, gain: 2.6 }, Pushups: { cost: 16, gain: 2.6 }, Sparring: { cost: 20, gain: 2.7 } },
+  boran:  { HeavyBag: { cost: 18, gain: 2.7 }, Situps: { cost: 16, gain: 2.6 }, Sparring: { cost: 20, gain: 2.7 } },
+  guihun: { HeavyBag: { cost: 18, gain: 2.7 }, Pushups: { cost: 16, gain: 2.6 }, Sparring: { cost: 22, gain: 2.8 } },
+  // elite all-stat gyms (only these cover every stat, premium price)
+  estate: {
+    Pushups: { cost: 16, gain: 2.6 }, Situps: { cost: 16, gain: 2.6 },
+    Squats: { cost: 16, gain: 2.6 }, ShadowBoxing: { cost: 16, gain: 2.6 },
+    Running: { cost: 18, gain: 2.7 }, HeavyBag: { cost: 18, gain: 2.7 },
+    Sparring: { cost: 20, gain: 2.7 }, Roadworks: { cost: 18, gain: 2.7 },
+  },
+  ultra: {
+    Pushups: { cost: 18, gain: 2.8 }, Situps: { cost: 18, gain: 2.8 },
+    Squats: { cost: 18, gain: 2.8 }, ShadowBoxing: { cost: 18, gain: 2.8 },
+    Running: { cost: 20, gain: 2.8 }, HeavyBag: { cost: 20, gain: 2.8 },
+    Sparring: { cost: 24, gain: 2.9 }, Roadworks: { cost: 20, gain: 2.8 },
+  },
+};
 
 // ------------------------------------------------------------------ STYLES --
 export const STYLES = {
