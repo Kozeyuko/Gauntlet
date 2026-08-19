@@ -561,6 +561,10 @@ export function initUI(game, opts = {}) {
     if (num(state.Lives) !== livesBefore) { pauseAutoRun(); return; }
     if (num(state.PotRank) !== rankBefore) { pauseAutoRun(); return; }
     if (num(state.Encounter) >= 1) { pauseAutoRun(); return; }
+    if (state.LastMsg && state.LastMsg.includes("Not enough Cash")) {
+      pauseAutoRun();
+      return;
+    }
 
     autoRunTimer = setTimeout(autoRunStep, 400);
   }
