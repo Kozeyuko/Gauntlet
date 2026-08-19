@@ -1,7 +1,7 @@
 // test/harness.mjs — Node test harness for gauntlet-web.
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
-import { freshState, snapshot, createGame } from "../js/engine.js";
+import { freshState, snapshot, createGame, eventToString } from "../js/engine.js";
 import { RIVALS, INSIDE } from "../js/data.js";
 
 let failures = 0;
@@ -27,6 +27,12 @@ function makeRng(seed) {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
+}
+
+// Scripted RNG: replays a fixed sequence, then settles on 0.5 (neutral rolls).
+function seqRng(values) {
+  let i = 0;
+  return () => (i < values.length ? values[i++] : 0.5);
 }
 
 function boostedState() {
@@ -183,6 +189,84 @@ console.log("== Snapshot round-trip ==");
   assert(snap.version === 2, "snapshot version is 2");
   assert(!("LastMsg" in snap), "transient LastMsg not persisted");
   assert(snap.Str === 12.5, "persistent value captured");
+}
+
+console.log("== Structured combat events ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(11) });
+  let v = g.beginFight();
+  v = g.fightMove(v.skills[0].name);
+  assert(Array.isArray(v.events) && v.events.length > 0, "events present after one fightMove");
+  const ev = v.events[0];
+  for (const k of ["who", "skill", "damage", "crit", "dodged", "round"]) {
+    assert(k in ev, `event has key '${k}'`);
+  }
+  assert(ev.who === "you" || ev.who === "foe", "who is 'you'|'foe'");
+  assert(typeof ev.damage === "number" && ev.damage >= 0, "damage is a non-negative number");
+}
+
+console.log("== Dodge flag ==");
+{
+  const state = boostedState();
+  state.RivalIdx = 6; // Blitz (LightningFlash) — near-capped dodge
+  state.Spd = 100; state.Int = 1; // player strikes first, low crit chance
+  const g = createGame(state, { rng: seqRng([0, 0.5, 0.1]) });
+  const v = g.beginFight();
+  const r1 = g.fightMove("Wild Swing");
+  const youEv = r1.events.find((e) => e.who === "you");
+  assert(!!youEv, "player event exists");
+  assert(youEv.dodged === true, "player's strike was dodged");
+  assert(youEv.crit === false, "no crit on a dodge");
+  assertClose(youEv.damage, youEv.raw * 0.3, "dodge damage ≈ 30% of raw", 1.5);
+}
+
+console.log("== Crit flag ==");
+{
+  const state = boostedState(); // Int 50 → base crit ~0.28
+  const g = createGame(state, { rng: seqRng([0, 0, 1]) });
+  const v = g.beginFight(); // Street Brawler (rival 1)
+  const r1 = g.fightMove("Wild Swing");
+  const youEv = r1.events.find((e) => e.who === "you");
+  assert(!!youEv, "player event exists");
+  assert(youEv.crit === true, "player's strike crit");
+  assert(youEv.dodged === false, "no dodge on a crit");
+  assertClose(youEv.damage, youEv.raw * 1.6, "crit damage ≈ raw × 1.6", 1.5);
+}
+
+console.log("== eventToString ==");
+{
+  const you = eventToString({ who: "you", skill: "Wild Swing", damage: 10, crit: true });
+  assert(you.includes("You"), "contains 'You'");
+  assert(you.includes("Wild Swing"), "contains 'Wild Swing'");
+  assert(you.includes("(CRIT)"), "contains '(CRIT)'");
+  assert(you.includes("10"), "contains '10'");
+  const foe = eventToString({ who: "foe", skill: "Jab", damage: 5, crit: false });
+  assert(foe.startsWith("Foe"), "starts with 'Foe'");
+  assert(foe === "Foe used Jab — 5 dmg", "foe line matches legacy format");
+  const plain = eventToString({ who: "you", skill: "Wild Swing", damage: 10, crit: false });
+  assert(plain === "You used Wild Swing — 10 dmg", "you line matches legacy format");
+}
+
+console.log("== Both paths produce structured events ==");
+{
+  const m = boostedState();
+  const g1 = createGame(m, { rng: makeRng(11) });
+  let v = g1.beginFight();
+  v = g1.fightMove(v.skills[0].name);
+  assert(
+    Array.isArray(v.events) && v.events.every((e) => e && typeof e === "object" && "who" in e),
+    "manual fightMove emits object events"
+  );
+
+  const a = boostedState();
+  const g2 = createGame(a, { rng: makeRng(7) });
+  const res = g2.fight();
+  assert(res && res.result && Array.isArray(res.result.events), "auto fight exposes an events array");
+  assert(
+    res.result.events.length > 0 && res.result.events.every((e) => e && typeof e === "object" && "who" in e && "damage" in e),
+    "auto fight events are structured objects"
+  );
 }
 
 console.log("");

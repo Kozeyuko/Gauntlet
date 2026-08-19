@@ -81,13 +81,24 @@ header {
   flex: 1;
 }
 .bar > i { display: block; height: 100%; border-radius: 6px; transition: width .25s ease; width: 0; }
+.bar > i:not(.bartail) { position: relative; z-index: 1; }
+.bar > i.bartail {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  height: 100%; width: 0; border-radius: 6px;
+  transition: width .3s ease .05s;
+  z-index: 0;
+}
+/* combat HP fill drops instantly; the ghost tail carries the delayed drain */
+.fighter .bar.hp > i:not(.bartail) { transition: none; }
 .bar.hp > i { background: linear-gradient(90deg, #3f8f52, var(--green)); }
+.bar.hp > i.bartail { background: linear-gradient(90deg, rgba(224,90,78,.5), rgba(224,90,78,.78)); }
 .bar.stam > i { background: linear-gradient(90deg, #3a6ea5, var(--blue)); }
 .bar.nut > i { background: linear-gradient(90deg, #a5733a, var(--gold)); }
 .bar.ult > i { background: linear-gradient(90deg, #6a5aa0, var(--purple)); }
 .bar span {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 10px; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums;
+  z-index: 2;
 }
 .barrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .barrow:last-child { margin-bottom: 0; }
@@ -116,6 +127,7 @@ header {
   font-size: 13px;
   transition: all .12s ease;
   user-select: none;
+  touch-action: manipulation;
 }
 .btn:hover { border-color: var(--gold); color: var(--gold); }
 .btn:active { transform: translateY(1px); }
@@ -127,6 +139,14 @@ header {
 .btn.orange:hover { border-color: var(--orange); color: var(--orange); }
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 .btn.small-btn { padding: 6px 10px; font-size: 11px; }
+
+.sndtoggle {
+  margin-left: auto;
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  white-space: nowrap;
+}
+.sndtoggle.muted { border-color: var(--line); color: var(--muted); }
 
 .grid .btn { padding: 8px 6px; font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 .grid .btn.active { background: var(--green); color: #0b1510; border-color: var(--green); font-weight: 600; }
@@ -222,6 +242,7 @@ footer .howto { font-size: 11px; color: var(--muted); line-height: 1.5; flex: 1;
   display: flex; align-items: center; gap: 8px; text-align: left;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 12px; cursor: pointer; transition: all .12s ease; color: var(--text); font-size: 13px;
+  touch-action: manipulation;
 }
 .movebtn:hover { border-color: var(--gold); }
 .movebtn:disabled { opacity: .35; cursor: not-allowed; }
@@ -236,6 +257,7 @@ footer .howto { font-size: 11px; color: var(--muted); line-height: 1.5; flex: 1;
   display: flex; align-items: center; gap: 10px; text-align: left;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   padding: 10px 12px; cursor: pointer; transition: all .12s ease; color: var(--text);
+  touch-action: manipulation;
 }
 .ghostrow:hover { border-color: var(--gold); }
 .ghostrow .gmain { flex: 1; min-width: 0; }
@@ -246,7 +268,139 @@ footer .howto { font-size: 11px; color: var(--muted); line-height: 1.5; flex: 1;
 .ghostrow .tag.echo { color: var(--blue); border-color: #3a5a7a; }
 .ghostempty { text-align: center; padding: 24px 0; display: none; }
 
+/* ---------- combat hit feedback & animations ---------- */
+.fighitbox {
+  --flash: var(--blue);
+  width: 84px; height: 84px; margin: 6px auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2c3440, #151a20);
+  border: 2px solid var(--line);
+  position: relative;
+  font-size: 38px; font-weight: 800; color: var(--text);
+  text-shadow: 0 2px 4px #000;
+  flex: none;
+}
+.fighitbox .fhb { line-height: 1; pointer-events: none; }
+#youHitbox { --flash: var(--blue); border-color: #3a5a7a; }
+#foeHitbox { --flash: var(--red); border-color: #6e352d; }
+
+/* attacker lunge (whole fighter presence shifts forward) */
+@keyframes kfLungeR { 0%,100% { transform: translateX(0) rotate(0deg); } 45% { transform: translateX(16px) rotate(3deg); } }
+@keyframes kfLungeL { 0%,100% { transform: translateX(0) rotate(0deg); } 45% { transform: translateX(-16px) rotate(-3deg); } }
+.fighter.you-lunge { animation: kfLungeR .15s ease-out; }
+.fighter.foe-lunge { animation: kfLungeL .15s ease-out; }
+
+/* hit flash + jitter (non-crit) */
+@keyframes kfHitFlash {
+  0% { filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+  30% { filter: brightness(2.2); box-shadow: 0 0 0 8px var(--flash); }
+  100% { filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes kfHitJitter { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+.fighitbox.hit-you, .fighitbox.hit-foe { animation: kfHitFlash .25s ease-out, kfHitJitter .2s linear 2; }
+
+/* crit: bigger flash + 4px shake */
+@keyframes kfCritFlash {
+  0% { filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+  30% { filter: brightness(3); box-shadow: 0 0 0 12px var(--flash); }
+  100% { filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes kfCritShake {
+  0%,100% { transform: translateX(0); } 20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+}
+.fighitbox.crit-you, .fighitbox.crit-foe { animation: kfCritFlash .32s ease-out, kfCritShake .3s linear 2; }
+
+/* dodge side-step */
+@keyframes kfDodgeL { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-24px); } 70% { transform: translateX(6px); } }
+@keyframes kfDodgeR { 0%,100% { transform: translateX(0); } 30% { transform: translateX(24px); } 70% { transform: translateX(-6px); } }
+.fighitbox.dodge-left { animation: kfDodgeL .3s ease-out; }
+.fighitbox.dodge-right { animation: kfDodgeR .3s ease-out; }
+
+/* ult burst ring (player) + button pulse */
+@keyframes kfUltBurst {
+  from { transform: scale(.5); opacity: .9; }
+  to { transform: scale(1.9); opacity: 0; }
+}
+.fighitbox.ult-burst::after {
+  content: ""; position: absolute; inset: -6px;
+  border: 3px solid var(--purple); border-radius: 50%;
+  animation: kfUltBurst .6s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes kfUltPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(180,138,224,.6); } 50% { box-shadow: 0 0 0 10px rgba(180,138,224,0); } }
+.ultbtn.pulse { animation: kfUltPulse .6s ease-in-out 2; }
+
+/* round banner pop */
+@keyframes kfPop { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+.roundbanner.pop { animation: kfPop .3s ease-out; }
+
+/* floating damage numbers */
+@keyframes kfDmgFloat {
+  0% { opacity: 0; transform: translate(-50%, 4px) scale(.7); }
+  15% { opacity: 1; transform: translate(-50%, -6px) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -38px) scale(1); }
+}
+.dmgnum {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  font-weight: 800; font-size: 18px; color: #fff; text-shadow: 0 1px 3px #000;
+  pointer-events: none; z-index: 6;
+  animation: kfDmgFloat .7s ease-out forwards;
+}
+.dmgnum.crit { color: var(--gold); font-size: 24px; text-shadow: 0 0 8px var(--gold); }
+
+/* crit / dodge ghost labels */
+@keyframes kfLabelFloat {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(.6); }
+  20% { opacity: 1; transform: translate(-50%, -8px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -30px) scale(1); }
+}
+.critlabel, .dodgelabel {
+  position: absolute; left: 50%; top: -14px; transform: translateX(-50%);
+  font-weight: 800; font-size: 20px; pointer-events: none; z-index: 5;
+  animation: kfLabelFloat .8s ease-out forwards;
+  text-shadow: 0 0 10px currentColor;
+}
+.critlabel { color: var(--gold); }
+.dodgelabel { color: var(--blue); font-size: 16px; }
+
+/* reduce motion: skip shakes/floats, keep text + bars */
+@media (prefers-reduced-motion: reduce) {
+  .fighter.you-lunge, .fighter.foe-lunge,
+  .fighitbox.hit-you, .fighitbox.hit-foe,
+  .fighitbox.crit-you, .fighitbox.crit-foe,
+  .fighitbox.dodge-left, .fighitbox.dodge-right,
+  .roundbanner.pop, .ultbtn.pulse { animation: none; }
+}
+
 @media (max-width: 640px) {
-  .vs, .combatbottom { flex-direction: column; }
+  /* keep fighters side by side, just compact */
+  .vs { flex-direction: row; gap: 10px; }
+  .combatbottom { flex-direction: column; gap: 14px; }
   .movescol { width: 100%; }
+  .modal { padding: 14px; }
+  .modal.combat { width: 100%; }
+  .roundbanner { font-size: 11px; padding: 6px 16px; letter-spacing: 2px; }
+  .winpct { font-size: 10px; padding: 4px 10px; }
+  .fighter { gap: 5px; }
+  .fighter .fhead .nm { font-size: 15px; }
+  .fighitbox { width: 56px; height: 56px; font-size: 26px; margin: 2px auto; }
+  .actgrid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .locgrid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+  .stygrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  #hub { padding: 12px 10px 40px; }
+  .log { height: 150px; }
+}
+
+/* touch screens: bigger move buttons in a 2-col grid, kill zoom delay */
+@media (hover: none) and (pointer: coarse) {
+  #moveList { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .movebtn { min-height: 44px; padding: 12px 14px; }
+}
+
+/* notch / home-indicator safe areas */
+@supports (padding: env(safe-area-inset-top)) {
+  header { padding-top: calc(10px + env(safe-area-inset-top)); }
+  footer { padding-bottom: env(safe-area-inset-bottom); }
 }

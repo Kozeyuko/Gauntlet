@@ -2,6 +2,7 @@
 import { freshState, restore, createGame } from "./engine.js";
 import { DAY_SECONDS } from "./data.js";
 import { initUI } from "./ui.js";
+import { audio } from "./audio.js";
 
 const SAVE_KEY = "gauntlet-save-v1";
 const GHOST_KEY = "gauntlet-ghosts-v1";
@@ -53,6 +54,9 @@ const ui = initUI(game, {
 
 // Debug handle (dev console access; harmless in production).
 window.__game = game;
+
+// AudioContext must be created/resumed inside a user gesture (autoplay policy).
+document.addEventListener("pointerdown", () => audio.init(), { once: true });
 
 // The day loop: one in-game day every DAY_SECONDS real seconds.
 setInterval(() => {

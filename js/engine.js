@@ -44,6 +44,57 @@ import {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+// Render a structured combat event back to the human-readable log line.
+// Reproduces the legacy format exactly: "You used Wild Swing (CRIT) — 10 dmg".
+export function eventToString(ev) {
+  const who = ev.who === "foe" ? "Foe" : "You";
+  const crit = ev.crit ? " (CRIT)" : "";
+  return `${who} used ${ev.skill}${crit} — ${ev.damage} dmg`;
+}
+
+// Resolve a single strike, apply damage to the defender, and return a structured
+// event object (snapshot fields left at 0 — callers fill them in after the round).
+// Shared by BOTH the manual path (fightMove) and the auto path (resolveFight) so
+// the event shape is identical. Keeps the exact RNG call order (crit, then dodge)
+// so win/loss math stays byte-identical.
+function strikeEvent(att, def, skill, isPlayer, rng) {
+  let dmg = att.dmg * (skill.mult || 1.0);
+  const critChance = att.crit + (skill.crit || 0.0);
+  const dodgeChance = def.dodge - (skill.dodge || 0.0);
+  const ultActive = att.modeRounds > 0;
+  if (ultActive) dmg *= att.ultMult;
+  if (att.stam <= 0) dmg *= GAS_MULT;
+  const raw = dmg;
+  const crit = rng() < critChance;
+  const dodged = rng() < dodgeChance;
+  if (crit) dmg *= 1.6;
+  if (dodged) dmg *= 0.3;
+  def.hp -= dmg;
+  return {
+    who: isPlayer ? "you" : "foe",
+    skill: skill.name,
+    damage: Math.floor(dmg),
+    raw,
+    crit,
+    dodged,
+    ultActive,
+    round: 0,
+    youHp: 0, foeHp: 0, youStam: 0, foeStam: 0,
+  };
+}
+
+// Fill the post-round state snapshot into a round's freshly-emitted events.
+function stampEvents(events, fromIndex, round, me, foe) {
+  for (let i = fromIndex; i < events.length; i++) {
+    const ev = events[i];
+    ev.round = round;
+    ev.youHp = Math.max(0, Math.floor(me.hp));
+    ev.foeHp = Math.max(0, Math.floor(foe.hp));
+    ev.youStam = Math.max(0, Math.floor(me.stam));
+    ev.foeStam = Math.max(0, Math.floor(foe.stam));
+  }
+}
+
 // Transient fields: recomputed every render/step, never persisted.
 export const TRANSIENT_KEYS = [
   "LastMsg", "Lifespan", "Encounter", "PotRankName", "PotNext", "StyleSkills", "StyleUltName",
@@ -285,6 +336,7 @@ export function createGame(state, opts = {}) {
     const foe = makeCombatant(foeStats, foeStyle);
     let round = 0;
     const MAX_ROUNDS = 15;
+    const events = [];
     while (round < MAX_ROUNDS && me.hp > 0 && foe.hp > 0) {
       round += 1;
       me.stam -= me.drain;
@@ -301,23 +353,17 @@ export function createGame(state, opts = {}) {
       }
       let first = me, second = foe;
       if (foe.spd > me.spd) { first = foe; second = me; }
+      const roundStart = events.length;
       const strike = (att, def) => {
         const skill = pickSkill(att);
         att.skillName = skill.name;
-        let dmg = att.dmg * (skill.mult || 1.0);
-        const crit = att.crit + (skill.crit || 0.0);
-        const dodge = def.dodge - (skill.dodge || 0.0);
-        if (att.modeRounds > 0) dmg *= att.ultMult;
-        if (att.stam <= 0) dmg *= GAS_MULT;
-        if (R() < crit) dmg *= 1.6;
-        if (R() < dodge) dmg *= 0.3;
-        def.hp -= dmg;
-        return dmg;
+        events.push(strikeEvent(att, def, skill, att === me, R));
       };
       strike(first, second);
       if (second.hp > 0) strike(second, first);
+      stampEvents(events, roundStart, round, me, foe);
     }
-    return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName };
+    return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName, events };
   }
 
   function meHpLost(result) {
@@ -622,6 +668,7 @@ export function createGame(state, opts = {}) {
     view.mode = setup.mode;
     view.round = 0;
     view.auto = state.AutoBattle === true;
+    view.events = [];
     return view;
   }
 
@@ -680,19 +727,7 @@ export function createGame(state, opts = {}) {
 
     const events = [];
     const doStrike = (att, def, skill, isPlayer) => {
-      let dmg = att.dmg * (skill.mult || 1.0);
-      const crit = att.crit + (skill.crit || 0.0);
-      const dodge = def.dodge - (skill.dodge || 0.0);
-      if (att.modeRounds > 0) dmg *= att.ultMult;
-      if (att.stam <= 0) dmg *= GAS_MULT;
-      const didCrit = R() < crit;
-      const didDodge = R() < dodge;
-      if (didCrit) dmg *= 1.6;
-      if (didDodge) dmg *= 0.3;
-      def.hp -= dmg;
-      const who = isPlayer ? "You" : "Foe";
-      events.push(`${who} used ${skill.name}${didCrit ? " (CRIT)" : ""} — ${Math.floor(dmg)} dmg`);
-      return dmg;
+      events.push(strikeEvent(att, def, skill, isPlayer, R));
     };
 
     const foeSkill = pickSkill(foe);
@@ -706,6 +741,7 @@ export function createGame(state, opts = {}) {
 
     const MAX_COMBAT_ROUNDS = 15;
     const roundNum = battle.round;
+    stampEvents(events, 0, roundNum, me, foe);
     const finished = me.hp <= 0 || foe.hp <= 0 || roundNum >= MAX_COMBAT_ROUNDS;
     if (finished) {
       if (me.hp <= 0 && foe.hp <= 0) me.hp = 0;

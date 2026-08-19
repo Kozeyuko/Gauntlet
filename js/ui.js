@@ -10,10 +10,17 @@ import {
   MAX_RIVAL,
   MAX_TOTAL,
 } from "./data.js";
+import { eventToString } from "./engine.js";
+import { audio } from "./audio.js";
 
 const $ = (id) => document.getElementById(id);
 
 const clamp01 = (v) => Math.min(100, Math.max(0, v));
+
+const reducedMotion =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function initUI(game, opts = {}) {
   const onReset = opts.onReset || (() => {});
@@ -21,11 +28,16 @@ export function initUI(game, opts = {}) {
   let combatMeta = null; // foe name/style/mode captured at fight start
   let activeView = null; // current manual-combat view
   let autoTimer = null;   // auto-battle setTimeout handle
+  let prevYouHp = null;   // last rendered HP (for ghost-tail bar)
+  let prevFoeHp = null;
+  let lastRound = 0;      // last rendered round (for banner pop)
+  let lastRankMsg = "";   // last POTENTIAL UP message (for rankup ding)
 
   // ------------------------------------------------------------ element refs --
   const el = {
     hMoney: $("hMoney"), hAge: $("hAge"), hLives: $("hLives"), hWins: $("hWins"),
     hRank: $("hRank"), hNext: $("hNext"),
+    btnSound: $("btnSound"),
     barHealth: $("barHealth"), barHealthTxt: $("barHealthTxt"),
     barStamina: $("barStamina"), barStaminaTxt: $("barStaminaTxt"),
     barNutrition: $("barNutrition"), barNutritionTxt: $("barNutritionTxt"),
@@ -45,11 +57,15 @@ export function initUI(game, opts = {}) {
     combatOverlay: $("combatOverlay"),
     roundLbl: $("roundLbl"), modeLbl: $("modeLbl"),
     youStyle: $("youStyle"), youHpBar: $("youHpBar"), youHpTxt: $("youHpTxt"),
+    youHpTail: $("youHpTail"),
     youStamBar: $("youStamBar"), youStamTxt: $("youStamTxt"),
     youUltTxt: $("youUltTxt"), youUltBar: $("youUltBar"),
+    youFighter: $("youFighter"), youHitbox: $("youHitbox"),
     foeName: $("foeName"), foeStyle: $("foeStyle"),
     foeHpBar: $("foeHpBar"), foeHpTxt: $("foeHpTxt"),
+    foeHpTail: $("foeHpTail"),
     foeStamBar: $("foeStamBar"), foeStamTxt: $("foeStamTxt"),
+    foeFighter: $("foeFighter"), foeHitbox: $("foeHitbox"),
     moveList: $("moveList"), combatLog: $("combatLog"),
     btnUlt: $("btnUlt"), btnAuto: $("btnAuto"), btnForfeit: $("btnForfeit"),
     // ghosts
@@ -225,7 +241,12 @@ export function initUI(game, opts = {}) {
   }
 
   function renderLog() {
-    el.logLine.textContent = String(state.LastMsg ?? "");
+    const msg = String(state.LastMsg ?? "");
+    el.logLine.textContent = msg;
+    if (msg.includes("POTENTIAL UP") && msg !== lastRankMsg) {
+      lastRankMsg = msg;
+      audio.rankup();
+    }
   }
 
   function renderLooking() {
@@ -251,6 +272,8 @@ export function initUI(game, opts = {}) {
     el.resultTitle.textContent = win ? "Victory" : "Defeat";
     el.resultBody.textContent = body || String(state.LastMsg ?? "");
     el.resultOverlay.classList.add("show");
+    if (win) audio.victory();
+    else audio.defeat();
   }
 
   // ------------------------------------------------------------ combat overlay --
@@ -262,28 +285,103 @@ export function initUI(game, opts = {}) {
     const box = el.combatLog;
     for (const ev of events) {
       const line = document.createElement("div");
-      line.textContent = `[${String(round).padStart(2, "0")}] ${ev}`;
-      if (ev.startsWith("You")) line.className = "you";
-      else if (ev.startsWith("Foe")) line.className = "foe";
+      const text = typeof ev === "string" ? ev : eventToString(ev);
+      line.textContent = `[${String(round).padStart(2, "0")}] ${text}`;
+      const who = typeof ev === "string" ? (ev.startsWith("Foe") ? "foe" : "you") : ev.who;
+      if (who === "you") line.className = "you";
+      else if (who === "foe") line.className = "foe";
       else line.className = "sys";
       box.appendChild(line);
     }
     box.scrollTop = box.scrollHeight;
   }
 
+  // ---- combat hit-feedback animation helpers ----
+  function triggerClass(element, cls) {
+    if (!element || reducedMotion) return;
+    element.classList.remove(cls);
+    void element.offsetWidth;
+    element.classList.add(cls);
+    element.addEventListener("animationend", () => element.classList.remove(cls), { once: true });
+  }
+
+  function spawnFloater(parent, cls, text, ms) {
+    if (reducedMotion || !parent) return;
+    const node = document.createElement("div");
+    node.className = cls;
+    node.textContent = text;
+    parent.appendChild(node);
+    setTimeout(() => node.remove(), ms);
+  }
+
+  function animateEvent(ev) {
+    const attacker = ev.who === "you" ? el.youFighter : el.foeFighter;
+    const defenderHitbox = ev.who === "you" ? el.foeHitbox : el.youHitbox;
+    const defenderIsYou = ev.who !== "you";
+    triggerClass(attacker, ev.who === "you" ? "you-lunge" : "foe-lunge");
+    audio.swing();
+    setTimeout(() => {
+      if (ev.dodged) {
+        triggerClass(defenderHitbox, defenderIsYou ? "dodge-left" : "dodge-right");
+        spawnFloater(defenderHitbox, "dodgelabel", "DODGED", 800);
+        audio.dodge();
+      } else {
+        const side = defenderIsYou ? "you" : "foe";
+        triggerClass(defenderHitbox, ev.crit ? `crit-${side}` : `hit-${side}`);
+        spawnFloater(defenderHitbox, ev.crit ? "dmgnum crit" : "dmgnum", String(ev.damage), 700);
+        if (ev.crit) {
+          spawnFloater(defenderHitbox, "critlabel", "CRIT!", 800);
+          audio.crit();
+        } else {
+          audio.hit();
+        }
+      }
+    }, reducedMotion ? 0 : 130);
+  }
+
+  function animateRound(events) {
+    if (!events || events.length === 0) return;
+    events.forEach((ev, i) => {
+      setTimeout(() => animateEvent(ev), reducedMotion ? 0 : i * 130);
+    });
+  }
+
+  function renderCombatHpBar(fill, tail, txt, value, max, prevValue) {
+    const maxHp = max || 1;
+    const pct = Math.max(0, value / maxHp * 100);
+    fill.style.width = pct + "%";
+    txt.textContent = `${Math.round(value)} / ${Math.round(maxHp)}`;
+    if (prevValue === null || value >= prevValue || reducedMotion) {
+      tail.style.width = pct + "%";
+    } else {
+      const oldPct = Math.max(0, prevValue / maxHp * 100);
+      tail.style.transition = "none";
+      tail.style.width = oldPct + "%";
+      void tail.offsetWidth;
+      tail.style.transition = "";
+      tail.style.width = pct + "%";
+    }
+  }
+
   function renderCombat(view) {
     el.roundLbl.textContent = "ROUND " + Math.max(1, view.round);
+    if (view.round !== lastRound) {
+      lastRound = view.round;
+      triggerClass(el.roundLbl, "pop");
+    }
     el.modeLbl.textContent = (view.mode || (combatMeta && combatMeta.mode) || "fight").toUpperCase();
     el.youStyle.textContent = view.playerStyleName || (combatMeta && combatMeta.playerStyleName) || state.ActiveStyle;
     el.foeName.textContent = view.foeName || (combatMeta && combatMeta.foeName) || "Rival";
     el.foeStyle.textContent = view.foeStyleName || (combatMeta && combatMeta.foeStyleName) || "—";
+    el.foeHitbox.querySelector(".fhb").textContent = String(el.foeName.textContent || "R").charAt(0).toUpperCase();
 
-    el.youHpBar.style.width = Math.max(0, view.playerHp / view.playerMaxHp * 100) + "%";
-    el.youHpTxt.textContent = `${view.playerHp} / ${view.playerMaxHp}`;
+    renderCombatHpBar(el.youHpBar, el.youHpTail, el.youHpTxt, view.playerHp, view.playerMaxHp, prevYouHp);
+    renderCombatHpBar(el.foeHpBar, el.foeHpTail, el.foeHpTxt, view.foeHp, view.foeMaxHp, prevFoeHp);
+    prevYouHp = view.playerHp;
+    prevFoeHp = view.foeHp;
+
     el.youStamBar.style.width = Math.max(0, view.playerStam / (view.playerMaxStam || 100) * 100) + "%";
     el.youStamTxt.textContent = `${view.playerStam} / ${view.playerMaxStam || 100}`;
-    el.foeHpBar.style.width = Math.max(0, view.foeHp / view.foeMaxHp * 100) + "%";
-    el.foeHpTxt.textContent = `${view.foeHp} / ${view.foeMaxHp}`;
     el.foeStamBar.style.width = Math.max(0, view.foeStam / (view.foeMaxStam || 100) * 100) + "%";
     el.foeStamTxt.textContent = `${view.foeStam} / ${view.foeMaxStam || 100}`;
 
@@ -306,7 +404,10 @@ export function initUI(game, opts = {}) {
         stopAuto();
         const v = game.fightMove(s.name);
         if (v) {
-          if (v.events && v.events.length) appendLog(v.events, v.round);
+          if (v.events && v.events.length) {
+            appendLog(v.events, v.round);
+            animateRound(v.events);
+          }
           if (v.finished) {
             finishCombat(v);
           } else {
@@ -329,7 +430,10 @@ export function initUI(game, opts = {}) {
       const skill = skills[Math.floor(Math.random() * skills.length)];
       const v = game.fightMove(skill.name);
       if (v) {
-        if (v.events && v.events.length) appendLog(v.events, v.round);
+        if (v.events && v.events.length) {
+          appendLog(v.events, v.round);
+          animateRound(v.events);
+        }
         if (v.finished) finishCombat(v);
         else { activeView = v; renderCombat(v); maybeAuto(); }
       }
@@ -353,6 +457,9 @@ export function initUI(game, opts = {}) {
       playerStyleName: view.playerStyleName,
       foeStyleName: view.foeStyleName,
     };
+    prevYouHp = null;
+    prevFoeHp = null;
+    lastRound = 0;
     el.combatLog.innerHTML = "";
     el.combatOverlay.classList.add("show");
     renderCombat(view);
@@ -427,8 +534,17 @@ export function initUI(game, opts = {}) {
 
   el.btnUlt.addEventListener("click", () => {
     if (!activeView || activeView.finished) return;
+    const wasActive = activeView.modeRounds > 0;
     const v = game.activateUlt();
-    if (v) { activeView = v; renderCombat(v); }
+    if (v) {
+      activeView = v;
+      renderCombat(v);
+      if (!wasActive && v.modeRounds > 0) {
+        triggerClass(el.youHitbox, "ult-burst");
+        triggerClass(el.btnUlt, "pulse");
+        audio.ult();
+      }
+    }
   });
 
   el.btnForfeit.addEventListener("click", () => {
@@ -454,8 +570,29 @@ export function initUI(game, opts = {}) {
     render();
   });
 
+  // sound toggle (persistent via localStorage)
+  function syncSoundBtn() {
+    el.btnSound.textContent = audio.enabled ? "SND ON" : "SND OFF";
+    el.btnSound.classList.toggle("muted", !audio.enabled);
+  }
+  el.btnSound.addEventListener("click", () => {
+    audio.toggle();
+    audio.click();
+    syncSoundBtn();
+  });
+
+  // short blip on any button-like click (hub + combat + ghosts)
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#btnSound")) return;
+    if (e.target.closest(".btn, .movebtn, .ghostrow")) {
+      audio.init();
+      audio.click();
+    }
+  });
+
   // ------------------------------------------------------------ initial paint --
   render();
+  syncSoundBtn();
   el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
 
   return { render };

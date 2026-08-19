@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Bit · Rise of Styles</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -10,6 +10,7 @@
 
 <header id="topbar">
   <div class="logo">GAUNTLET<small>BIT · RISE OF STYLES</small></div>
+  <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
   <div class="vitals">
     <span class="vital"><span class="lbl">Money</span><b id="hMoney">30</b></span>
     <span class="vital"><span class="lbl">Age</span><b id="hAge">18 y 0 d</b></span>
@@ -99,10 +100,11 @@
     </div>
 
     <div class="vs">
-      <div class="fighter">
+      <div class="fighter" id="youFighter">
         <div class="fhead"><span class="nm">You</span><span class="chip gold" id="youStyle">Brawling</span></div>
+        <div class="fighitbox" id="youHitbox"><span class="fhb">Y</span></div>
         <div class="small">HEALTH</div>
-        <div class="bar hp"><i id="youHpBar"></i><span id="youHpTxt">100 / 100</span></div>
+        <div class="bar hp"><i class="bartail" id="youHpTail"></i><i id="youHpBar"></i><span id="youHpTxt">100 / 100</span></div>
         <div class="small" style="margin-top:6px">STAMINA</div>
         <div class="bar stam"><i id="youStamBar"></i><span id="youStamTxt">100 / 100</span></div>
         <div class="ultline">
@@ -110,10 +112,11 @@
           <div class="bar ult"><i id="youUltBar"></i></div>
         </div>
       </div>
-      <div class="fighter">
+      <div class="fighter" id="foeFighter">
         <div class="fhead"><span class="nm" id="foeName">Rival</span><span class="chip" id="foeStyle">Brawling</span></div>
+        <div class="fighitbox" id="foeHitbox"><span class="fhb">R</span></div>
         <div class="small">HEALTH</div>
-        <div class="bar hp"><i id="foeHpBar"></i><span id="foeHpTxt">100 / 100</span></div>
+        <div class="bar hp"><i class="bartail" id="foeHpTail"></i><i id="foeHpBar"></i><span id="foeHpTxt">100 / 100</span></div>
         <div class="small" style="margin-top:6px">STAMINA</div>
         <div class="bar stam"><i id="foeStamBar"></i><span id="foeStamTxt">100 / 100</span></div>
       </div>
