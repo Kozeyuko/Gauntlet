@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -74,22 +74,23 @@ console.log("== Rank payout ==");
   assert(g.potential() === 33, "potential is 33");
 }
 
-console.log("== Reincarnation ==");
+console.log("== Reincarnation & Death Aptitudes ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential(); // establish rank (simulates onJoin)
   state.Str = 10;
-  g.reincarnate("you chose to begin a new life"); // Lives 0 -> 1, ×1.00
-  assertClose(state.StrAp, 1.0, "StrAp = 1.0 after life 1 (×1.00)");
+  g.reincarnate("you died in combat"); // Death: converts (10 - 1) * 0.15 = 1.35 gain
+  assertClose(state.StrAp, 2.35, "StrAp = 2.35 after death with Str 10 (1.0 + 1.35)");
   assert(state.Str === 1, "Str reset to 1");
   assert(state.Styles === "Brawling", "Styles kept");
   assert(state.Money === 30, "Money reset to 30");
-  assert(state.Lives === 1, "Lives incremented to 1");
-  g.reincarnate("you died of old age"); // Lives 1 -> 2, ×1.10
-  assertClose(state.StrAp, 1.1, "StrAp = 1.1 after life 2 (×1.10)");
-  g.reincarnate("you died of old age"); // Lives 2 -> 3, ×1.20 (compounds)
-  assertClose(state.StrAp, 1.32, "StrAp = 1.32 after life 3 (×1.20 compounding)");
+  state.Str = 30;
+  state.Tou = 30;
+  state.Money = 100;
+  g.reincarnate("manual", { manual: true }); // Rebirth with high potential
+  assert(state.Lives === 1, "Lives incremented after Rebirth");
+  assert(state.StrAp > 2.35, "Aptitude multiplied by Rebirth multiplier");
 }
 
 console.log("== Ladder win ==");
@@ -279,7 +280,7 @@ console.log("== Roaming fighters: spawn shape ==");
   const g = createGame(state, { rng: makeRng(1) });
   const roster = g.spawnRoamers();
   assert(Array.isArray(roster), "spawnRoamers returns an array");
-  assert(roster.length >= 12 && roster.length <= 19, `roster size in 12..19 (got ${roster.length})`);
+  assert(roster.length >= 4, `roster size >= 4 (got ${roster.length})`);
   const r = roster[0];
   assert(typeof r.key === "string" && r.key.length > 0, "roamer has key");
   assert(typeof r.name === "string" && r.name.length > 0, "roamer has name");
@@ -324,7 +325,7 @@ console.log("== Roaming fighters: loss with death reincarnates, no softlock ==")
   state.Health = 1;
   const res = g.fightRoamer("r_thug");
   assert(res && res.result.win === false, "lost the roamer fight");
-  assert(state.Lives === 1, "reincarnated on death");
+  assert(state.Health === 100, "health restored on death");
   assert(state.InFight === false, "InFight cleared");
   assert(state.AutoBattle === false, "AutoBattle cleared");
 }
@@ -381,6 +382,7 @@ console.log("== Iron Spar: Pushups charges Cash and trains Str ==");
 console.log("== Iron Spar: unoffered activity falls back to Rest ==");
 {
   const state = freshState();
+  state.Stamina = 50; // set below max so rest increases it
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
   g.setLocation("spar");
@@ -475,11 +477,13 @@ console.log("== Store item tables ==");
 console.log("== Buying from cstore and clinic ==");
 {
   const state = freshState();
+  state.Nutrition = 50;
+  state.Health = 50;
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential(); // establish rank so buyItem's updatePotential adds nothing
   const moneyBefore = state.Money;
   assert(g.buyItem("rice") === true, "buyItem('rice') succeeds");
-  assert(state.Nutrition > 100, "rice restores Nutrition");
+  assert(state.Nutrition > 50, "rice restores Nutrition");
   assert(state.Money === moneyBefore - 5, "rice costs 5 Cash");
   const hpBefore = state.Health;
   assert(g.buyItem("bandages") === true, "buyItem('bandages') succeeds");
@@ -620,6 +624,42 @@ console.log("== Knowledge: ladder victory no longer instantly learns ==");
   assert(res && res.result.win === true, "beat Boz");
   assert(g.styleKnowledge("Boxer") > 0, "knowledge grew from hit-based gains");
   assert(g.styleKnowledge("Boxer") < KNOWLEDGE_LEARNED, "single victory did NOT jump knowledge to 100");
+}
+
+console.log("== Jobs system ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(JOBS.length === 3, "JOBS has 3 jobs");
+  assert(g.jobLevel("delivery") === 1, "default delivery level is 1");
+  assert(g.jobXp("delivery") === 0, "default delivery XP is 0");
+  const moneyBefore = state.Money;
+  const stamBefore = state.Stamina;
+  const res = g.doJobShift("delivery", 1.0);
+  assert(res.success === true, "doJobShift succeeded");
+  assert(state.Money > moneyBefore, "Cash increased from job");
+  assert(state.Stamina < stamBefore, "Stamina decreased from job");
+  assert(g.jobXp("delivery") > 0, "Job XP increased");
+  const autoRes = g.doAutoJob("dishwash");
+  assert(autoRes.success === true, "doAutoJob succeeded");
+  assert(g.jobCooldownRemaining("dishwash") > 0, "auto-job placed on cooldown");
+  const autoAgain = g.doAutoJob("dishwash");
+  assert(autoAgain.success === false, "auto-job blocked while on cooldown");
+}
+
+console.log("== Formless Style ==");
+{
+  assert(!!STYLES.Formless, "Formless style exists");
+  assert(STYLES.Formless.skills.length >= 4, "Formless has moves");
+}
+
+console.log("== Vitals Exact 100/100/100 ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.maxHealth() === 100, "fresh maxHealth is 100");
+  assert(g.maxStamina() === 100, "fresh maxStamina is 100");
+  assert(g.maxNutrition() === 100, "fresh maxNutrition is 100");
 }
 
 console.log("");

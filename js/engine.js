@@ -11,6 +11,12 @@ import {
   STYLES,
   CSTORE_ITEMS,
   CLINIC_ITEMS,
+  JOBS,
+  jobPay,
+  jobStaminaCost,
+  jobXpForLevel,
+  JOB_AUTO_RATE,
+  JOB_AUTO_COOLDOWN_MS,
   RIVALS,
   INSIDE,
   RANKS,
@@ -121,6 +127,7 @@ export const PERSISTENT_KEYS = [
   "Lives", "Wins", "RivalIdx", "Location", "Activity",
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
   "StyleKnowledge", "KnownSkills", "Build",
+  "JobXp", "JobLevel", "JobCooldowns",
   "InFight", "AutoBattle",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
@@ -137,6 +144,7 @@ export function freshState() {
     Looking: false, Styles: "Brawling", ActiveStyle: "Brawling",
     StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
     StyleKnowledge: "", KnownSkills: "", Build: "",
+    JobXp: "", JobLevel: "", JobCooldowns: {},
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     AutoRun: false,
     Roamers: {},
@@ -201,9 +209,9 @@ export function createGame(state, opts = {}) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   }
-  function maxHealth() { return 100 + attrValue("Tou") * 10; }
-  function maxStamina() { return 100 + attrValue("Spd") * 8; }
-  function maxNutrition() { return 100 + attrValue("Int") * 5; }
+  function maxHealth() { return 100 + Math.max(0, attrValue("Tou") - 1) * 10; }
+  function maxStamina() { return 100 + Math.max(0, attrValue("Spd") - 1) * 8; }
+  function maxNutrition() { return 100 + Math.max(0, attrValue("Int") - 1) * 5; }
   function clampVitals() {
     state.Health = clamp(num(state.Health), 0, maxHealth());
     state.Stamina = clamp(num(state.Stamina), 0, maxStamina());
@@ -340,7 +348,124 @@ export function createGame(state, opts = {}) {
     }
   }
 
-  // ---- custom builds ----
+  // ---- jobs ----
+  function jobXpMap() {
+    const out = {};
+    const raw = String(state.JobXp ?? "");
+    for (const pair of raw.split(";")) {
+      if (pair === "") continue;
+      const eq = pair.indexOf("=");
+      if (eq < 0) continue;
+      out[pair.slice(0, eq)] = Number(pair.slice(eq + 1)) || 0;
+    }
+    return out;
+  }
+
+  function jobLevelMap() {
+    const out = {};
+    const raw = String(state.JobLevel ?? "");
+    for (const pair of raw.split(";")) {
+      if (pair === "") continue;
+      const eq = pair.indexOf("=");
+      if (eq < 0) continue;
+      out[pair.slice(0, eq)] = Number(pair.slice(eq + 1)) || 1;
+    }
+    return out;
+  }
+
+  function jobLevel(jobKey) { return jobLevelMap()[jobKey] || 1; }
+  function jobXp(jobKey) { return jobXpMap()[jobKey] || 0; }
+
+  function addJobXp(jobKey, amt) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return;
+    const xmap = jobXpMap();
+    const lmap = jobLevelMap();
+    let xp = (xmap[jobKey] || 0) + amt;
+    let level = lmap[jobKey] || 1;
+    while (level < job.maxLevel && xp >= jobXpForLevel(job, level)) {
+      xp -= jobXpForLevel(job, level);
+      level += 1;
+      logMsg(`${job.name} level up! Now level ${level}.`, "job");
+    }
+    xmap[jobKey] = xp;
+    lmap[jobKey] = level;
+    state.JobXp = Object.entries(xmap).map(([k, v]) => `${k}=${v}`).join(";");
+    state.JobLevel = Object.entries(lmap).map(([k, v]) => `${k}=${v}`).join(";");
+  }
+
+  function doJobShift(jobKey, performanceScore = 1.0) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return { success: false };
+    const level = jobLevel(jobKey);
+    const cost = jobStaminaCost(job, level);
+    if (num(state.Stamina) < cost) {
+      logMsg("Too tired to work. Rest first.", "job");
+      return { success: false };
+    }
+    state.Stamina = num(state.Stamina) - cost;
+    const fullPay = jobPay(job, level);
+    const score = Math.max(0, Math.min(1, performanceScore));
+    const pay = Math.max(1, Math.round(fullPay * score));
+    const xp = Math.max(1, Math.round(job.xpPerShift * score));
+    const chaBonus = Math.floor(attrValue("Cha") * 0.5);
+    const totalPay = pay + chaBonus;
+    state.Money = num(state.Money) + totalPay;
+    const oldLevel = level;
+    addJobXp(jobKey, xp);
+    const newLevel = jobLevel(jobKey);
+    logMsg(`${job.name} shift: +${totalPay} Cash${newLevel > oldLevel ? ", LEVEL UP!" : ""}.`, "job");
+    updatePotential();
+    return { success: true, pay: totalPay, xp, level: newLevel, levelUp: newLevel > oldLevel };
+  }
+
+  function doAutoJob(jobKey) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return { success: false };
+    const level = jobLevel(jobKey);
+    const cost = jobStaminaCost(job, level);
+    if (num(state.Stamina) < cost) {
+      logMsg("Too tired to work. Rest first.", "job");
+      return { success: false };
+    }
+    const now = getNow();
+    const cooldowns = state.JobCooldowns || {};
+    const last = Number(cooldowns[jobKey]) || 0;
+    if (now < last + JOB_AUTO_COOLDOWN_MS) {
+      const remain = Math.ceil((last + JOB_AUTO_COOLDOWN_MS - now) / 1000);
+      logMsg(`${job.name} auto-work on cooldown (${remain}s).`, "job");
+      return { success: false, cooldown: remain };
+    }
+    state.Stamina = num(state.Stamina) - cost;
+    const fullPay = jobPay(job, level);
+    const pay = Math.max(1, Math.round(fullPay * JOB_AUTO_RATE));
+    const xp = Math.max(1, Math.round(job.xpPerShift * JOB_AUTO_RATE));
+    const chaBonus = Math.floor(attrValue("Cha") * 0.5);
+    const totalPay = pay + chaBonus;
+    state.Money = num(state.Money) + totalPay;
+    const oldLevel = level;
+    addJobXp(jobKey, xp);
+    const newLevel = jobLevel(jobKey);
+    cooldowns[jobKey] = now;
+    state.JobCooldowns = cooldowns;
+    logMsg(`${job.name} auto-shift: +${totalPay} Cash.`, "job");
+    updatePotential();
+    return { success: true, pay: totalPay, xp, level: newLevel, levelUp: newLevel > oldLevel, cooldownMs: JOB_AUTO_COOLDOWN_MS };
+  }
+
+  function jobCooldownRemaining(jobKey) {
+    const cooldowns = state.JobCooldowns || {};
+    const last = Number(cooldowns[jobKey]) || 0;
+    const now = getNow();
+    return Math.max(0, last + JOB_AUTO_COOLDOWN_MS - now);
+  }
+
+  function jobCanWork(jobKey) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return false;
+    const level = jobLevel(jobKey);
+    return num(state.Stamina) >= jobStaminaCost(job, level);
+  }
   function lookupSkill(key) {
     const pipe = key.indexOf("|");
     if (pipe < 0) return null;
@@ -449,28 +574,14 @@ export function createGame(state, opts = {}) {
     ghostCache = [];
   }
 
-  // ---- reincarnation ----
-  function reincarnateCost() {
-    return 25 + num(state.Lives) * 25; // 50, 75, 100, ... scaling
-  }
-
-  function reincarnate(cause, opts = {}) {
-    const manual = opts.manual === true;
-    if (manual) {
-      const cost = reincarnateCost();
-      if (num(state.Money) < cost) {
-        logMsg(`Not enough Cash to reincarnate. Cost: ${cost} Cash.`, "sys");
-        return false;
-      }
-      state.Money = num(state.Money) - cost;
-    }
+  // ---- death & rebirth ----
+  function onDeath(cause) {
     const prevLives = num(state.Lives);
-    state.Lives = prevLives + 1;
-    const mult = Math.min(5.0, 1 + prevLives * 0.10);
     const gains = {};
     for (const a of ATTRIBUTES) {
-      const ap = attrApt(a.id);
-      const newAp = ap * mult;
+      const currentVal = num(state[a.id]);
+      const addedAp = Math.max(0, (currentVal - 1) * 0.15);
+      const newAp = attrApt(a.id) + addedAp;
       state[a.id + "Ap"] = newAp;
       gains[a.id] = newAp;
     }
@@ -482,13 +593,49 @@ export function createGame(state, opts = {}) {
     state.Money = START_MONEY;
     state.AgeDays = START_AGE_DAYS;
     state.Activity = "Rest";
-    let best = "";
-    let bestAp = 0;
-    for (const a of ATTRIBUTES) {
-      if (gains[a.id] > bestAp) { bestAp = gains[a.id]; best = a.name; }
-    }
-    logMsg(`Life ${state.Lives}: ${cause}. Aptitude ×${mult.toFixed(2)} — ${best} now ×${bestAp.toFixed(2)}.`, "life");
+    logMsg(`Death: ${cause}. The body remembers: aptitudes increased from your training!`, "life");
     updatePotential();
+  }
+
+  function rebirthCost() {
+    return 50 + num(state.Lives) * 50;
+  }
+
+  function rebirth() {
+    const pot = potential();
+    if (pot < 25) {
+      logMsg("You need at least 25 Potential to Rebirth.", "sys");
+      return false;
+    }
+    const cost = rebirthCost();
+    if (num(state.Money) < cost) {
+      logMsg(`Not enough Cash to Rebirth. Cost: ${cost} Cash.`, "sys");
+      return false;
+    }
+    state.Money = num(state.Money) - cost;
+    state.Lives = num(state.Lives) + 1;
+    const mult = 1 + (pot / 100);
+    for (const a of ATTRIBUTES) {
+      state[a.id + "Ap"] = attrApt(a.id) * mult;
+      state[a.id] = 1;
+    }
+    state.TempBoosts = { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 };
+    state.Health = maxHealth();
+    state.Stamina = maxStamina();
+    state.Nutrition = maxNutrition();
+    state.Money = START_MONEY;
+    state.AgeDays = START_AGE_DAYS;
+    state.Activity = "Rest";
+    logMsg(`REBIRTH #${state.Lives}! Potential ${pot} granted aptitude multiplier x${mult.toFixed(2)}!`, "life");
+    updatePotential();
+    return true;
+  }
+
+  function reincarnate(cause, opts = {}) {
+    if (opts.manual) {
+      return rebirth();
+    }
+    onDeath(cause);
     return true;
   }
 
@@ -697,7 +844,25 @@ export function createGame(state, opts = {}) {
         state.Money = num(state.Money) + reward;
         addStyleXp(activeStyle(), num(extra.styleXp) || 4);
         applyFightGains(true);
-        logMsg(`You beat ${extra.name}, a roaming fighter. +${reward} Cash.`, "fight");
+        logMsg(`You won Bout ${extra.chainStep || 1} of ${extra.name}. +${reward} Cash.`, "fight");
+      } else if (mode === "tourney") {
+        const reward = num(extra.reward);
+        state.Money = num(state.Money) + reward;
+        addStyleXp(activeStyle(), 10);
+        applyFightGains(true);
+        logMsg(`TOURNAMENT ROUND ${extra.round} VICTORY! +${reward} Cash.`, "fight");
+      } else if (mode === "gu") {
+        const wave = extra.wave || 1;
+        addStyleXp(activeStyle(), 15);
+        applyFightGains(true);
+        if (wave >= 5) {
+          state.Money = num(state.Money) + 500;
+          learnStyle("Formless");
+          addKnowledge("Formless", KNOWLEDGE_LEARNED);
+          logMsg("THE GU RITUAL IS WON! You survived the pit and mastered the FORMLESS style! +500 Cash.", "fight");
+        } else {
+          logMsg(`Gu Ritual Wave ${wave} cleared! Prepare for the next survivor.`, "fight");
+        }
       } else { // encounter
         const moneyGain = 5 + Math.floor(pot / 20);
         state.Money = num(state.Money) + moneyGain;
@@ -884,6 +1049,7 @@ export function createGame(state, opts = {}) {
       district: r.district,
       zone: r.zone,
       style: r.style,
+      chainStep: 1,
       stats: {
         Str: Math.max(1, Math.floor(cur.Str * m)),
         Tou: Math.max(1, Math.floor(cur.Tou * m)),
@@ -893,6 +1059,32 @@ export function createGame(state, opts = {}) {
       },
       reward: Math.max(1, Math.round((r.reward || 0) + Math.floor(pot / 20))),
       styleXp: 4 + Math.floor(pot / 100),
+    };
+  }
+
+  function buildChainedRoamer(r, step = 1) {
+    const pot = potential();
+    const cur = currentStats();
+    const stepMult = 1 + (step - 1) * 0.25;
+    const m = (r.mult || 1.0) * stepMult;
+    const allStyles = Object.keys(STYLES);
+    const chosenStyle = step === 1 ? r.style : allStyles[Math.floor(R() * allStyles.length)];
+    return {
+      key: r.key,
+      name: `${r.name} - Bout ${step}`,
+      district: r.district,
+      zone: r.zone,
+      style: chosenStyle,
+      chainStep: step,
+      stats: {
+        Str: Math.max(1, Math.floor(cur.Str * m)),
+        Tou: Math.max(1, Math.floor(cur.Tou * m)),
+        Spd: Math.max(1, Math.floor(cur.Spd * m)),
+        Int: Math.max(1, Math.floor(cur.Int * m)),
+        Cha: 1,
+      },
+      reward: Math.max(1, Math.round(((r.reward || 0) + Math.floor(pot / 20)) * Math.pow(1.3, step - 1))),
+      styleXp: (4 + Math.floor(pot / 100)) * step,
     };
   }
 
@@ -942,14 +1134,14 @@ export function createGame(state, opts = {}) {
     return { result, mode: "roamer" };
   }
 
-  function beginRoamerFight(key) {
+  function beginRoamerFight(key, step = 1) {
     if (num(state.Health) <= 0) return null;
     if (battle) return null;
     if (typeof key !== "string") return null;
     const roamer = getRoamer(key);
     if (!roamer) return null;
     if (roamerStatus(key) !== "ready") return null;
-    const built = buildRoamer(roamer);
+    const built = buildChainedRoamer(roamer, step);
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(built.stats, built.style);
     battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0 };
@@ -962,6 +1154,86 @@ export function createGame(state, opts = {}) {
     view.round = 0;
     view.auto = state.AutoBattle === true;
     view.events = [];
+    view.chainStep = step;
+    view.roamerKey = key;
+    return view;
+  }
+
+  // ---- Arena Modes: Tournament & Gu Ritual ----
+  function beginTourneyFight(round = 1) {
+    if (num(state.Health) <= 0) return null;
+    if (battle) return null;
+    const pot = potential();
+    const cur = currentStats();
+    const m = 0.85 + (round - 1) * 0.35;
+    const styles = Object.keys(STYLES);
+    const foeStyle = styles[Math.floor(R() * styles.length)];
+    const foeStats = {
+      Str: Math.max(2, Math.floor(cur.Str * m)),
+      Tou: Math.max(2, Math.floor(cur.Tou * m)),
+      Spd: Math.max(2, Math.floor(cur.Spd * m)),
+      Int: Math.max(1, Math.floor(cur.Int * m)),
+      Cha: 1,
+    };
+    const names = ["Contender", "Pit Veteran", "Arena Champion"];
+    const foeName = `${names[round - 1] || "Gladiator"} (${STYLES[foeStyle].name})`;
+    const extra = {
+      round,
+      name: foeName,
+      style: foeStyle,
+      reward: 30 * round + Math.floor(pot / 10),
+    };
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const foe = makeCombatant(foeStats, foeStyle);
+    battle = { me, foe, mode: "tourney", extra, idx: 0, bet: 0, pot, round: 0 };
+    state.InFight = true;
+    const view = combatantToView(me, foe);
+    view.foeName = foeName;
+    view.foeStyleName = STYLES[foeStyle].name;
+    view.playerStyleName = STYLES[activeStyle()].name;
+    view.mode = "tourney";
+    view.round = 0;
+    view.auto = state.AutoBattle === true;
+    view.events = [];
+    view.tourneyRound = round;
+    return view;
+  }
+
+  function beginGuFight(wave = 1) {
+    if (num(state.Health) <= 0) return null;
+    if (battle) return null;
+    const pot = potential();
+    const cur = currentStats();
+    const m = 0.90 + (wave - 1) * 0.22;
+    const styles = Object.keys(STYLES);
+    const foeStyle = styles[Math.floor(R() * styles.length)];
+    const foeStats = {
+      Str: Math.max(3, Math.floor(cur.Str * m)),
+      Tou: Math.max(3, Math.floor(cur.Tou * m)),
+      Spd: Math.max(3, Math.floor(cur.Spd * m)),
+      Int: Math.max(2, Math.floor(cur.Int * m)),
+      Cha: 1,
+    };
+    const foeName = `Gu Survivor #${wave} (${STYLES[foeStyle].name})`;
+    const extra = {
+      wave,
+      name: foeName,
+      style: foeStyle,
+      reward: 20 * wave,
+    };
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const foe = makeCombatant(foeStats, foeStyle);
+    battle = { me, foe, mode: "gu", extra, idx: 0, bet: 0, pot, round: 0 };
+    state.InFight = true;
+    const view = combatantToView(me, foe);
+    view.foeName = foeName;
+    view.foeStyleName = STYLES[foeStyle].name;
+    view.playerStyleName = STYLES[activeStyle()].name;
+    view.mode = "gu";
+    view.round = 0;
+    view.auto = state.AutoBattle === true;
+    view.events = [];
+    view.guWave = wave;
     return view;
   }
 
@@ -1356,9 +1628,13 @@ export function createGame(state, opts = {}) {
     logMsg, snapshot: () => snapshot(state),
     maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions
-    setActivity, setLocation, setLooking, setStyle, reincarnate, reincarnateCost,
+    setActivity, setLocation, setLooking, setStyle, reincarnate, rebirthCost,
     setName, hardReset,
     setAutoBattle, buyItem, trainingAt,
+    // jobs
+    jobLevel, jobXp, doJobShift, doAutoJob, jobCooldownRemaining, jobCanWork,
+    // arena modes
+    beginTourneyFight, beginGuFight,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
     // ghosts

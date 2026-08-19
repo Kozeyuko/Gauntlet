@@ -554,29 +554,38 @@ header {
 }
 .loglist {
   font-family: var(--mono);
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.45;
   color: var(--muted);
   background: #101318;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   min-height: 46px;
   max-height: 200px;
   overflow-y: auto;
 }
-.logentry { margin-bottom: 4px; display: flex; align-items: baseline; gap: 6px; }
+.logentry {
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .logentry:last-child { margin-bottom: 0; }
 .logtag {
   flex: none;
-  font-size: 9.5px;
-  letter-spacing: 1px;
-  padding: 1px 5px;
-  border-radius: 4px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 0px 4px;
+  border-radius: 3px;
   border: 1px solid var(--line);
   color: var(--muted);
 }
 /* kind colors */
+.k-job .logtag { color: var(--blue); border-color: rgba(106,168,232,.5); }
 .k-rank .logtag { color: var(--gold); border-color: var(--gold-dim); }
 .k-fight .logtag { color: var(--red); border-color: rgba(224,90,78,.5); }
 .k-train .logtag { color: var(--green); border-color: rgba(94,194,123,.5); }
@@ -605,6 +614,77 @@ header {
 .logrow { display: flex; gap: 8px; align-items: baseline; padding: 1px 0; }
 .logage { flex: none; color: var(--muted); opacity: .65; font-size: 11px; width: 46px; }
 .logtxt { flex: 1; color: var(--text); }
+
+/* ---------- Jobs & Minigames ---------- */
+.jobcard {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.jobcard .jhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.jobcard .jdesc { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.jobcard .jmeta { font-size: 12px; color: var(--text); margin-bottom: 10px; }
+.jobcard .jbtns { display: flex; gap: 8px; }
+.jobcard .jbar { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.jobcard .jbar i { display: block; height: 100%; background: var(--gold); }
+
+#jobGameArea {
+  min-height: 260px;
+  background: #101318;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.mg-header { font-size: 14px; font-weight: 600; color: var(--gold); margin-bottom: 12px; text-align: center; }
+.mg-prompt { font-size: 15px; margin-bottom: 16px; text-align: center; }
+.mg-grid { display: grid; gap: 10px; width: 100%; max-width: 360px; }
+.mg-grid.doors { grid-template-columns: repeat(3, 1fr); }
+.mg-grid.whack { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 70px); }
+.mg-grid.bins { grid-template-columns: repeat(2, 1fr); }
+.mg-target {
+  min-height: 54px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+  touch-action: manipulation;
+}
+.mg-target:active { transform: scale(0.96); }
+.mg-target.hit { border-color: var(--green); background: rgba(94,194,123,.2); }
+.mg-target.miss { border-color: var(--red); background: rgba(224,90,78,.2); }
+.mg-target.active-dish { border-color: var(--orange); background: rgba(235,150,70,.25); }
+
+/* ---------- Arena Hub ---------- */
+.arenacard {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.arenacard h3 { color: var(--gold); margin-bottom: 4px; }
+.arenacard p { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.arenacard .btn { width: 100%; }
 
 /* ---------- overlays / modals ---------- */
 .overlay {

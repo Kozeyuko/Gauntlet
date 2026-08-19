@@ -9,6 +9,10 @@ import {
   INSIDE,
   CSTORE_ITEMS,
   CLINIC_ITEMS,
+  JOBS,
+  jobPay,
+  jobStaminaCost,
+  jobXpForLevel,
   ROAMERS,
   MASTERY_TIERS,
   KNOWLEDGE_UNMASTERED,
@@ -46,7 +50,7 @@ const MAP_POS = {
   home: [75, 60], spar: [225, 60], wat: [375, 60],
   tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
   clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
-  arena: [225, 540], cstore: [375, 540],
+  jobboard: [75, 540], arena: [225, 540], cstore: [375, 540],
   // East district
   foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
   sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
@@ -166,6 +170,15 @@ export function initUI(game, opts = {}) {
     btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
     optNameInput: $("optNameInput"), btnOptNameSave: $("btnOptNameSave"),
     btnOptionsClose: $("btnOptionsClose"),
+    // jobs
+    btnJobs: $("btnJobs"), jobsOverlay: $("jobsOverlay"), jobList: $("jobList"),
+    jobGameArea: $("jobGameArea"), btnJobsClose: $("btnJobsClose"),
+    // arena hub
+    arenaOverlay: $("arenaOverlay"), btnArenaLadder: $("btnArenaLadder"),
+    btnArenaTourney: $("btnArenaTourney"), btnArenaGu: $("btnArenaGu"), btnArenaClose: $("btnArenaClose"),
+    // chained roamers
+    chainOverlay: $("chainOverlay"), chainPrompt: $("chainPrompt"),
+    btnChainNext: $("btnChainNext"), btnChainCashout: $("btnChainCashout"),
     // city map
     citymap: $("citymap"),
     // rival overlay
@@ -230,6 +243,8 @@ export function initUI(game, opts = {}) {
     game.setLocation(key);
     if (key === "cstore") { openStore("cstore"); return; }
     if (key === "clinic") { openStore("clinic"); return; }
+    if (key === "jobboard") { openJobs(); return; }
+    if (key === "arena") { openArena(); return; }
     openLocationOverlay(key);
   }
 
@@ -472,7 +487,7 @@ export function initUI(game, opts = {}) {
 
   const LOG_KIND_LABEL = {
     sys: "", rank: "RANK", fight: "FIGHT", train: "TRAIN", money: "MONEY",
-    life: "LIFE", eat: "NUTRI", store: "STORE", skill: "MASTERY", loc: "MOVE", act: "ACT",
+    life: "LIFE", eat: "NUTRI", store: "STORE", skill: "MASTERY", loc: "MOVE", act: "ACT", job: "JOB",
   };
 
   function renderLog() {
@@ -565,9 +580,10 @@ export function initUI(game, opts = {}) {
     renderLog();
     renderLooking();
     maybeOpenRivalForEncounter();
-    const cost = game.reincarnateCost ? game.reincarnateCost() : 0;
-    el.btnReincarnate.textContent = `REINCARNATE (${cost} Cash)`;
+    const cost = game.rebirthCost ? game.rebirthCost() : 0;
+    el.btnReincarnate.textContent = `REBIRTH (${cost} Cash)`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
+    if (el.jobsOverlay.classList.contains("show") && el.jobList.style.display !== "none") renderJobs();
     if (el.locOverlay.classList.contains("show") && openLocKey) renderLocActivities(openLocKey);
   }
 
@@ -741,6 +757,248 @@ export function initUI(game, opts = {}) {
     renderLocStyles(key);
     el.locOverlay.classList.add("show");
   }
+
+  // ------------------------------------------------------------ Jobs UI & Minigames --
+  let minigameTimer = null;
+
+  function renderJobs() {
+    el.jobList.innerHTML = "";
+    for (const j of JOBS) {
+      const lvl = game.jobLevel(j.key);
+      const xp = game.jobXp(j.key);
+      const needed = jobXpForLevel(j, lvl);
+      const pay = jobPay(j, lvl);
+      const cost = jobStaminaCost(j, lvl);
+      const cd = game.jobCooldownRemaining(j.key);
+      const canAfford = num(state.Stamina) >= cost;
+
+      const card = document.createElement("div");
+      card.className = "jobcard";
+      card.innerHTML = `
+        <div class="jhead">
+          <span>${j.name}</span>
+          <span class="gold">Lv. ${lvl}</span>
+        </div>
+        <div class="jdesc">${j.desc}</div>
+        <div class="jbar"><i style="width:${Math.min(100, (xp / needed) * 100)}%"></i></div>
+        <div class="jmeta">
+          <span>XP: ${xp} / ${needed}</span> · 
+          <span>Cost: ${cost} STA</span> · 
+          <span>Pay: ~${pay} Cash</span>
+        </div>
+        <div class="jbtns">
+          <button class="btn small-btn work-btn" ${canAfford ? "" : "disabled"}>WORK SHIFT</button>
+          <button class="btn small-btn auto-btn" ${canAfford && cd <= 0 ? "" : "disabled"}>
+            ${cd > 0 ? `AUTO (${Math.ceil(cd / 1000)}s)` : "AUTO (50%)"}
+          </button>
+        </div>
+      `;
+
+      card.querySelector(".work-btn").addEventListener("click", () => startJobMinigame(j));
+      card.querySelector(".auto-btn").addEventListener("click", () => {
+        game.doAutoJob(j.key);
+        render();
+      });
+
+      el.jobList.appendChild(card);
+    }
+  }
+
+  function openJobs() {
+    el.jobList.style.display = "";
+    el.jobGameArea.style.display = "none";
+    el.jobGameArea.innerHTML = "";
+    renderJobs();
+    el.jobsOverlay.classList.add("show");
+  }
+
+  function startJobMinigame(job) {
+    if (!game.jobCanWork(job.key)) {
+      game.logMsg("Too tired to work.");
+      render();
+      return;
+    }
+    el.jobList.style.display = "none";
+    el.jobGameArea.style.display = "flex";
+    el.jobGameArea.innerHTML = "";
+
+    const lvl = game.jobLevel(job.key);
+    let round = 0;
+    let hits = 0;
+    const cfg = job.minigameConfig;
+    const totalRounds = cfg.rounds || 5;
+
+    function cleanup() {
+      if (minigameTimer) { clearTimeout(minigameTimer); minigameTimer = null; }
+    }
+
+    function finish(score) {
+      cleanup();
+      game.doJobShift(job.key, score);
+      el.jobGameArea.style.display = "none";
+      el.jobList.style.display = "";
+      render();
+    }
+
+    function nextRound() {
+      cleanup();
+      if (round >= totalRounds) {
+        finish(hits / totalRounds);
+        return;
+      }
+      round += 1;
+
+      if (job.minigame === "matchtap") {
+        const targetDoor = Math.floor(Math.random() * 3) + 1;
+        el.jobGameArea.innerHTML = `
+          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-prompt">Deliver to Door <b class="gold">#${targetDoor}</b>!</div>
+          <div class="mg-grid doors">
+            <button class="mg-target" data-door="1">#1</button>
+            <button class="mg-target" data-door="2">#2</button>
+            <button class="mg-target" data-door="3">#3</button>
+          </div>
+        `;
+        let resolved = false;
+        el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
+          b.addEventListener("click", () => {
+            if (resolved) return;
+            resolved = true;
+            const chosen = Number(b.getAttribute("data-door"));
+            if (chosen === targetDoor) {
+              hits += 1;
+              b.classList.add("hit");
+            } else {
+              b.classList.add("miss");
+            }
+            minigameTimer = setTimeout(nextRound, 400);
+          });
+        });
+        minigameTimer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            nextRound();
+          }
+        }, cfg.timePerRound || 2500);
+      } else if (job.minigame === "whack") {
+        const targetPos = Math.floor(Math.random() * 6);
+        el.jobGameArea.innerHTML = `
+          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-prompt">Quick! Tap the dirty dish!</div>
+          <div class="mg-grid whack">
+            ${[0, 1, 2, 3, 4, 5].map((i) => `<button class="mg-target ${i === targetPos ? "active-dish" : ""}" data-pos="${i}">${i === targetPos ? "🍽️" : ""}</button>`).join("")}
+          </div>
+        `;
+        let resolved = false;
+        el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
+          b.addEventListener("click", () => {
+            if (resolved) return;
+            resolved = true;
+            const pos = Number(b.getAttribute("data-pos"));
+            if (pos === targetPos) {
+              hits += 1;
+              b.classList.add("hit");
+            } else {
+              b.classList.add("miss");
+            }
+            minigameTimer = setTimeout(nextRound, 350);
+          });
+        });
+        minigameTimer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            nextRound();
+          }
+        }, cfg.timePerRound || 2000);
+      } else { // sort
+        const items = ["A", "B", "C", "D"];
+        const target = items[Math.floor(Math.random() * items.length)];
+        el.jobGameArea.innerHTML = `
+          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-prompt">Sort Box <b class="gold">[${target}]</b> into Bin:</div>
+          <div class="mg-grid bins">
+            ${items.map((it) => `<button class="mg-target" data-it="${it}">Bin ${it}</button>`).join("")}
+          </div>
+        `;
+        let resolved = false;
+        el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
+          b.addEventListener("click", () => {
+            if (resolved) return;
+            resolved = true;
+            const chosen = b.getAttribute("data-it");
+            if (chosen === target) {
+              hits += 1;
+              b.classList.add("hit");
+            } else {
+              b.classList.add("miss");
+            }
+            minigameTimer = setTimeout(nextRound, 400);
+          });
+        });
+        minigameTimer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            nextRound();
+          }
+        }, cfg.timePerRound || 3000);
+      }
+    }
+
+    nextRound();
+  }
+
+  // ------------------------------------------------------------ Arena Hub UI --
+  function openArena() {
+    el.arenaOverlay.classList.add("show");
+  }
+
+  // ------------------------------------------------------------ Chained Roamers UI --
+  let currentChain = null; // { key, step }
+
+  function promptChain(key, nextStep) {
+    currentChain = { key, step: nextStep };
+    el.chainPrompt.textContent = `Bout ${nextStep - 1} won! Face opponent #${nextStep} with +30% higher stakes, or cash out now?`;
+    el.chainOverlay.classList.add("show");
+  }
+
+  el.btnChainNext.addEventListener("click", () => {
+    el.chainOverlay.classList.remove("show");
+    if (!currentChain) return;
+    const view = game.beginRoamerFight(currentChain.key, currentChain.step);
+    if (view) openCombat(view);
+    else render();
+  });
+
+  el.btnChainCashout.addEventListener("click", () => {
+    el.chainOverlay.classList.remove("show");
+    currentChain = null;
+    game.logMsg("You cashed out and left the street gauntlet with your winnings.", "fight");
+    render();
+  });
+
+  el.btnJobs.addEventListener("click", openJobs);
+  el.btnJobsClose.addEventListener("click", () => {
+    if (minigameTimer) { clearTimeout(minigameTimer); minigameTimer = null; }
+    el.jobsOverlay.classList.remove("show");
+  });
+
+  el.btnArenaClose.addEventListener("click", () => el.arenaOverlay.classList.remove("show"));
+  el.btnArenaLadder.addEventListener("click", () => {
+    el.arenaOverlay.classList.remove("show");
+    el.rivalOverlay.classList.add("show");
+  });
+  el.btnArenaTourney.addEventListener("click", () => {
+    el.arenaOverlay.classList.remove("show");
+    const view = game.beginTourneyFight(1);
+    if (view) openCombat(view);
+    else render();
+  });
+  el.btnArenaGu.addEventListener("click", () => {
+    el.arenaOverlay.classList.remove("show");
+    const view = game.beginGuFight(1);
+    if (view) openCombat(view);
+    else render();
+  });
 
   // ------------------------------------------------------------ store overlay --
   let storeType = "cstore";
@@ -1109,12 +1367,33 @@ export function initUI(game, opts = {}) {
   }
 
   function finishCombat(view) {
+    const meta = combatMeta;
     activeView = null;
     combatMeta = null;
     stopAuto();
     el.combatOverlay.classList.remove("show");
     render();
-    showResult(view.win, String(state.LastMsg ?? ""));
+    if (meta && meta.mode === "roamer" && view.win) {
+      const curStep = view.chainStep || 1;
+      const roamerKey = view.roamerKey || "r_thug";
+      promptChain(roamerKey, curStep + 1);
+    } else if (meta && meta.mode === "tourney" && view.win && (view.tourneyRound || 1) < 3) {
+      const nextR = (view.tourneyRound || 1) + 1;
+      game.logMsg(`Tournament round ${nextR - 1} won! Advancing to Round ${nextR}...`, "fight");
+      setTimeout(() => {
+        const nextV = game.beginTourneyFight(nextR);
+        if (nextV) openCombat(nextV);
+      }, 500);
+    } else if (meta && meta.mode === "gu" && view.win && (view.guWave || 1) < 5) {
+      const nextW = (view.guWave || 1) + 1;
+      game.logMsg(`Gu Ritual Wave ${nextW - 1} eliminated! Next wave approaches...`, "fight");
+      setTimeout(() => {
+        const nextV = game.beginGuFight(nextW);
+        if (nextV) openCombat(nextV);
+      }, 500);
+    } else {
+      showResult(view.win, String(state.LastMsg ?? ""));
+    }
   }
 
   function openCombat(view) {

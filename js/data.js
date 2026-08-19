@@ -39,6 +39,58 @@ export const DATA_VERSION = 2;
 export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 
+// ------------------------------------------------------------------ JOBS --
+export const JOBS = [
+  {
+    key: "delivery",
+    name: "Delivery Run",
+    desc: "Drop off packages to the right doors. Tap the matching house before the timer expires.",
+    staminaCost: 8,
+    basePay: 6,
+    xpPerShift: 10,
+    xpToLevel: 50,
+    maxLevel: 20,
+    minigame: "matchtap",
+    minigameConfig: { rounds: 5, timePerRound: 3000, choices: 3 },
+  },
+  {
+    key: "dishwash",
+    name: "Dish Dash",
+    desc: "Tap dirty dishes as they appear. Quick taps = clean streaks = more pay.",
+    staminaCost: 6,
+    basePay: 5,
+    xpPerShift: 8,
+    xpToLevel: 40,
+    maxLevel: 20,
+    minigame: "whack",
+    minigameConfig: { rounds: 8, timePerRound: 2000, spawnDelay: 600 },
+  },
+  {
+    key: "stocking",
+    name: "Stock Sort",
+    desc: "Sort incoming boxes into the right bin. Tap the bin that matches the box label.",
+    staminaCost: 7,
+    basePay: 7,
+    xpPerShift: 9,
+    xpToLevel: 45,
+    maxLevel: 20,
+    minigame: "sort",
+    minigameConfig: { rounds: 6, timePerRound: 3500, bins: 4 },
+  },
+];
+
+export function jobPay(job, level) {
+  return Math.round(job.basePay * (1 + 0.18 * (level - 1)));
+}
+export function jobStaminaCost(job, level) {
+  return Math.max(Math.ceil(job.staminaCost * 0.5), Math.ceil(job.staminaCost * (1 - 0.03 * (level - 1))));
+}
+export function jobXpForLevel(job, level) {
+  return Math.round(job.xpToLevel * Math.pow(1.5, level - 1));
+}
+export const JOB_AUTO_RATE = 0.5;
+export const JOB_AUTO_COOLDOWN_MS = 60 * 1000;
+
 // ------------------------------------------------------------------ ATTRIBUTES --
 export const ATTRIBUTES = [
   { id: "Str", name: "Strength", desc: "Raw power. Boosts damage in every fight." },
@@ -120,6 +172,7 @@ export const LOCATIONS = {
   estate: { name: "Kure Estate", unlock: 11, tier: 4, styleGym: "KureStyle" },
   clinic: { name: "Clinic", unlock: 0, tier: 0, styleGym: null },
   cstore: { name: "Convenience Store", unlock: 0, tier: 0, styleGym: null },
+  jobboard: { name: "Job Board", unlock: 0, tier: 0, styleGym: null },
   arena: { name: "Bloody Arena", unlock: 0, tier: 0, styleGym: null },
   inside: { name: "The Inside", unlock: 7, tier: 0, styleGym: null },
   oldhouse: { name: "The Old House", unlock: 0, tier: 1, styleGym: null },
@@ -163,7 +216,8 @@ export const LOCATION_LIST = [
   { key: "estate", label: "Kure Estate", desc: "Polished grounds. High-standing opponents." },
   { key: "clinic", label: "Clinic", desc: "Surgical recovery. Heal fast, heal smart." },
   { key: "cstore", label: "Convenience Store", desc: "Food, drinks, and gear. Cash only.", glyph: "$" },
-  { key: "arena", label: "Arena", desc: "Raised ring, crowd noise, big payouts." },
+  { key: "jobboard", label: "Job Board", desc: "Pick up odd jobs and shifts. Earn Cash and level up.", glyph: "J" },
+  { key: "arena", label: "Arena", desc: "Raised ring, crowd noise, tournaments, and the Gu Ritual." },
   { key: "inside", label: "The Inside", desc: "They say this place changes you. Permanently." },
   { key: "oldhouse", label: "Old House", desc: "Creaking wood and hidden corners." },
   { key: "niko", label: "Boundless Dojo", desc: "No walls. No limits. Fight free." },
@@ -312,6 +366,8 @@ export const STYLES = {
     skills: [{ name: "Demon Step", mult: 1.0, crit: 0.04, dodge: 0.02, weight: 2 }, { name: "Demon Back Fist", mult: 1.35, crit: 0.12, dodge: 0.0, weight: 2 }, { name: "Culling Blow", mult: 1.6, crit: 0.18, dodge: -0.04, weight: 1 }] },
   UltraInstinct: { name: "Ultra Instinct", desc: "Move without thought. The body answers before the mind.", dmg: 1.36, dodge: 0.28, crit: 0.12, ult: { name: "Autonomous Brawl", mult: 1.7 },
     skills: [{ name: "Autonomous Dodge", mult: 0.75, crit: 0.0, dodge: 0.08, weight: 3 }, { name: "Instinct Counter", mult: 1.2, crit: 0.08, dodge: 0.04, weight: 2 }, { name: "Autonomous Brawl", mult: 1.45, crit: 0.12, dodge: 0.02, weight: 1 }] },
+  Formless: { name: "Formless", desc: "No fixed stance, no predictable flow. Born from the bloody crucible of the Gu Ritual.", dmg: 1.45, dodge: 0.25, crit: 0.15, ult: { name: "Void Stance", mult: 2.0 },
+    skills: [{ name: "Fluid Dodge", mult: 0.85, crit: 0.05, dodge: 0.10, weight: 3 }, { name: "Phantom Jab", mult: 1.20, crit: 0.08, dodge: 0.04, weight: 2 }, { name: "Whip Strike", mult: 1.40, crit: 0.12, dodge: 0.02, weight: 2 }, { name: "Gu Evolution", mult: 1.70, crit: 0.20, dodge: 0.05, weight: 1 }] },
 };
 
 // ------------------------------------------------------------------ RIVALS --
@@ -539,22 +595,11 @@ export const IMAGINED_NPCS = [
 export const ENCOUNTER_NAMES = ["Street Fighter", "Drifter", "Bouncer", "Thug", "Rival in the Crowd"];
 
 // ------------------------------------------------------------------ ROAMERS --
-// Free-roaming NPCs on the city map. Separate from RIVALS/INSIDE/ghosts.
-// `mult` scales their stats against the player's current stats (like ghosts);
-// `reward` is a base Cash payout, boosted by the player's potential at fight time.
+// Free-roaming encounter nodes on the city map.
+// Each node triggers a chained street fight sequence.
 export const ROAMERS = [
-  { key: "r_thug", name: "Alley Thug", district: "west", zone: "w-bottom", style: "Brawling", mult: 0.7, reward: 4 },
-  { key: "r_runner", name: "Park Runner", district: "west", zone: "w-top", style: "Taekwondo", mult: 0.75, reward: 5 },
-  { key: "r_rookie", name: "Gym Rookie", district: "west", zone: "w-mid", style: "Boxer", mult: 0.7, reward: 5 },
-  { key: "r_vagrant", name: "River Vagrant", district: "west", zone: "w-conn", style: "Brawling", mult: 0.8, reward: 6 },
-  { key: "r_kure", name: "Kure Straggler", district: "west", zone: "w-top2", style: "KureStyle", mult: 1.1, reward: 12 },
-  { key: "r_bridge", name: "Bridge Tough", district: "east", zone: "bridge", style: "MuayThai", mult: 0.9, reward: 8 },
-  { key: "r_bouncer", name: "Dock Bouncer", district: "east", zone: "e-bottom", style: "Wrestling", mult: 0.85, reward: 7 },
-  { key: "r_kickboxer", name: "Street Kickboxer", district: "east", zone: "e-mid", style: "Kickboxing", mult: 0.9, reward: 8 },
-  { key: "r_karateka", name: "Wandering Karateka", district: "east", zone: "e-top", style: "Shotokan", mult: 0.85, reward: 7 },
-  { key: "r_grappler", name: "Back-alley Grappler", district: "east", zone: "e-conn", style: "Judo", mult: 0.95, reward: 9 },
-  { key: "r_blade", name: "Stick Fighter", district: "east", zone: "e-conn2", style: "KaliArnis", mult: 0.9, reward: 9 },
-  { key: "r_monk", name: "Itinerant Monk", district: "east", zone: "e-mid2", style: "KungFu", mult: 1.0, reward: 10 },
-  { key: "r_brute", name: "Foundry Brute", district: "east", zone: "e-bottom2", style: "M2Cross", mult: 1.0, reward: 10 },
-  { key: "r_silat", name: "Pencak Drifter", district: "east", zone: "e-top2", style: "Silat", mult: 1.05, reward: 11 },
+  { key: "r_thug", name: "Back Alley Slums", district: "west", zone: "w-bottom", style: "Brawling", mult: 0.75, reward: 8 },
+  { key: "r_bridge", name: "Grand River Bridge", district: "west", zone: "bridge", style: "MuayThai", mult: 0.90, reward: 12 },
+  { key: "r_monk", name: "Eastern Temple Grounds", district: "east", zone: "e-top", style: "KungFu", mult: 1.05, reward: 16 },
+  { key: "r_brute", name: "Industrial Pits", district: "east", zone: "e-bottom2", style: "M2Cross", mult: 1.20, reward: 22 },
 ];

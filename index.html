@@ -22,6 +22,7 @@
   <div class="headerbtns">
     <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
+    <button class="btn small-btn" id="btnJobs">JOBS</button>
     <button class="btn small-btn" id="btnRival">RIVAL</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
   </div>
@@ -76,10 +77,61 @@
       <button class="btn red" id="btnQuickFight">FIGHT</button>
     </section>
     <div class="footbtns">
-      <button class="btn orange" id="btnReincarnate">REINCARNATE</button>
+      <button class="btn orange" id="btnReincarnate">REBIRTH</button>
       <button class="btn small-btn" id="btnReset">RESET SAVE</button>
     </div>
   </aside>
+</div>
+
+<!-- ============ JOBS OVERLAY ============ -->
+<div class="overlay" id="jobsOverlay">
+  <div class="modal">
+    <h2>Job Board</h2>
+    <div class="sub">Pick up a shift. Earn Cash. Level up for better pay.</div>
+    <div id="jobList"></div>
+    <div id="jobGameArea" style="display:none"></div>
+    <div class="acts">
+      <button class="btn" id="btnJobsClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ARENA HUB OVERLAY ============ -->
+<div class="overlay" id="arenaOverlay">
+  <div class="modal">
+    <h2>Bloody Arena</h2>
+    <div class="sub">The center of district combat. Choose your battleground.</div>
+    <div class="arenacard">
+      <h3>Ladder Match</h3>
+      <p>Challenge the current ranked rival or Inside champion.</p>
+      <button class="btn red" id="btnArenaLadder">FIGHT RIVAL</button>
+    </div>
+    <div class="arenacard">
+      <h3>District Tournament</h3>
+      <p>3-round single elimination bracket. Big Cash rewards and stat growth.</p>
+      <button class="btn gold" id="btnArenaTourney">ENTER TOURNAMENT</button>
+    </div>
+    <div class="arenacard">
+      <h3>The Gu Ritual</h3>
+      <p>5-wave pit survival. Survive against everyone to master the legendary FORMLESS style.</p>
+      <button class="btn purple" id="btnArenaGu">ENTER GU RITUAL</button>
+    </div>
+    <div class="acts">
+      <button class="btn" id="btnArenaClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAUNTLET CHAIN OVERLAY ============ -->
+<div class="overlay" id="chainOverlay">
+  <div class="modal">
+    <h2>Bout Won!</h2>
+    <p id="chainPrompt">You defeated your opponent. Continue down the alley for higher stakes?</p>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn red" id="btnChainNext">NEXT BOUT (+30% Rewards)</button>
+      <button class="btn gold" id="btnChainCashout">CASH OUT & LEAVE</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ RIVAL OVERLAY ============ -->
