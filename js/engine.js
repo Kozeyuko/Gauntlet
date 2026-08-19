@@ -297,9 +297,9 @@ export function createGame(state, opts = {}) {
 
   // ---- reincarnation ----
   function reincarnate(cause) {
-    const totalLivesSoFar = num(state.Lives);
-    state.Lives = totalLivesSoFar + 1;
-    const mult = Math.min(5.0, 1 + totalLivesSoFar * 0.10);
+    const prevLives = num(state.Lives);
+    state.Lives = prevLives + 1;
+    const mult = Math.min(5.0, 1 + prevLives * 0.10);
     const gains = {};
     for (const a of ATTRIBUTES) {
       const ap = attrApt(a.id);

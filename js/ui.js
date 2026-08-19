@@ -662,8 +662,12 @@ export function initUI(game, opts = {}) {
 
   el.btnReset.addEventListener("click", () => {
     if (!confirm("Hard reset? This wipes your save and ghosts.")) return;
-    localStorage.removeItem(SAVE_KEY);
-    localStorage.removeItem(GHOST_KEY);
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(GHOST_KEY);
+    } catch (e) {
+      // localStorage may be unavailable (private browsing); clear state anyway
+    }
     game.hardReset();
     game.clampVitals();
     game.logMsg("You leave home at 18. Train, fight, and learn.");
