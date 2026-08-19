@@ -8,6 +8,7 @@ import {
   ACTIVITY_ALIAS,
   LOCATIONS,
   STYLES,
+  STORE_ITEMS,
   RIVALS,
   INSIDE,
   RANKS,
@@ -43,6 +44,8 @@ import {
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+const BUFF_LABELS = { weights: "Training weights" };
 
 // Render a structured combat event back to the human-readable log line.
 // Reproduces the legacy format exactly: "You used Wild Swing (CRIT) — 10 dmg".
@@ -108,6 +111,7 @@ export const PERSISTENT_KEYS = [
   "Lives", "Wins", "RivalIdx", "Location", "Activity",
   "Looking", "Styles", "ActiveStyle", "StyleXp", "PotRank",
   "InFight", "AutoBattle",
+  "StoreBuffs", "TempBoosts",
   "Log",
 ];
 
@@ -121,6 +125,8 @@ export function freshState() {
     RivalIdx: 1, Location: "home", Activity: "Rest",
     Looking: false, Styles: "Brawling", ActiveStyle: "Brawling",
     StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
+    StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
+    AutoRun: false,
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -171,11 +177,19 @@ export function createGame(state, opts = {}) {
   }
 
   // ---- attribute helpers ----
-  const attrValue = (id) => Math.max(0, num(state[id]));
+  const attrValue = (id) => Math.max(0, num(state[id]) + num(state.TempBoosts && state.TempBoosts[id]));
   const attrApt = (id) => Math.max(1, num(state[id + "Ap"]));
   function num(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
+  }
+  function maxHealth() { return 100 + attrValue("Tou") * 10; }
+  function maxStamina() { return 100 + attrValue("Spd") * 8; }
+  function maxNutrition() { return 100 + attrValue("Int") * 5; }
+  function clampVitals() {
+    state.Health = clamp(num(state.Health), 0, maxHealth());
+    state.Stamina = clamp(num(state.Stamina), 0, maxStamina());
+    state.Nutrition = clamp(num(state.Nutrition), 0, maxNutrition());
   }
   function logMsg(msg) {
     state.LastMsg = msg;
@@ -209,7 +223,7 @@ export function createGame(state, opts = {}) {
     for (let i = from; i <= idx; i++) paid += RANKS[i - 1].reward;
     if (paid > 0) {
       state.Money = num(state.Money) + paid;
-      logMsg(`POTENTIAL UP! Rank ${RANKS[idx - 1].name} — +${paid} Taels.`);
+      logMsg(`POTENTIAL UP! Rank ${RANKS[idx - 1].name} — +${paid} Cash.`);
     }
     state.PotRank = idx;
     state.PotRankName = RANKS[idx - 1].name;
@@ -275,19 +289,21 @@ export function createGame(state, opts = {}) {
 
   // ---- reincarnation ----
   function reincarnate(cause) {
-    state.Lives = num(state.Lives) + 1;
+    const totalLivesSoFar = num(state.Lives);
+    state.Lives = totalLivesSoFar + 1;
+    const mult = Math.min(5.0, 1 + totalLivesSoFar * 0.10);
     const gains = {};
     for (const a of ATTRIBUTES) {
-      const v = attrValue(a.id);
       const ap = attrApt(a.id);
-      const newAp = ap + v / 25;
+      const newAp = ap * mult;
       state[a.id + "Ap"] = newAp;
       gains[a.id] = newAp;
     }
     for (const a of ATTRIBUTES) state[a.id] = 1;
-    state.Health = 100;
-    state.Stamina = 100;
-    state.Nutrition = 100;
+    state.TempBoosts = { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 };
+    state.Health = maxHealth();
+    state.Stamina = maxStamina();
+    state.Nutrition = maxNutrition();
     state.Money = START_MONEY;
     state.AgeDays = START_AGE_DAYS;
     state.Activity = "Rest";
@@ -296,7 +312,7 @@ export function createGame(state, opts = {}) {
     for (const a of ATTRIBUTES) {
       if (gains[a.id] > bestAp) { bestAp = gains[a.id]; best = a.name; }
     }
-    logMsg(`Life ${state.Lives}: ${cause}. Aptitudes grew — ${best} now ×${bestAp.toFixed(2)}.`);
+    logMsg(`Life ${state.Lives}: ${cause}. Aptitude ×${mult.toFixed(2)} — ${best} now ×${bestAp.toFixed(2)}.`);
     updatePotential();
   }
 
@@ -378,10 +394,10 @@ export function createGame(state, opts = {}) {
   function applyFightGains(win) {
     const gains = { Str: 0.20, Tou: 0.15, Spd: 0.15, Int: 0.10 };
     for (const id of Object.keys(gains)) {
-      state[id] = attrValue(id) + gains[id] * attrApt(id);
+      state[id] = num(state[id]) + gains[id] * attrApt(id);
     }
     if (!win) {
-      state.Tou = attrValue("Tou") + 0.05 * attrApt("Tou");
+      state.Tou = num(state.Tou) + 0.05 * attrApt("Tou");
     }
   }
 
@@ -418,7 +434,7 @@ export function createGame(state, opts = {}) {
       foeName = foe.name;
       bet = foe.bet;
       if (num(state.Money) < bet) {
-        logMsg(`The Inside demands a ${bet} Tael wager. You can't afford it.`);
+        logMsg(`The Inside demands a ${bet} Cash wager. You can't afford it.`);
         return null;
       }
       state.Money = num(state.Money) - bet;
@@ -449,9 +465,9 @@ export function createGame(state, opts = {}) {
         if (learned) {
           logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds! You learned ${STYLES[extra.style].name}!`);
         } else if (idx === MAX_RIVAL) {
-          logMsg(`THE MASTER FALLS in ${result.rounds} rounds! The Inside opens its doors. +${moneyGain} Taels.`);
+          logMsg(`THE MASTER FALLS in ${result.rounds} rounds! The Inside opens its doors. +${moneyGain} Cash.`);
         } else {
-          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds — landed ${result.playerSkill || "a clean hit"}! +${moneyGain} Taels. Next: ${RIVALS[idx].name}.`);
+          logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds — landed ${result.playerSkill || "a clean hit"}! +${moneyGain} Cash. Next: ${RIVALS[idx].name}.`);
         }
       } else if (mode === "inside") {
         state.Money = num(state.Money) + extra.pay;
@@ -460,9 +476,9 @@ export function createGame(state, opts = {}) {
         applyFightGains(true);
         if (idx < MAX_TOTAL) {
           state.RivalIdx = idx + 1;
-          logMsg(`INSIDE VICTORY over ${extra.name}! +${extra.pay} Taels. Next monster: ${INSIDE[idx - MAX_RIVAL].name}.`);
+          logMsg(`INSIDE VICTORY over ${extra.name}! +${extra.pay} Cash. Next monster: ${INSIDE[idx - MAX_RIVAL].name}.`);
         } else {
-          logMsg(`KURE REIKO FALLS! You conquered The Inside. Champion of the district. +${extra.pay} Taels.`);
+          logMsg(`KURE REIKO FALLS! You conquered The Inside. Champion of the district. +${extra.pay} Cash.`);
         }
       } else if (mode === "ghost") {
         const moneyGain = 10 + Math.floor((extra.potential || pot) / 50);
@@ -470,13 +486,13 @@ export function createGame(state, opts = {}) {
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 4 + Math.floor((extra.potential || 0) / 100));
         applyFightGains(true);
-        logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Taels. Their record is yours to claim.`);
+        logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`);
       } else { // encounter
         const moneyGain = 5 + Math.floor(pot / 20);
         state.Money = num(state.Money) + moneyGain;
         addStyleXp(activeStyle(), 3 + Math.floor(pot / 50));
         applyFightGains(true);
-        logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Taels.`);
+        logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Cash.`);
       }
       updatePotential();
     } else {
@@ -485,7 +501,7 @@ export function createGame(state, opts = {}) {
       if (mode === "inside") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
-        logMsg(`The Inside eats you alive — ${extra.name} takes the ${bet} Tael pot. You took ${dmg} damage.`);
+        logMsg(`The Inside eats you alive — ${extra.name} takes the ${bet} Cash pot. You took ${dmg} damage.`);
       } else if (mode === "encounter") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
@@ -498,6 +514,11 @@ export function createGame(state, opts = {}) {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
         logMsg(`DEFEAT by ${extra.name} after ${result.rounds} rounds. You took ${dmg} damage. Train and try again.`);
+      }
+      if (num(state.Health) <= 0) {
+        reincarnate("you succumbed to your wounds");
+        state.InFight = false;
+        state.AutoBattle = false;
       }
       updatePotential();
     }
@@ -814,6 +835,37 @@ export function createGame(state, opts = {}) {
     }
   }
 
+  // ---- store ----
+  function hasBuff(name) {
+    return (Array.isArray(state.StoreBuffs) ? state.StoreBuffs : []).some((b) => b && b.name === name && num(b.daysLeft) > 0);
+  }
+
+  function buyItem(key) {
+    const item = STORE_ITEMS.find((i) => i.key === key);
+    if (!item) return false;
+    if (num(state.Money) < item.price) {
+      logMsg("Not enough Cash.");
+      return false;
+    }
+    state.Money = num(state.Money) - item.price;
+    if (item.nutrition) {
+      state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
+      logMsg(`Bought ${item.name}. +${item.nutrition} Nutrition.`);
+    } else if (item.stat) {
+      if (!state.TempBoosts) state.TempBoosts = {};
+      state.TempBoosts[item.stat] = num(state.TempBoosts[item.stat]) + item.amount;
+      const attrName = ATTRIBUTES.find((a) => a.id === item.stat).name;
+      logMsg(`Bought ${item.name}. +${item.amount} ${attrName} for this life.`);
+    } else if (item.buff) {
+      if (!state.StoreBuffs) state.StoreBuffs = [];
+      state.StoreBuffs.push({ name: item.buff, daysLeft: item.days });
+      logMsg(`Bought ${item.name}. Training gains doubled for ${item.days} days.`);
+    }
+    clampVitals();
+    updatePotential();
+    return true;
+  }
+
   function locationMult(actKey) {
     const loc = LOCATIONS[String(state.Location ?? "home")] || LOCATIONS.home;
     if (loc.name === "Home") return HOME_MULT;
@@ -834,14 +886,14 @@ export function createGame(state, opts = {}) {
       if (money >= 5) {
         state.Money = money - 5;
         nutrition = 20;
-        logMsg("Hungry — bought a bowl of rice for 5 Taels.");
+        logMsg("Hungry — bought a bowl of rice for 5 Cash.");
       } else {
         nutrition = 0;
         state.Health = num(state.Health) - 5;
         logMsg("Starvation! You have no food and no money. -5 Health.");
       }
     }
-    state.Nutrition = clamp(nutrition, 0, 100);
+    state.Nutrition = clamp(nutrition, 0, maxNutrition());
 
     // 2) Activity
     let actKey = String(state.Activity ?? "Rest");
@@ -857,21 +909,22 @@ export function createGame(state, opts = {}) {
     const locName = loc.name;
 
     if (actKey === "Rest") {
-      state.Stamina = Math.min(100, stamina + 35);
-      state.Health = Math.min(100, num(state.Health) + 2);
+      state.Stamina = Math.min(maxStamina(), stamina + 35);
+      state.Health = Math.min(maxHealth(), num(state.Health) + 2);
     } else if (actKey === "OddJobs") {
       const money = act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha);
       state.Money = num(state.Money) + money;
       state.Stamina = stamina - act.cost;
-      logMsg(`Odd jobs: +${money} Taels.`);
+      logMsg(`Odd jobs: +${money} Cash.`);
     } else if (act.attr) {
       const mult = locationMult(actKey);
-      const gain = act.gain * mult * attrApt(act.attr);
-      state[act.attr] = attrValue(act.attr) + gain;
+      const double = hasBuff("weights") ? 2 : 1;
+      const gain = act.gain * mult * attrApt(act.attr) * double;
+      state[act.attr] = num(state[act.attr]) + gain;
       let cost = act.cost;
       if (actKey === "Running") cost = Math.floor(cost * 1.5);
       state.Stamina = stamina - cost;
-      if (act.staminaBonus) state.Stamina = Math.min(100, num(state.Stamina) + act.staminaBonus);
+      if (act.staminaBonus) state.Stamina = Math.min(maxStamina(), num(state.Stamina) + act.staminaBonus);
       const attrName = ATTRIBUTES.find((a) => a.id === act.attr).name;
       let sxp = "";
       if (loc.styleGym && loc.styleGym === activeStyle()) {
@@ -891,6 +944,20 @@ export function createGame(state, opts = {}) {
 
     // 4) Lifespan
     state.Lifespan = Math.min(60, BASE_LIFESPAN + attrValue("Tou") / 2);
+
+    // 4b) Store buffs tick down
+    if (Array.isArray(state.StoreBuffs) && state.StoreBuffs.length > 0) {
+      const kept = [];
+      for (const b of state.StoreBuffs) {
+        const d = num(b.daysLeft) - 1;
+        if (d <= 0) {
+          logMsg(`${BUFF_LABELS[b.name] || b.name} wore off.`);
+        } else {
+          kept.push({ name: b.name, daysLeft: d });
+        }
+      }
+      state.StoreBuffs = kept;
+    }
 
     // 5) Death
     const health = num(state.Health);
@@ -925,9 +992,10 @@ export function createGame(state, opts = {}) {
     attrValue, attrApt, potential, rankIndexFor, updatePotential,
     learnedStyles, activeStyle, styleXpMap,
     logMsg, snapshot: () => snapshot(state),
+    maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate,
-    setAutoBattle,
+    setAutoBattle, buyItem,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
     // ghosts

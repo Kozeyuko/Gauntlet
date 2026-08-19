@@ -75,6 +75,17 @@ export const ACTIVITY_LIST = [
   { key: "HeavyBag", label: "Heavy Bag (Str)" },
 ];
 
+// ------------------------------------------------------------------ STORE --
+export const STORE_ITEMS = [
+  { key: "rice", name: "Rice bowl", desc: "Restores 20 Nutrition", price: 5, nutrition: 20 },
+  { key: "protein", name: "Protein shake", desc: "+5 Strength for this life", price: 15, stat: "Str", amount: 5 },
+  { key: "energy", name: "Energy drink", desc: "+5 Speed for this life", price: 15, stat: "Spd", amount: 5 },
+  { key: "focus", name: "Focus tea", desc: "+5 Intelligence for this life", price: 15, stat: "Int", amount: 5 },
+  { key: "heart", name: "Heart tonic", desc: "+5 Toughness for this life", price: 20, stat: "Tou", amount: 5 },
+  { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5 },
+  { key: "weights", name: "Training weights", desc: "Double training gains for 3 days", price: 30, buff: "weights", days: 3 },
+];
+
 // ------------------------------------------------------------------ LOCATIONS --
 export const LOCATIONS = {
   home: { name: "Home", unlock: 0, mults: {}, styleGym: null },

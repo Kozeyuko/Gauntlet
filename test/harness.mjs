@@ -80,12 +80,16 @@ console.log("== Reincarnation ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential(); // establish rank (simulates onJoin)
   state.Str = 10;
-  g.reincarnate("you chose to begin a new life");
-  assertClose(state.StrAp, 1.4, "StrAp = 1.4 (1 + 10/25)");
+  g.reincarnate("you chose to begin a new life"); // Lives 0 -> 1, ×1.00
+  assertClose(state.StrAp, 1.0, "StrAp = 1.0 after life 1 (×1.00)");
   assert(state.Str === 1, "Str reset to 1");
   assert(state.Styles === "Brawling", "Styles kept");
   assert(state.Money === 30, "Money reset to 30");
   assert(state.Lives === 1, "Lives incremented to 1");
+  g.reincarnate("you died of old age"); // Lives 1 -> 2, ×1.10
+  assertClose(state.StrAp, 1.1, "StrAp = 1.1 after life 2 (×1.10)");
+  g.reincarnate("you died of old age"); // Lives 2 -> 3, ×1.20 (compounds)
+  assertClose(state.StrAp, 1.32, "StrAp = 1.32 after life 3 (×1.20 compounding)");
 }
 
 console.log("== Ladder win ==");

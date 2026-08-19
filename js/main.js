@@ -1,6 +1,5 @@
-// js/main.js — boot: load save, build the engine, start the day loop + autosave.
+// js/main.js — boot: load save, build the engine, start autosave.
 import { freshState, restore, createGame } from "./engine.js";
-import { DAY_SECONDS } from "./data.js";
 import { initUI } from "./ui.js";
 import { audio } from "./audio.js";
 
@@ -39,6 +38,7 @@ const saved = loadSave();
 const cameBack = restore(state, saved);
 
 const game = createGame(state, { loadGhosts, saveGhosts });
+game.clampVitals();
 
 // Welcome message mirrors BitCore onJoin, then refresh rank display.
 game.logMsg(cameBack ? "Welcome back. Your training continues." : "You leave home at 18. Train, fight, and learn.");
@@ -57,12 +57,6 @@ window.__game = game;
 
 // AudioContext must be created/resumed inside a user gesture (autoplay policy).
 document.addEventListener("pointerdown", () => audio.init(), { once: true });
-
-// The day loop: one in-game day every DAY_SECONDS real seconds.
-setInterval(() => {
-  game.doDay();
-  ui.render();
-}, DAY_SECONDS * 1000);
 
 // Autosave every 10s and on hide/reload.
 function persist() {

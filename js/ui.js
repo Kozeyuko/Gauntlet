@@ -7,6 +7,7 @@ import {
   STYLES,
   RIVALS,
   INSIDE,
+  STORE_ITEMS,
   MAX_RIVAL,
   MAX_TOTAL,
 } from "./data.js";
@@ -15,7 +16,10 @@ import { audio } from "./audio.js";
 
 const $ = (id) => document.getElementById(id);
 
-const clamp01 = (v) => Math.min(100, Math.max(0, v));
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const reducedMotion =
   typeof window !== "undefined" &&
@@ -32,6 +36,7 @@ export function initUI(game, opts = {}) {
   let prevFoeHp = null;
   let lastRound = 0;      // last rendered round (for banner pop)
   let lastRankMsg = "";   // last POTENTIAL UP message (for rankup ding)
+  let autoRunTimer = null; // activity auto-run setTimeout handle
 
   // ------------------------------------------------------------ element refs --
   const el = {
@@ -53,6 +58,13 @@ export function initUI(game, opts = {}) {
     logLine: $("logLine"),
     btnReincarnate: $("btnReincarnate"),
     btnReset: $("btnReset"),
+    btnAutoRun: $("btnAutoRun"),
+    btnStore: $("btnStore"),
+    storeOverlay: $("storeOverlay"), storeCash: $("storeCash"), storeList: $("storeList"),
+    btnStoreClose: $("btnStoreClose"),
+    btnOptions: $("btnOptions"), optionsOverlay: $("optionsOverlay"),
+    btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
+    btnOptionsClose: $("btnOptionsClose"),
     // combat
     combatOverlay: $("combatOverlay"),
     roundLbl: $("roundLbl"), modeLbl: $("modeLbl"),
@@ -82,7 +94,7 @@ export function initUI(game, opts = {}) {
     const b = document.createElement("button");
     b.className = "btn";
     b.textContent = act.label;
-    b.addEventListener("click", () => { game.setActivity(act.key); render(); });
+    b.addEventListener("click", () => clickActivity(act.key));
     activityButtons[act.key] = b;
     el.activitiesGrid.appendChild(b);
   });
@@ -92,10 +104,6 @@ export function initUI(game, opts = {}) {
     const b = document.createElement("button");
     b.className = "btn";
     b.textContent = loc.label;
-    if (loc.desc) {
-      b.setAttribute("title", loc.desc);
-      b.setAttribute("data-tip", loc.desc);
-    }
     b.addEventListener("click", () => { game.setLocation(loc.key); render(); });
     locationButtons[loc.key] = b;
     el.locationsGrid.appendChild(b);
@@ -125,15 +133,16 @@ export function initUI(game, opts = {}) {
   }
 
   function setBar(bar, txt, value, max = 100) {
-    const v = clamp01(value);
-    bar.style.width = (v / max) * 100 + "%";
-    txt.textContent = `${Math.round(value)} / ${Math.round(max)}`;
+    const m = Math.max(1, Number(max) || 0);
+    const v = Math.max(0, Number(value) || 0);
+    bar.style.width = Math.min(100, (v / m) * 100) + "%";
+    txt.textContent = `${Math.round(value)} / ${Math.round(m)}`;
   }
 
   function renderVitals() {
-    setBar(el.barHealth, el.barHealthTxt, Number(state.Health) || 0);
-    setBar(el.barStamina, el.barStaminaTxt, Number(state.Stamina) || 0);
-    setBar(el.barNutrition, el.barNutritionTxt, Number(state.Nutrition) || 0);
+    setBar(el.barHealth, el.barHealthTxt, Number(state.Health) || 0, game.maxHealth());
+    setBar(el.barStamina, el.barStaminaTxt, Number(state.Stamina) || 0, game.maxStamina());
+    setBar(el.barNutrition, el.barNutritionTxt, Number(state.Nutrition) || 0, game.maxNutrition());
   }
 
   function renderAttrs() {
@@ -219,7 +228,7 @@ export function initUI(game, opts = {}) {
         name: r.name,
         style: `Style: ${styleName(r.style)}`,
         line: r.line,
-        stats: `${fmtStats(r.stats)} · Reward ${r.rewardMoney} Taels`,
+        stats: `${fmtStats(r.stats)} · Reward ${r.rewardMoney} Cash`,
         fightLabel: "FIGHT",
         mode: "ladder",
       };
@@ -277,6 +286,111 @@ export function initUI(game, opts = {}) {
     renderRival();
     renderLog();
     renderLooking();
+  }
+
+  // ------------------------------------------------------------ activity auto-run --
+  function syncAutoRunBtn() {
+    const on = state.AutoRun === true;
+    el.btnAutoRun.textContent = on ? "AUTO: ON" : "AUTO: OFF";
+    el.btnAutoRun.classList.toggle("on", on);
+  }
+
+  function stopAutoRun() {
+    if (autoRunTimer) { clearTimeout(autoRunTimer); autoRunTimer = null; }
+  }
+
+  function pauseAutoRun() {
+    stopAutoRun();
+    state.AutoRun = false;
+    syncAutoRunBtn();
+  }
+
+  function autoRunStep() {
+    autoRunTimer = null;
+    if (state.AutoRun !== true) { syncAutoRunBtn(); return; }
+
+    const livesBefore = num(state.Lives);
+    const rankBefore = num(state.PotRank);
+
+    game.doDay();
+    render();
+
+    if (state.AutoRun !== true) { syncAutoRunBtn(); return; }
+    if (num(state.Lives) !== livesBefore) { pauseAutoRun(); return; }
+    if (num(state.PotRank) !== rankBefore) { pauseAutoRun(); return; }
+    if (num(state.Encounter) >= 1) { pauseAutoRun(); return; }
+
+    autoRunTimer = setTimeout(autoRunStep, 400);
+  }
+
+  function clickActivity(key) {
+    game.setActivity(key);
+    if (state.AutoRun === true) {
+      stopAutoRun();
+      autoRunStep();
+    } else {
+      game.doDay();
+      render();
+    }
+  }
+
+  // ------------------------------------------------------------ store overlay --
+  function renderStore() {
+    el.storeCash.textContent = String(Math.floor(num(state.Money)));
+    el.storeList.innerHTML = "";
+    for (const item of STORE_ITEMS) {
+      const row = document.createElement("div");
+      row.className = "storerow";
+      const main = document.createElement("div");
+      main.className = "smain";
+      const nm = document.createElement("div");
+      nm.className = "snm";
+      nm.textContent = item.name;
+      const sub = document.createElement("div");
+      sub.className = "ssub";
+      sub.textContent = item.desc;
+      main.appendChild(nm);
+      main.appendChild(sub);
+      const btn = document.createElement("button");
+      btn.className = "btn small-btn";
+      btn.textContent = `${item.price} Cash`;
+      btn.addEventListener("click", () => {
+        game.buyItem(item.key);
+        renderStore();
+        render();
+      });
+      row.appendChild(main);
+      row.appendChild(btn);
+      el.storeList.appendChild(row);
+    }
+  }
+
+  function openStore() {
+    renderStore();
+    el.storeOverlay.classList.add("show");
+  }
+
+  // ------------------------------------------------------------ options overlay --
+  const THEME_KEY = "gauntlet-theme";
+  function currentTheme() {
+    try { return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark"; }
+    catch (e) { return "dark"; }
+  }
+  function syncThemeBtns() {
+    const t = currentTheme();
+    el.btnThemeDark.classList.toggle("active-opt", t === "dark");
+    el.btnThemeLight.classList.toggle("active-opt", t === "light");
+  }
+  function applyTheme(theme) {
+    const t = theme === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* ignore */ }
+    syncThemeBtns();
+  }
+  function openOptions() {
+    syncSoundBtn();
+    syncThemeBtns();
+    el.optionsOverlay.classList.add("show");
   }
 
   // ------------------------------------------------------------ result overlay --
@@ -474,6 +588,8 @@ export function initUI(game, opts = {}) {
     lastRound = 0;
     el.combatLog.innerHTML = "";
     el.combatOverlay.classList.add("show");
+    el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
+    el.btnAuto.classList.toggle("gold", state.AutoBattle === true);
     renderCombat(view);
     maybeAuto();
   }
@@ -500,6 +616,7 @@ export function initUI(game, opts = {}) {
           <span class="tag ${tagCls}">[${tag}]</span>`;
         row.addEventListener("click", () => {
           el.ghostOverlay.classList.remove("show");
+          pauseAutoRun();
           const view = game.fightGhost(g.id);
           if (view) openCombat(view);
           else render();
@@ -512,12 +629,14 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ event wiring --
   el.btnFight.addEventListener("click", () => {
+    pauseAutoRun();
     const view = game.beginFight();
     if (view) openCombat(view);
     else render();
   });
 
   el.btnAutoFight.addEventListener("click", () => {
+    pauseAutoRun();
     const res = game.fight();
     render();
     if (res) showResult(res.result.win, String(state.LastMsg ?? ""));
@@ -584,18 +703,52 @@ export function initUI(game, opts = {}) {
 
   // sound toggle (persistent via localStorage)
   function syncSoundBtn() {
-    el.btnSound.textContent = audio.enabled ? "SND ON" : "SND OFF";
-    el.btnSound.classList.toggle("muted", !audio.enabled);
+    const on = audio.enabled;
+    el.btnSound.textContent = on ? "SND ON" : "SND OFF";
+    el.btnSound.classList.toggle("muted", !on);
+    el.btnOptSound.textContent = on ? "SND ON" : "SND OFF";
+    el.btnOptSound.classList.toggle("muted", !on);
   }
-  el.btnSound.addEventListener("click", () => {
+  function toggleSound() {
     audio.toggle();
     audio.click();
     syncSoundBtn();
+  }
+  el.btnSound.addEventListener("click", toggleSound);
+  el.btnOptSound.addEventListener("click", toggleSound);
+
+  // activity auto-run toggle
+  el.btnAutoRun.addEventListener("click", () => {
+    state.AutoRun = state.AutoRun !== true;
+    if (state.AutoRun !== true) stopAutoRun();
+    syncAutoRunBtn();
   });
+
+  // store
+  el.btnStore.addEventListener("click", () => {
+    if (el.storeOverlay.classList.contains("show")) el.storeOverlay.classList.remove("show");
+    else openStore();
+  });
+  el.btnStoreClose.addEventListener("click", () => el.storeOverlay.classList.remove("show"));
+  el.storeOverlay.addEventListener("click", (e) => {
+    if (e.target === el.storeOverlay) el.storeOverlay.classList.remove("show");
+  });
+
+  // options
+  el.btnOptions.addEventListener("click", () => {
+    if (el.optionsOverlay.classList.contains("show")) el.optionsOverlay.classList.remove("show");
+    else openOptions();
+  });
+  el.btnOptionsClose.addEventListener("click", () => el.optionsOverlay.classList.remove("show"));
+  el.optionsOverlay.addEventListener("click", (e) => {
+    if (e.target === el.optionsOverlay) el.optionsOverlay.classList.remove("show");
+  });
+  el.btnThemeDark.addEventListener("click", () => applyTheme("dark"));
+  el.btnThemeLight.addEventListener("click", () => applyTheme("light"));
 
   // short blip on any button-like click (hub + combat + ghosts)
   document.addEventListener("click", (e) => {
-    if (e.target.closest("#btnSound")) return;
+    if (e.target.closest("#btnSound, #btnOptSound")) return;
     if (e.target.closest(".btn, .movebtn, .ghostrow")) {
       audio.init();
       audio.click();
@@ -603,8 +756,10 @@ export function initUI(game, opts = {}) {
   });
 
   // ------------------------------------------------------------ initial paint --
+  applyTheme(currentTheme());
   render();
   syncSoundBtn();
+  syncAutoRunBtn();
   el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
 
   return { render };
