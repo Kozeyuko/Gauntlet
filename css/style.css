@@ -140,7 +140,7 @@ header {
 .btn:active { transform: translateY(1px); }
 
 /* ---------- tooltip ---------- */
-.btn[data-tip] { position: relative; }
+.btn[data-tip] { position: relative; overflow: visible !important; }
 .btn[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute;
