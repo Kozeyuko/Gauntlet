@@ -729,33 +729,24 @@ export function initUI(game, opts = {}) {
   }
 
   function renderLocActivities(key) {
-    const table = game.trainingAt(key) || {};
     el.activitiesGrid.innerHTML = "";
     const money = num(state.Money);
 
     function addRow(actKey) {
       const act = ACTIVITIES[actKey];
       if (!act) return;
-      const isGlobal = actKey === "Rest" || actKey === "OddJobs";
-      const entry = isGlobal ? null : table[actKey];
-      const isFree = !entry || entry.cost === 0;
-      const canAfford = isFree || money >= entry.cost;
+      const isFree = true;
+      const canAfford = true;
 
       const b = document.createElement("button");
       b.className = "btn locrow";
       if (!canAfford) b.classList.add("cantafford");
       if (actKey === state.Activity) b.classList.add("active");
 
-      const statName = act.attr
-        ? (ATTRIBUTES.find((a) => a.id === act.attr) || {}).name
-        : (actKey === "Rest" ? "recover" : "earn Cash");
+      const statName = actKey === "Rest" ? "recover" : "earn Cash";
 
       let meta = "";
-      if (entry) {
-        meta += `<span class="lr-gain">×${entry.gain.toFixed(1)}</span>`;
-        meta += `<span class="lr-cost${canAfford ? "" : " red"}">${entry.cost > 0 ? fmtCash(entry.cost) : "Free"}</span>`;
-        meta += `<span class="lr-stam">${act.cost} STA</span>`;
-      } else if (actKey === "Rest") {
+      if (actKey === "Rest") {
         meta += `<span class="lr-cost">Free</span>`;
         meta += `<span class="lr-stam">+35 STA</span>`;
       } else {
@@ -763,41 +754,16 @@ export function initUI(game, opts = {}) {
         meta += `<span class="lr-stam">${act.cost} STA</span>`;
       }
 
-      let tierLine = "";
-      const chain = trainChain(actKey);
-      if (chain) {
-        const tn = game.trainTierName(actKey);
-        const tp = game.trainTierProgress(actKey);
-        if (tn && tp) {
-          const nextTier = chain.tiers[tp.tier + 1];
-          if (nextTier && tp.req > 0) {
-            tierLine = `<span class="lr-tier">${tn} — ${tp.progress}/${tp.req} · ${nextTier.gainMult}x</span>`;
-          } else {
-            tierLine = `<span class="lr-tier">${tn} (max)</span>`;
-          }
-        }
-      }
-
       b.innerHTML = `
         <span class="lr-main">
           <span class="lr-name">${act.name}</span>
           <span class="lr-stat">${statName}</span>
-          ${tierLine}
         </span>
         <span class="lr-meta">${meta}</span>`;
       b.addEventListener("click", () => clickActivity(actKey));
       el.activitiesGrid.appendChild(b);
     }
 
-    const programs = Object.keys(table);
-    if (programs.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "small locempty";
-      empty.textContent = "No training programs here.";
-      el.activitiesGrid.appendChild(empty);
-    } else {
-      for (const actKey of programs) addRow(actKey);
-    }
     addRow("Rest");
     addRow("OddJobs");
   }
@@ -1046,7 +1012,6 @@ export function initUI(game, opts = {}) {
       const needed = jobXpForLevel(j, lvl);
       const pay = jobPay(j, lvl);
       const cost = jobStaminaCost(j, lvl);
-      const cd = game.jobCooldownRemaining(j.key);
       const canAfford = num(state.Stamina) >= cost;
       const isAutoActive = activeAuto === j.key;
 
@@ -1066,9 +1031,6 @@ export function initUI(game, opts = {}) {
         </div>
         <div class="jbtns">
           <button class="btn small-btn work-btn" ${canAfford ? "" : "disabled"}>WORK SHIFT</button>
-          <button class="btn small-btn auto-btn" ${canAfford && cd <= 0 ? "" : "disabled"}>
-            ${cd > 0 ? `AUTO (${Math.ceil(cd / 1000)}s)` : "AUTO (50%)"}
-          </button>
           <button class="btn small-btn auto-toggle-btn ${isAutoActive ? "on" : ""}">
             ${isAutoActive ? "AUTO: ON" : "AUTO: OFF"}
           </button>
@@ -1076,10 +1038,6 @@ export function initUI(game, opts = {}) {
       `;
 
       card.querySelector(".work-btn").addEventListener("click", () => startJobMinigame(j));
-      card.querySelector(".auto-btn").addEventListener("click", () => {
-        game.doAutoJob(j.key);
-        render();
-      });
       card.querySelector(".auto-toggle-btn").addEventListener("click", () => {
         if (isAutoActive) {
           game.clearAutoJob();
@@ -2265,7 +2223,7 @@ export function initUI(game, opts = {}) {
     }
     game.hardReset();
     game.clampVitals();
-    game.logMsg("You leave home at 18. Train, fight, and learn.");
+    game.logMsg("You enter Bobsled City at 18, looking to become the strongest.");
     render();
   });
 

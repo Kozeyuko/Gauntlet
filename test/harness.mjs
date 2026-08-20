@@ -57,9 +57,10 @@ console.log("== Training day at Home (Pushups) ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   g.doDay();
-  assertClose(state.Str, 0.06, "Str ≈ 0.06 (0.10 × 0.6 × 1)");
+  assertClose(state.Str, 0.10, "Str ≈ 0.10 (0.10 × 1.0 × 1)");
   assertClose(state.Stamina, 90, "Stamina = 90 (100 − 10)");
 }
 
@@ -179,6 +180,7 @@ console.log("== Encounter roll ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: () => 0 }); // always roll below any threshold
+  g.buyTraining("Pushups");
   g.setLooking(true);
   state.Location = "spar";
   state.Activity = "Pushups";
@@ -364,19 +366,18 @@ console.log("== trainingAt helper ==");
   assert(clinic && Object.keys(clinic).length === 0, "trainingAt('clinic') returns {}");
 }
 
-console.log("== Iron Spar: Pushups charges Cash and trains Str ==");
+console.log("== Iron Spar: Pushups trains Str after purchase ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential(); // establish rank so doDay doesn't pay a rank bonus
+  g.buyTraining("Pushups");
   g.setLocation("spar");
   g.setActivity("Pushups");
-  const moneyBefore = state.Money;
   const strBefore = state.Str;
   g.doDay();
-  assert(state.Money === moneyBefore - 2, `cash deducted for Pushups at Iron Spar (${moneyBefore} -> ${state.Money})`);
   assert(state.Str > strBefore, "Str gained");
-  assert(String(state.LastMsg).includes("Cash"), "log shows cost");
+  assert(String(state.LastMsg).includes("Training"), "log shows training");
 }
 
 console.log("== Iron Spar: unoffered activity falls back to Rest ==");
@@ -394,22 +395,7 @@ console.log("== Iron Spar: unoffered activity falls back to Rest ==");
   assert(state.Spd === spdBefore, "no stat gain");
   assert(state.Money === moneyBefore, "no cash lost");
   assert(state.Stamina > staminaBefore, "stamina restored (rested)");
-  assert(String(state.LastMsg).includes("can't train"), "log explains can't train here");
-}
-
-console.log("== Iron Spar: not enough Cash falls back to Rest ==");
-{
-  const state = freshState();
-  const g = createGame(state, { rng: makeRng(1) });
-  g.updatePotential();
-  g.setLocation("spar");
-  g.setActivity("Pushups");
-  state.Money = 0;
-  const strBefore = state.Str;
-  g.doDay();
-  assert(state.Str === strBefore, "no stat gain");
-  assert(state.Money === 0, "no cash lost (still 0)");
-  assert(String(state.LastMsg).includes("Not enough Cash"), "log explains not enough Cash");
+  assert(String(state.LastMsg).includes("haven't purchased training"), "log explains no training purchased");
 }
 
 console.log("== Home Pushups: free, Str grows ==");
@@ -417,11 +403,10 @@ console.log("== Home Pushups: free, Str grows ==");
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
-  const moneyBefore = state.Money;
   g.doDay();
   assert(state.Str > 0, "Str grows");
-  assert(state.Money === moneyBefore, "cost 0 (no cash charged)");
 }
 
 console.log("== OddJobs still earns Cash everywhere ==");
@@ -994,6 +979,7 @@ console.log("== Tasklist: empty TaskList falls back to Activity ==");
   state.Activity = "Pushups";
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   const strBefore = state.Str;
   g.doDay();
   assert(state.Str > strBefore, "Pushups trained (Str grew)");
@@ -1081,10 +1067,11 @@ console.log("== Training ladder: tier 0 gainMult 1.0 (baseline) ==");
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   g.doDay();
-  // Expected: 0.10 * 0.6 * 1.0 * 1.0 * 1 (home gain, no buff) = 0.06
-  assertClose(state.Str, 0.06, "tier 0 Str gain = 0.06");
+  // Expected: 0.10 * 1.0 * 1.0 * 1 (base gain, no location mult) = 0.10
+  assertClose(state.Str, 0.10, "tier 0 Str gain = 0.10");
 }
 
 console.log("== Training ladder: tier advances after req sessions ==");
@@ -1093,6 +1080,7 @@ console.log("== Training ladder: tier advances after req sessions ==");
   state.TrainProgress.Pushups = 19;
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   g.doDay();
   assert(g.trainTier("Pushups") === 1, "tier advanced to 1");
@@ -1125,7 +1113,7 @@ console.log("== Training ladder: tier 1 costs more stamina ==");
   state.TrainProgress.Pushups = 0;
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
-  g.setLocation("spar");
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   const stamBefore = state.Stamina;
   g.doDay();
@@ -1142,12 +1130,13 @@ console.log("== Training ladder: tier 1 gainMult applied ==");
   state.TrainProgress.Pushups = 0;
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   const strBefore = state.Str;
   g.doDay();
-  // tier 1: gainMult 1.35, home gain 0.6, so 0.10 * 0.6 * 1.35 = 0.081
+  // tier 1: gainMult 1.35, base gain 0.10, so 0.10 * 1.35 = 0.135
   const gained = state.Str - strBefore;
-  assertClose(gained, 0.081, "tier 1 Str gain = 0.081");
+  assertClose(gained, 0.135, "tier 1 Str gain = 0.135");
 }
 
 console.log("== Training ladder: TRAIN_CHAINS table has 6 activities ==");
@@ -1180,6 +1169,7 @@ console.log("== Training ladder: already at max tier stays at max ==");
   state.TrainProgress.Pushups = 0;
   const g = createGame(state, { rng: makeRng(1) });
   g.updatePotential();
+  g.buyTraining("Pushups");
   g.setActivity("Pushups");
   g.doDay();
   assert(g.trainTier("Pushups") === maxTier, "still at max tier");
@@ -1206,7 +1196,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 1.01, "GAME_VERSION === 1.01");
+  assert(GAME_VERSION === 2.0, "GAME_VERSION === 2.0");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1216,6 +1206,7 @@ console.log("== Part A: versionCompare ==");
   assert(versionCompare(1.01, 1.01) === 0, "1.01 === 1.01");
   assert(versionCompare(2, 1) === 1, "2 > 1");
   assert(versionCompare(1, 2) === -1, "1 < 2");
+  assert(versionCompare(2.0, 1.01) === 1, "2.0 > 1.01");
 }
 
 console.log("== Part A: UPDATE_LOG has correct structure ==");
@@ -1236,9 +1227,26 @@ console.log("== Part A: shouldShowUpdateLog uses versionCompare ==");
 console.log("== Part A: shouldShowUpdateLog false when current ==");
 {
   const state = freshState();
-  state.SeenVersion = 1.01;
+  state.SeenVersion = 2.0;
   const g = createGame(state, { rng: makeRng(1) });
-  assert(g.shouldShowUpdateLog() === false, "should not show when seenVersion=1.01");
+  assert(g.shouldShowUpdateLog() === false, "should not show when seenVersion=2.0");
+}
+
+// ================================================================
+// PART A — v2 training-anywhere
+// ================================================================
+console.log("== Part A: training via tasklist works regardless of location ==");
+{
+  const state = freshState();
+  state.Location = "clinic";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyTraining("Pushups");
+  g.setTaskList(["Pushups"], false);
+  const tlBefore = state.Stamina;
+  g.advanceDay();
+  assert(state.TaskList.length === 0, "task consumed");
+  assert(state.Stamina < tlBefore, "Pushups trained (stamina spent) even at clinic");
 }
 
 // ================================================================

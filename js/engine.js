@@ -1996,16 +1996,11 @@ export function createGame(state, opts = {}) {
     const loc = LOCATIONS[locKey] || LOCATIONS.home;
     const locName = loc.name;
 
-    // Location training economy: only programs offered at this location may be
-    // trained here. Rest / OddJobs stay globally available for free.
+    // Training via tasklist works anywhere the player has purchased the training
+    // (from the City Gym), regardless of current location.
     if (actKey !== "Rest" && actKey !== "OddJobs" && act.attr) {
-      const entry = trainingAt(locKey)[actKey];
-      if (!entry) {
-        logMsg(`You can't train ${actKey} here. Home has basics; gyms have programs.`);
-        actKey = "Rest";
-        act = ACTIVITIES.Rest;
-      } else if (num(state.Money) < entry.cost) {
-        logMsg(`Not enough Cash to train ${act.name} here (${entry.cost} Cash).`);
+      if (!hasTraining(actKey)) {
+        logMsg(`You haven't purchased training for ${actKey} yet.`);
         actKey = "Rest";
         act = ACTIVITIES.Rest;
       }
@@ -2020,15 +2015,13 @@ export function createGame(state, opts = {}) {
       state.Stamina = stamina - act.cost;
       logMsg(`Odd jobs: +${money} Cash.`, "money");
     } else if (act.attr) {
-      const entry = trainingAt(locKey)[actKey];
       const chain = trainChain(actKey);
       const tierIdx = chain ? trainTier(actKey) : 0;
       const tier = chain ? chain.tiers[tierIdx] : null;
       const gainMult = tier ? tier.gainMult : 1.0;
       const costMult = tier ? tier.costMult : 1.0;
-      state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
       const equipMult = trainingEquipMult(act.attr);
-      const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * equipMult;
+      const gain = act.gain * gainMult * attrApt(act.attr) * equipMult;
       state[act.attr] = num(state[act.attr]) + gain;
       let cost = act.cost;
       if (actKey === "Running") cost = Math.floor(cost * 1.5);
@@ -2042,7 +2035,7 @@ export function createGame(state, opts = {}) {
         sxp = ` — style mastery +${STYLEXP_TRAIN}`;
       }
       const tierLabel = tier ? ` [${tier.name}]` : "";
-      logMsg(`Training: +${gain.toFixed(2)} ${attrName} at ${locName}${tierLabel} (x${entry.gain.toFixed(1)}, ${Math.ceil(entry.cost * costMult)} Cash).${sxp}`, "train");
+      logMsg(`Training: +${gain.toFixed(2)} ${attrName}${tierLabel}.${sxp}`, "train");
 
       if (chain) {
         if (tierIdx + 1 < chain.tiers.length) {
@@ -2125,22 +2118,17 @@ export function createGame(state, opts = {}) {
       state.Stamina = stamina - act.cost;
       logMsg(`Odd jobs: +${money} Cash.`, "money");
     } else if (act.attr) {
-      const entry = trainingAt(locKey)[actKey];
-      if (!entry) {
+      if (!hasTraining(actKey)) {
         state.Stamina = Math.min(maxStamina(), stamina + 35);
-        logMsg("Can't train that here — resting.");
-      } else if (num(state.Money) < entry.cost) {
-        state.Stamina = Math.min(maxStamina(), stamina + 35);
-        logMsg("Not enough Cash — resting.");
+        logMsg("Haven't purchased that training — resting.");
       } else {
         const chain = trainChain(actKey);
         const tierIdx = chain ? trainTier(actKey) : 0;
         const tier = chain ? chain.tiers[tierIdx] : null;
         const gainMult = tier ? tier.gainMult : 1.0;
         const costMult = tier ? tier.costMult : 1.0;
-        state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
         const equipMult = trainingEquipMult(act.attr);
-        const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * equipMult;
+        const gain = act.gain * gainMult * attrApt(act.attr) * equipMult;
         state[act.attr] = num(state[act.attr]) + gain;
         let cost = act.cost;
         if (actKey === "Running") cost = Math.floor(cost * 1.5);

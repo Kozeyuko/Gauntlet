@@ -47,7 +47,7 @@ function persist() {
 }
 
 // Welcome message, then refresh rank display.
-game.logMsg(cameBack ? "Welcome back. Your training continues." : "You leave home at 18. Train, fight, and learn.");
+game.logMsg(cameBack ? "Welcome back. Your training continues." : "You enter Bobsled City at 18, looking to become the strongest.");
 game.updatePotential();
 
 const ui = initUI(game, {

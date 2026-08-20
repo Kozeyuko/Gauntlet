@@ -56,6 +56,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* ---------- three-column game screen ---------- */
@@ -702,11 +704,12 @@ header {
   position: fixed; inset: 0; background: rgba(8,10,12,.8);
   display: none; align-items: center; justify-content: center; z-index: 50;
   padding: 16px;
+  max-width: 100vw; overflow-x: hidden;
 }
 .overlay.show { display: flex; }
 .modal {
   width: 460px; max-width: 100%;
-  max-height: 92vh; overflow-y: auto;
+  max-height: 92vh; overflow-y: auto; overflow-x: hidden;
   background: var(--panel2);
   border: 1px solid var(--gold-dim);
   border-radius: 12px;
@@ -1003,20 +1006,20 @@ header {
 
 @media (max-width: 640px) {
   /* keep fighters side by side, just compact */
-  .vs { flex-direction: row; gap: 10px; }
-  .combatbottom { flex-direction: column; gap: 14px; }
-  .movescol { width: 100%; }
-  .modal { padding: 14px; }
-  .modal.combat { width: 100%; }
+  .vs { flex-direction: row; gap: 10px; overflow-x: hidden; }
+  .combatbottom { flex-direction: column; gap: 14px; overflow-x: hidden; }
+  .movescol { width: 100%; overflow-x: hidden; }
+  .modal { padding: 14px; overflow-x: hidden; }
+  .modal.combat { width: 100%; max-width: 100vw; }
   .roundbanner { font-size: 11px; padding: 6px 16px; letter-spacing: 2px; }
   .winpct { font-size: 10px; padding: 4px 10px; }
-  .fighter { gap: 5px; }
+  .fighter { gap: 5px; overflow-x: hidden; }
   .fighter .fhead .nm { font-size: 15px; }
   .fighitbox { width: 56px; height: 56px; font-size: 26px; margin: 2px auto; }
   .actgrid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .locgrid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
   .stygrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
-  .log { height: 150px; }
+  .log { height: 150px; overflow-x: hidden; }
 }
 
 /* touch screens: bigger move buttons in a 2-col grid, kill zoom delay */

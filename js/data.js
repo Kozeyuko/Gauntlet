@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 1.01;
+export const GAME_VERSION = 2.0;
 export const UPDATE_LOG = [
+  { v: 2.0, text: "v2: decimal cash, auto-work jobs, City Gym store, tasklist UI, traversable city map, job rework, stat-gain rework, gyms fight-only (training via purchased programs), removed 60s auto-work button, mobile zoom fix." },
   { v: 1.01, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
   { v: 1.0, text: "Launch: train, fight rivals, learn styles, reincarnate." },
 ];
