@@ -58,6 +58,7 @@ import {
   MAX_TOTAL,
   ROAMERS,
   ROAMER_COOLDOWN_MS,
+  COOLDOWN_LOSS_MULT,
   STYLE_TIER_MULT,
   styleTier,
   trainChain,
@@ -1065,7 +1066,7 @@ export function createGame(state, opts = {}) {
       }
       updatePotential();
     }
-    if (mode === "roamer" && extra && extra.key) markRoamerDefeated(extra.key);
+    if (mode === "roamer" && extra && extra.key) markRoamerDefeated(extra.key, result.win !== true);
   }
 
   // ---- ghosts (single-player: local self-echoes) ----
@@ -1263,9 +1264,14 @@ export function createGame(state, opts = {}) {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  function markRoamerDefeated(key) {
+  function markRoamerDefeated(key, loss) {
     if (!state.Roamers) state.Roamers = {};
-    state.Roamers[key] = getNow();
+    if (loss) {
+      const shortMs = Math.max(5, Math.round(roamerCooldownMs * COOLDOWN_LOSS_MULT));
+      state.Roamers[key] = getNow() - roamerCooldownMs + shortMs;
+    } else {
+      state.Roamers[key] = getNow();
+    }
   }
 
   function roamerStatus(key) {
@@ -1483,7 +1489,7 @@ export function createGame(state, opts = {}) {
       if (c.modeRounds > 0) {
         c.modeRounds -= 1;
       } else if (c === foe && c.ultCharge >= ULT_MAX) {
-        // Foe's awakening auto-fires at full charge (matches Lua).
+        // Foe's awakening auto-fires at full charge.
         c.modeRounds = Math.min(MODE_DUR_BASE + Math.floor(c.int / MODE_DUR_PER_INT), MODE_DUR_CAP);
         c.ultCharge = 0;
       } else {

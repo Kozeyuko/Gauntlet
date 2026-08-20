@@ -1,4 +1,4 @@
-// js/data.js — ALL game data tables, verbatim from BitCore.server.lua (v5).
+// js/data.js — ALL game data tables.
 // This file is data only: no logic, no DOM, no state.
 
 // ------------------------------------------------------------------ CONSTANTS --
@@ -48,6 +48,7 @@ export function versionCompare(a, b) {
 }
 export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
+export const COOLDOWN_LOSS_MULT = 0.1;
 
 // ------------------------------------------------------------------ JOBS --
 export const JOBS = [
@@ -132,7 +133,7 @@ export const ACTIVITY_ALIAS = {
   TrainCha: "OddJobs",
 };
 
-// Display order for the activities grid (matches BitHub ACTIVITY_LIST).
+// Display order for the activities grid.
 export const ACTIVITY_LIST = [
   { key: "Rest", label: "Rest" },
   { key: "OddJobs", label: "Odd Jobs" },
@@ -181,7 +182,7 @@ export const LOCATIONS = {
   tatami: { name: "Tatami Hall", unlock: 0, tier: 1, styleGym: "Judo" },
   roda: { name: "Roda Circle", unlock: 0, tier: 1, styleGym: "Capoeira" },
   dohyo: { name: "Dohyo Ring", unlock: 0, tier: 1, styleGym: "Sumo" },
-  foundry: { name: "The Foundry", unlock: 0, tier: 1, styleGym: "M2Cross" },
+  foundry: { name: "The Foundry", unlock: 0, tier: 1, styleGym: "IronBoxing" },
   mikazuki: { name: "Mikazuchi Dojo", unlock: 3, tier: 2, styleGym: "Mikazuchi" },
   stormpg: { name: "Storm Pagoda", unlock: 5, tier: 2, styleGym: "ThunderClap" },
   lightning: { name: "Lightning Alley", unlock: 6, tier: 2, styleGym: "LightningFlash" },
@@ -368,8 +369,7 @@ export const STYLES = {
     skills: [{ name: "High Jab", mult: 0.9, crit: 0.0, dodge: 0.02, weight: 3 }, { name: "Counter Cross", mult: 1.15, crit: 0.04, dodge: 0.02, weight: 2 }, { name: "Mikazuchi Flurry", mult: 1.0, crit: 0.0, dodge: 0.0, weight: 2 }, { name: "Chin Strike", mult: 1.35, crit: 0.06, dodge: 0.0, weight: 1 }] },
   Judo: { name: "Judo", desc: "Use their momentum. The mat is a teacher.", tier: 1, dmg: 1.16, dodge: 0.18, crit: 0.04, ult: { name: "Ippon", mult: 1.6 },
     skills: [{ name: "Grip", mult: 0.8, crit: 0.0, dodge: 0.04, weight: 3 }, { name: "Ashi Waza", mult: 0.95, crit: 0.0, dodge: 0.02, weight: 2, status: { effect: "limb", value: "leg" } }, { name: "Osoto Gari", mult: 1.2, crit: 0.02, dodge: 0.0, weight: 2 }, { name: "Ippon Seoi", mult: 1.4, crit: 0.06, dodge: 0.0, weight: 1 }] },
-  M2Cross: { name: "M2 Heavy Cross", desc: "One devastating cross. Slow to load, brutal to eat.", tier: 1, dmg: 1.28, dodge: 0.0, crit: 0.12, ult: { name: "Guillotine", mult: 2.0 },
-    skills: [{ name: "Feint", mult: 0.7, crit: 0.0, dodge: 0.02, weight: 2 }, { name: "Load the Cross", mult: 0.9, crit: 0.06, dodge: -0.02, weight: 2 }, { name: "Heavy Cross", mult: 1.6, crit: 0.12, dodge: -0.04, weight: 1 }] },
+
   Capoeira: { name: "Capoeira", desc: "Dance like a flame, strike like a whip.", tier: 1, dmg: 1.20, dodge: 0.20, crit: 0.06, ult: { name: "Ginga Roda", mult: 1.25 },
     skills: [{ name: "Ginga", mult: 0.8, crit: 0.0, dodge: 0.06, weight: 3 }, { name: "Martelo", mult: 1.15, crit: 0.02, dodge: 0.02, weight: 2 }, { name: "Meia Lua", mult: 1.2, crit: 0.04, dodge: 0.02, weight: 2 }, { name: "Armada Voadora", mult: 1.35, crit: 0.06, dodge: 0.0, weight: 1 }] },
   ThunderClap: { name: "Thunder Clap", desc: "Clap the air and shockwave your enemy.", tier: 2, dmg: 1.35, dodge: 0.05, crit: 0.06, ult: { name: "Sonic Clap", mult: 1.35 },
@@ -442,7 +442,7 @@ export const RIVALS = [
     stats: { Str: 10, Tou: 9, Spd: 10, Int: 4, Cha: 3 },
     rewardMoney: 14, rewardXp: 18,
     line: "A student of the Mikazuchi school. His guard never drops." },
-  { id: 4, name: "Sledge", style: "M2Cross",
+  { id: 4, name: "Sledge", style: "IronBoxing",
     stats: { Str: 16, Tou: 13, Spd: 9, Int: 5, Cha: 4 },
     rewardMoney: 22, rewardXp: 30,
     line: "A brawler who put everything into one punch. Avoid it." },
@@ -679,7 +679,7 @@ export const IMAGINED_NPCS = [
   { key: "boxghost", name: "The Boxing Ghost", style: "Boxer", mult: 0.80, line: "An old champion, long dead, still shadowboxing." },
   { key: "boran", name: "The Muay Boran Elder", style: "MuayBoran", mult: 0.95, line: "Nine weapons, no ring, no mercy." },
   { key: "twin", name: "The Silent Twin", style: "NikoStyle", mult: 0.85, line: "A shape that mirrors your stance, then improves it." },
-  { key: "demonsfist", name: "The Demon's Fist", style: "M2Cross", mult: 0.75, line: "One imagined punch that could end it all." },
+  { key: "demonsfist", name: "The Demon's Fist", style: "IronBoxing", mult: 0.75, line: "One imagined punch that could end it all." },
   { key: "blade", name: "The Blade Saint", style: "DaidojiSchool", mult: 0.88, line: "A thousand cuts you never see drawn." },
   { key: "storm", name: "The Storm", style: "ThunderClap", mult: 0.82, line: "Breath, thunder, nothing in between." },
   { key: "stillgod", name: "The Still God", style: "UltraInstinct", mult: 1.10, line: "It is already where the blow is not." },
@@ -719,5 +719,5 @@ export const ROAMERS = [
   { key: "r_thug", name: "Back Alley Slums", district: "west", zone: "w-bottom", style: "Brawling", mult: 0.75, reward: 8 },
   { key: "r_bridge", name: "Grand River Bridge", district: "west", zone: "bridge", style: "MuayThai", mult: 0.90, reward: 12 },
   { key: "r_monk", name: "Eastern Temple Grounds", district: "east", zone: "e-top", style: "KungFu", mult: 1.05, reward: 16 },
-  { key: "r_brute", name: "Industrial Pits", district: "east", zone: "e-bottom2", style: "M2Cross", mult: 1.20, reward: 22 },
+  { key: "r_brute", name: "Industrial Pits", district: "east", zone: "e-bottom2", style: "IronBoxing", mult: 1.20, reward: 22 },
 ];

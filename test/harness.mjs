@@ -1702,6 +1702,80 @@ console.log("== Part D: LOCATION_FIGHTS and UNLOCKED_TIERS in PERSISTENT_KEYS ==
   assert(PERSISTENT_KEYS.includes("UnlockedTiers"), "PERSISTENT_KEYS includes UnlockedTiers");
 }
 
+console.log("== Fight cooldown: win sets full cooldown ==");
+{
+  let nowMs = 5000000;
+  const state = boostedState();
+  const g = createGame(state, { rng: () => 0.5, now: () => nowMs });
+  const key = "r_thug";
+  assert(g.roamerStatus(key) === "ready", "ready before win");
+  g.fightRoamer(key);
+  assert(g.roamerStatus(key) === "defeated", "defeated after win");
+  const fullMs = 3 * 60 * 1000;
+  nowMs += fullMs - 1;
+  assert(g.roamerStatus(key) === "defeated", "still defeated just before full cooldown");
+  nowMs += 2;
+  assert(g.roamerStatus(key) === "ready", "ready after full cooldown elapses");
+}
+
+console.log("== Fight cooldown: loss/forfeit sets 90% shorter cooldown ==");
+{
+  let nowMs = 6000000;
+  const state = freshState();
+  const g = createGame(state, { rng: () => 1, now: () => nowMs });
+  state.InFight = true;
+  state.AutoBattle = true;
+  state.Health = 1;
+  g.fightRoamer("r_thug");
+  assert(g.roamerStatus("r_thug") === "defeated", "defeated after loss");
+  const shortMs = Math.max(5, Math.round(3 * 60 * 1000 * 0.1));
+  nowMs += shortMs - 1;
+  assert(g.roamerStatus("r_thug") === "defeated", "still defeated just before short cooldown");
+  nowMs += 2;
+  assert(g.roamerStatus("r_thug") === "ready", "ready after short cooldown elapses");
+}
+
+console.log("== Fight cooldown: forfeit sets 90% shorter cooldown ==");
+{
+  let nowMs = 7000000;
+  const state = boostedState();
+  const g = createGame(state, { rng: () => 0.5, now: () => nowMs });
+  const view = g.beginRoamerFight("r_thug");
+  assert(!!view, "beginRoamerFight started");
+  g.forfeit();
+  assert(g.roamerStatus("r_thug") === "defeated", "defeated after forfeit");
+  const shortMs = Math.max(5, Math.round(3 * 60 * 1000 * 0.1));
+  nowMs += shortMs + 1;
+  assert(g.roamerStatus("r_thug") === "ready", "ready after short cooldown");
+}
+
+console.log("== M2Cross removal: STYLES no longer contains M2Cross ==");
+{
+  assert(!("M2Cross" in STYLES), "M2Cross removed from STYLES");
+}
+
+console.log("== M2Cross removal: IronBoxing exists in STYLES ==");
+{
+  assert("IronBoxing" in STYLES, "IronBoxing exists in STYLES");
+}
+
+console.log("== M2Cross removal: no location/rival/roamer/imagined NPC references M2Cross ==");
+{
+  const { LOCATIONS, RIVALS, IMAGINED_NPCS, ROAMERS } = await import("../js/data.js");
+  for (const [k, v] of Object.entries(LOCATIONS)) {
+    if (v.styleGym) assert(v.styleGym !== "M2Cross", `LOCATIONS[${k}].styleGym is not M2Cross`);
+  }
+  for (const r of RIVALS) {
+    assert(r.style !== "M2Cross", `RIVALS[${r.id}].style is not M2Cross`);
+  }
+  for (const n of IMAGINED_NPCS) {
+    assert(n.style !== "M2Cross", `IMAGINED_NPCS[${n.key}].style is not M2Cross`);
+  }
+  for (const r of ROAMERS) {
+    assert(r.style !== "M2Cross", `ROAMERS[${r.key}].style is not M2Cross`);
+  }
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);
