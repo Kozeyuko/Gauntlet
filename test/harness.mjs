@@ -2350,6 +2350,17 @@ console.log("== v2.2: locationRivals stats are randomized across calls ==");
   assert(true, "locationRivals may randomize (checked no crash)");
 }
 
+console.log("== v2.2: central locations near home ==");
+{
+  const home = MAP_POS.home;
+  for (const key of ["gym", "cstore", "clinic", "jobboard"]) {
+    const p = MAP_POS[key];
+    assert(!!p, `${key} has a position`);
+    const d = Math.max(Math.abs(p[0]-home[0]), Math.abs(p[1]-home[1]));
+    assert(d < 200, `${key} near home (chebyshev ${d} < 200)`);
+  }
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);

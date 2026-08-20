@@ -157,6 +157,7 @@ export function initUI(game, opts = {}) {
     btnQuickFight: $("btnQuickFight"),
     btnFight: $("btnFight"), btnAutoFight: $("btnAutoFight"),
     btnLooking: $("btnLooking"), btnGhosts: $("btnGhosts"),
+    btnLookingQuick: $("btnLookingQuick"),
     logList: $("logList"),
     btnReincarnate: $("btnReincarnate"),
     btnReset: $("btnReset"),
@@ -679,6 +680,10 @@ export function initUI(game, opts = {}) {
     const on = state.Looking === true;
     el.btnLooking.textContent = on ? "Looking: ON" : "Looking: OFF";
     el.btnLooking.classList.toggle("gold", on);
+    if (el.btnLookingQuick) {
+      el.btnLookingQuick.textContent = `SEARCHING FOR TROUBLE: ${on ? "ON" : "OFF"}`;
+      el.btnLookingQuick.classList.toggle("gold", on);
+    }
   }
 
   function render() {
@@ -2173,6 +2178,12 @@ export function initUI(game, opts = {}) {
     game.setLooking(state.Looking !== true);
     render();
   });
+  if (el.btnLookingQuick) {
+    el.btnLookingQuick.addEventListener("click", () => {
+      game.setLooking(state.Looking !== true);
+      render();
+    });
+  }
 
   el.btnGhosts.addEventListener("click", () => {
     if (el.ghostOverlay.classList.contains("show")) el.ghostOverlay.classList.remove("show");
