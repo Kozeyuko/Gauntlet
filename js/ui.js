@@ -122,6 +122,7 @@ function mapSvgMarkup() {
 
 export function initUI(game, opts = {}) {
   const onReset = opts.onReset || (() => {});
+  const onSave = opts.onSave || (() => {});
   const firstLaunch = opts.firstLaunch === true;
   const state = game.state;
   let combatMeta = null; // foe name/style/mode captured at fight start
@@ -419,7 +420,12 @@ export function initUI(game, opts = {}) {
       }
     }
     const gate = $("insideGate");
-    if (gate) gate.classList.toggle("open", rivalIdx > MAX_RIVAL);
+    if (gate) {
+      gate.classList.toggle("open", rivalIdx > MAX_RIVAL);
+      gate.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
+    }
+    const insideLabel = document.querySelector(".m-insidetext");
+    if (insideLabel) insideLabel.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
     renderRoamers();
   }
 
@@ -621,6 +627,7 @@ export function initUI(game, opts = {}) {
     if (game.shouldShowUpdateLog && game.shouldShowUpdateLog()) {
       updateLogAutoOpened = true;
       state.SeenVersion = game.GAME_VERSION;
+      onSave();
       openUpdateLog(game.GAME_VERSION);
     }
   }
@@ -1779,7 +1786,7 @@ export function initUI(game, opts = {}) {
   });
 
   // rival overlay
-  el.btnRival.addEventListener("click", () => {
+  if (el.btnRival) el.btnRival.addEventListener("click", () => {
     if (el.rivalOverlay.classList.contains("show")) el.rivalOverlay.classList.remove("show");
     else { el.locOverlay.classList.remove("show"); renderRival(); el.rivalOverlay.classList.add("show"); }
   });

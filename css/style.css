@@ -213,6 +213,7 @@ header {
 .bldg.here .blbl { color: var(--gold); }
 .bldg.locked { cursor: not-allowed; }
 .bldg.hidden { display: none; }
+#citymap .bldg.hidden { display: none !important; }
 .bldg.locked .pin { background: #20252c; border-color: var(--line); opacity: .55; box-shadow: none; }
 .bldg.locked .blbl { opacity: .55; }
 .bldg .lock {
@@ -1081,4 +1082,10 @@ header {
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
+}
+#locFlavor {
+  max-width: 100%;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  white-space: normal;
 }

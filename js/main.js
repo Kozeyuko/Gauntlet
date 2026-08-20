@@ -40,6 +40,12 @@ const cameBack = restore(state, saved);
 const game = createGame(state, { loadGhosts, saveGhosts });
 game.clampVitals();
 
+function persist() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(game.snapshot()));
+  } catch (e) { /* ignore */ }
+}
+
 // Welcome message mirrors BitCore onJoin, then refresh rank display.
 game.logMsg(cameBack ? "Welcome back. Your training continues." : "You leave home at 18. Train, fight, and learn.");
 game.updatePotential();
@@ -47,6 +53,7 @@ game.updatePotential();
 const ui = initUI(game, {
   onReset() {},
   firstLaunch: !cameBack,
+  onSave: persist,
 });
 
 // Debug handle (dev console access; harmless in production).
@@ -56,11 +63,6 @@ window.__game = game;
 document.addEventListener("pointerdown", () => audio.init(), { once: true });
 
 // Autosave every 10s and on hide/reload.
-function persist() {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(game.snapshot()));
-  } catch (e) { /* ignore */ }
-}
 setInterval(persist, 10000);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") persist();
