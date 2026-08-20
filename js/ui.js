@@ -21,6 +21,7 @@ import {
   CUSTOM_MAX_SKILLS,
   MAX_RIVAL,
   MAX_TOTAL,
+  styleTier,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -367,7 +368,7 @@ export function initUI(game, opts = {}) {
       const status = k >= KNOWLEDGE_LEARNED ? "Learned" : (k >= KNOWLEDGE_UNMASTERED ? "Unmastered" : "—");
       const b = document.createElement("button");
       b.className = "btn stybtn";
-      b.setAttribute("data-tip", `${styleName(id)} — ${Math.round(k)}% known`);
+      b.setAttribute("data-tip", `${styleName(id)} — Tier ${styleTier(id)} — ${Math.round(k)}% known`);
       b.innerHTML = `<span class="sname">${styleName(id)}</span><span class="sbar"><i style="width:${Math.round(k)}%"></i></span><span class="sstat">${status}</span>`;
       b.disabled = k < KNOWLEDGE_UNMASTERED;
       if (k >= KNOWLEDGE_UNMASTERED) {

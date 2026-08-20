@@ -57,6 +57,8 @@ import {
   MAX_TOTAL,
   ROAMERS,
   ROAMER_COOLDOWN_MS,
+  STYLE_TIER_MULT,
+  styleTier,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -68,7 +70,8 @@ const BUFF_LABELS = { weights: "Training weights" };
 export function eventToString(ev) {
   const who = ev.who === "foe" ? "Foe" : "You";
   const crit = ev.crit ? " (CRIT)" : "";
-  return `${who} used ${ev.skill}${crit} — ${ev.damage} dmg`;
+  const suffix = ev.statusText ? ` (${ev.statusText})` : "";
+  return `${who} used ${ev.skill}${crit} — ${ev.damage} dmg${suffix}`;
 }
 
 // Resolve a single strike, apply damage to the defender, and return a structured
@@ -78,6 +81,9 @@ export function eventToString(ev) {
 // so win/loss math stays byte-identical.
 function strikeEvent(att, def, skill, isPlayer, rng) {
   let dmg = att.dmg * (skill.mult || 1.0);
+  dmg *= (1 + (att.status.buff?.value || 0));
+  dmg *= (1 + (def.status.debuff?.value || 0));
+  if (def.status.limbArm) dmg *= 0.7;
   const critChance = att.crit + (skill.crit || 0.0);
   const dodgeChance = def.dodge - (skill.dodge || 0.0);
   const ultActive = att.modeRounds > 0;
@@ -89,7 +95,7 @@ function strikeEvent(att, def, skill, isPlayer, rng) {
   if (crit) dmg *= 1.6;
   if (dodged) dmg *= 0.3;
   def.hp -= dmg;
-  return {
+  const ev = {
     who: isPlayer ? "you" : "foe",
     skill: skill.name,
     damage: Math.floor(dmg),
@@ -100,6 +106,48 @@ function strikeEvent(att, def, skill, isPlayer, rng) {
     round: 0,
     youHp: 0, foeHp: 0, youStam: 0, foeStam: 0,
   };
+  if (skill.status && !dodged) {
+    const st = skill.status;
+    if (st.effect === "poison") {
+      def.status.poison = { value: st.value, rounds: st.rounds };
+      ev.statusText = `poisoned for ${st.rounds} rounds`;
+    } else if (st.effect === "debuff") {
+      def.status.debuff = { value: st.value, rounds: st.rounds };
+      ev.statusText = "defense lowered";
+    } else if (st.effect === "buff") {
+      att.status.buff = { value: st.value, rounds: st.rounds };
+      ev.statusText = "own offense raised";
+    } else if (st.effect === "limb" && st.value === "arm") {
+      def.status.limbArm = true;
+      ev.statusText = "damaged the arm";
+    } else if (st.effect === "limb" && st.value === "leg") {
+      def.status.limbLeg = true;
+      ev.statusText = "damaged the leg";
+    }
+  }
+  return ev;
+}
+
+function tickStatuses(c, events) {
+  if (c.status.poison) {
+    const p = c.status.poison;
+    c.hp -= p.value;
+    events.push({
+      who: "sys", skill: "Poison", damage: p.value, raw: p.value,
+      crit: false, dodged: false, ultActive: false, statusText: "poison damage",
+      round: 0, youHp: 0, foeHp: 0, youStam: 0, foeStam: 0,
+    });
+    p.rounds -= 1;
+    if (p.rounds <= 0) c.status.poison = null;
+  }
+  if (c.status.buff) {
+    c.status.buff.rounds -= 1;
+    if (c.status.buff.rounds <= 0) c.status.buff = null;
+  }
+  if (c.status.debuff) {
+    c.status.debuff.rounds -= 1;
+    if (c.status.debuff.rounds <= 0) c.status.debuff = null;
+  }
 }
 
 // Fill the post-round state snapshot into a round's freshly-emitted events.
@@ -676,6 +724,7 @@ export function createGame(state, opts = {}) {
       skills, skillName: null, ultCharge: 0, modeRounds: 0,
       ultMult: style.ult && style.ult.mult ? style.ult.mult : 1.35,
       ultName: style.ult && style.ult.name ? style.ult.name : "Berserk",
+      status: { poison: null, buff: null, debuff: null, limbArm: false, limbLeg: false },
     };
   }
 
@@ -713,8 +762,12 @@ export function createGame(state, opts = {}) {
           c.ultCharge += ULT_CHARGE_BASE + c.int * ULT_CHARGE_PER_INT;
         }
       }
+      const meSpd = me.spd * (me.status.limbLeg ? 0.6 : 1);
+      const foeSpd = foe.spd * (foe.status.limbLeg ? 0.6 : 1);
       let first = me, second = foe;
-      if (foe.spd > me.spd) { first = foe; second = me; }
+      if (foeSpd > meSpd) { first = foe; second = me; }
+      tickStatuses(me, events);
+      tickStatuses(foe, events);
       const roundStart = events.length;
       const strike = (att, def) => {
         const skill = pickSkill(att);
@@ -938,7 +991,7 @@ export function createGame(state, opts = {}) {
       if (pool.length === 0) break;
       const i = Math.floor(R() * pool.length);
       const npc = pool.splice(i, 1)[0];
-      const m = npc.mult || 0.9;
+      const m = (npc.mult || 0.9) * STYLE_TIER_MULT[styleTier(npc.style)];
       board.push({
         id: "npc_" + npc.key,
         name: npc.name,
@@ -1002,7 +1055,7 @@ export function createGame(state, opts = {}) {
       const key = entryId.slice(4);
       const npc = IMAGINED_NPCS.find((n) => n.key === key);
       if (!npc) { logMsg("The shadow slips from your mind. Focus and try again."); return null; }
-      const m = npc.mult || 0.9;
+      const m = (npc.mult || 0.9) * STYLE_TIER_MULT[styleTier(npc.style)];
       foeStats = {
         Str: Math.max(1, Math.floor(attrValue("Str") * m)),
         Tou: Math.max(1, Math.floor(attrValue("Tou") * m)),
@@ -1042,7 +1095,7 @@ export function createGame(state, opts = {}) {
   function buildRoamer(r) {
     const pot = potential();
     const cur = currentStats();
-    const m = r.mult || 1.0;
+    const m = (r.mult || 1.0) * STYLE_TIER_MULT[styleTier(r.style)];
     return {
       key: r.key,
       name: r.name,
@@ -1066,9 +1119,9 @@ export function createGame(state, opts = {}) {
     const pot = potential();
     const cur = currentStats();
     const stepMult = 1 + (step - 1) * 0.25;
-    const m = (r.mult || 1.0) * stepMult;
     const allStyles = Object.keys(STYLES);
     const chosenStyle = step === 1 ? r.style : allStyles[Math.floor(R() * allStyles.length)];
+    const m = (r.mult || 1.0) * stepMult * STYLE_TIER_MULT[styleTier(chosenStyle)];
     return {
       key: r.key,
       name: `${r.name} - Bout ${step}`,
@@ -1330,9 +1383,13 @@ export function createGame(state, opts = {}) {
     }
 
     let first = me, second = foe;
-    if (foe.spd > me.spd) { first = foe; second = me; }
+    const meSpd = me.spd * (me.status.limbLeg ? 0.6 : 1);
+    const foeSpd = foe.spd * (foe.status.limbLeg ? 0.6 : 1);
+    if (foeSpd > meSpd) { first = foe; second = me; }
 
     const events = [];
+    tickStatuses(me, events);
+    tickStatuses(foe, events);
     const doStrike = (att, def, skill, isPlayer) => {
       const ev = strikeEvent(att, def, skill, isPlayer, R);
       if (!isPlayer) {
