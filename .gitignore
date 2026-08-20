@@ -1,0 +1,23 @@
+# Secrets / local config — never commit these
+.env
+.env.*
+*.local
+*secret*
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*~
+.nogit
+
+# Temp / scratch
+tmp/
+*.log
+node_modules/

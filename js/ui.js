@@ -442,6 +442,8 @@ export function initUI(game, opts = {}) {
     }
     const insideLabel = document.querySelector(".m-insidetext");
     if (insideLabel) insideLabel.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
+    const insideBox = document.querySelector(".m-inside");
+    if (insideBox) insideBox.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
     renderRoamers();
   }
 
@@ -892,6 +894,7 @@ export function initUI(game, opts = {}) {
     renderLocFighters(key);
     renderBuyTraining(key);
     // Cook panel at Home
+    const isHome = key === "home";
     if (isHome && el.cookPanel) {
       renderCookPanel();
       el.cookPanel.style.display = "";
