@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, LOCATIONS } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, jobActionRate, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, LOCATIONS } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -1861,6 +1861,80 @@ console.log("== M2Cross removal: no location/rival/roamer/imagined NPC reference
   for (const r of ROAMERS) {
     assert(r.style !== "M2Cross", `ROAMERS[${r.key}].style is not M2Cross`);
   }
+}
+
+// ================================================================
+// v2 Batch 2: Job minigame reward rework
+// ================================================================
+console.log("== v2 B2: jobActionRate(0) === 0.25 ==");
+{
+  assertClose(jobActionRate(0), 0.25, "jobActionRate(0) === 0.25");
+}
+
+console.log("== v2 B2: jobActionRate(25) === 1.0 ==");
+{
+  assertClose(jobActionRate(25), 1.0, "jobActionRate(25) === 1.0");
+}
+
+console.log("== v2 B2: jobActionRate(12) between 0.25 and 1.0 ==");
+{
+  const r12 = jobActionRate(12);
+  assert(r12 > 0.25 && r12 < 1.0, `jobActionRate(12) = ${r12}, between 0.25 and 1.0`);
+  assertClose(r12, 0.25 + (1.0 - 0.25) * (12 / 25), "jobActionRate(12) matches formula");
+}
+
+console.log("== v2 B2: all jobs have staminaCost === 5 ==");
+{
+  for (const j of JOBS) {
+    assert(j.staminaCost === 5, `${j.key} staminaCost === 5 (got ${j.staminaCost})`);
+  }
+}
+
+console.log("== v2 B2: jobStaminaCost returns 5 ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  for (const j of JOBS) {
+    assert(jobStaminaCost(j, 1) === 5, `jobStaminaCost(${j.key}, 1) === 5`);
+    assert(jobStaminaCost(j, 20) === 5, `jobStaminaCost(${j.key}, 20) === 5`);
+  }
+}
+
+console.log("== v2 B2: doJobAction with high combo grants more cash/xp than low combo ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const moneyBefore = state.Money;
+  const resLow = g.doJobAction("delivery", 0, true);
+  const cashLow = resLow.pay;
+  const xpLow = resLow.xp;
+  const resHigh = g.doJobAction("delivery", 25, true);
+  const cashHigh = resHigh.pay;
+  const xpHigh = resHigh.xp;
+  assert(resLow.success === true, "doJobAction low combo succeeded");
+  assert(resHigh.success === true, "doJobAction high combo succeeded");
+  assert(cashHigh > cashLow, `high combo cash ${cashHigh} > low combo cash ${cashLow}`);
+  assert(xpHigh > xpLow, `high combo xp ${xpHigh} > low combo xp ${xpLow}`);
+  assert(resHigh.rate === 1.0, "high combo rate is 1.0");
+  assertClose(resLow.rate, 0.25, "low combo rate is 0.25");
+}
+
+console.log("== v2 B2: doJobAction miss grants nothing ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const res = g.doJobAction("delivery", 5, false);
+  assert(res.success === false, "miss returns success false");
+  assert(res.pay === 0, "miss grants 0 pay");
+  assert(res.xp === 0, "miss grants 0 xp");
+}
+
+console.log("== v2 B2: doJobAction combo is returned ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const res = g.doJobAction("delivery", 10, true);
+  assert(res.combo === 10, "combo 10 returned in result");
 }
 
 console.log("");

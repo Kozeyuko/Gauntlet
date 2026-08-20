@@ -57,7 +57,7 @@ export const JOBS = [
     key: "delivery",
     name: "Delivery Run",
     desc: "Drop off packages to the right doors. Tap the matching house before the timer expires.",
-    staminaCost: 8,
+    staminaCost: 5,
     basePay: 6,
     xpPerShift: 10,
     xpToLevel: 50,
@@ -69,7 +69,7 @@ export const JOBS = [
     key: "dishwash",
     name: "Dish Dash",
     desc: "Tap dirty dishes as they appear. Quick taps = clean streaks = more pay.",
-    staminaCost: 6,
+    staminaCost: 5,
     basePay: 5,
     xpPerShift: 8,
     xpToLevel: 40,
@@ -81,7 +81,7 @@ export const JOBS = [
     key: "stocking",
     name: "Stock Sort",
     desc: "Sort incoming boxes into the right bin. Tap the bin that matches the box label.",
-    staminaCost: 7,
+    staminaCost: 5,
     basePay: 7,
     xpPerShift: 9,
     xpToLevel: 45,
@@ -95,7 +95,14 @@ export function jobPay(job, level) {
   return Math.round(job.basePay * (1 + 0.18 * (level - 1)));
 }
 export function jobStaminaCost(job, level) {
-  return Math.max(Math.ceil(job.staminaCost * 0.5), Math.ceil(job.staminaCost * (1 - 0.03 * (level - 1))));
+  return 5;
+}
+export const JOB_BASE_RATE = 0.25;
+export const JOB_MAX_RATE = 1.0;
+export const JOB_COMBO_TARGET = 25;
+export function jobActionRate(combo) {
+  const t = Math.min(JOB_COMBO_TARGET, Math.max(0, combo));
+  return JOB_BASE_RATE + (JOB_MAX_RATE - JOB_BASE_RATE) * (t / JOB_COMBO_TARGET);
 }
 export function jobXpForLevel(job, level) {
   return Math.round(job.xpToLevel * Math.pow(1.5, level - 1));

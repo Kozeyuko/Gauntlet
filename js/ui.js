@@ -13,6 +13,7 @@ import {
   jobPay,
   jobStaminaCost,
   jobXpForLevel,
+  jobActionRate,
   ROAMERS,
   MASTERY_TIERS,
   KNOWLEDGE_UNMASTERED,
@@ -1072,23 +1073,40 @@ export function initUI(game, opts = {}) {
       render();
       return;
     }
+
     el.jobList.style.display = "none";
     el.jobGameArea.style.display = "flex";
     el.jobGameArea.innerHTML = "";
 
     const lvl = game.jobLevel(job.key);
     let round = 0;
-    let hits = 0;
+    let combo = 0;
+    let totalCash = 0;
+    let totalXp = 0;
     const cfg = job.minigameConfig;
     const totalRounds = cfg.rounds || 5;
+
+    game.doJobShift(job.key, 0);
 
     function cleanup() {
       if (minigameTimer) { clearTimeout(minigameTimer); minigameTimer = null; }
     }
 
-    function finish(score) {
+    function updateHud(success) {
+      const rate = jobActionRate(combo);
+      const ratePct = Math.round(rate * 100);
+      const stam = Math.max(0, Math.round(num(state.Stamina)));
+      let hudHtml = `<div class="mg-hud">Round ${round}/${totalRounds} · Combo ${combo} · Rate ${ratePct}% · Cash +${fmtCash(totalCash)} · XP +${totalXp.toFixed(1)} · Stamina ${stam}</div>`;
+      const existing = el.jobGameArea.querySelector('.mg-hud');
+      if (existing) {
+        existing.outerHTML = hudHtml;
+      } else {
+        el.jobGameArea.insertAdjacentHTML('afterbegin', hudHtml);
+      }
+    }
+
+    function finish() {
       cleanup();
-      game.doJobShift(job.key, score);
       el.jobGameArea.style.display = "none";
       el.jobList.style.display = "";
       render();
@@ -1097,10 +1115,20 @@ export function initUI(game, opts = {}) {
     function nextRound() {
       cleanup();
       if (round >= totalRounds) {
-        finish(hits / totalRounds);
+        finish();
         return;
       }
       round += 1;
+
+      function onResult(success) {
+        if (success) combo += 1;
+        else combo = 0;
+        const res = game.doJobAction(job.key, combo, success);
+        totalCash += res.pay;
+        totalXp += res.xp;
+        updateHud(success);
+        minigameTimer = setTimeout(nextRound, 400);
+      }
 
       if (job.minigame === "matchtap") {
         const targetDoor = Math.floor(Math.random() * 3) + 1;
@@ -1113,6 +1141,7 @@ export function initUI(game, opts = {}) {
             <button class="mg-target" data-door="3">#3</button>
           </div>
         `;
+        updateHud();
         let resolved = false;
         el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
           b.addEventListener("click", () => {
@@ -1120,18 +1149,17 @@ export function initUI(game, opts = {}) {
             resolved = true;
             const chosen = Number(b.getAttribute("data-door"));
             if (chosen === targetDoor) {
-              hits += 1;
               b.classList.add("hit");
             } else {
               b.classList.add("miss");
             }
-            minigameTimer = setTimeout(nextRound, 400);
+            onResult(chosen === targetDoor);
           });
         });
         minigameTimer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            nextRound();
+            onResult(false);
           }
         }, cfg.timePerRound || 2500);
       } else if (job.minigame === "whack") {
@@ -1143,6 +1171,7 @@ export function initUI(game, opts = {}) {
             ${[0, 1, 2, 3, 4, 5].map((i) => `<button class="mg-target ${i === targetPos ? "active-dish" : ""}" data-pos="${i}">${i === targetPos ? "🍽️" : ""}</button>`).join("")}
           </div>
         `;
+        updateHud();
         let resolved = false;
         el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
           b.addEventListener("click", () => {
@@ -1150,21 +1179,20 @@ export function initUI(game, opts = {}) {
             resolved = true;
             const pos = Number(b.getAttribute("data-pos"));
             if (pos === targetPos) {
-              hits += 1;
               b.classList.add("hit");
             } else {
               b.classList.add("miss");
             }
-            minigameTimer = setTimeout(nextRound, 350);
+            onResult(pos === targetPos);
           });
         });
         minigameTimer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            nextRound();
+            onResult(false);
           }
         }, cfg.timePerRound || 2000);
-      } else { // sort
+      } else {
         const items = ["A", "B", "C", "D"];
         const target = items[Math.floor(Math.random() * items.length)];
         el.jobGameArea.innerHTML = `
@@ -1174,6 +1202,7 @@ export function initUI(game, opts = {}) {
             ${items.map((it) => `<button class="mg-target" data-it="${it}">Bin ${it}</button>`).join("")}
           </div>
         `;
+        updateHud();
         let resolved = false;
         el.jobGameArea.querySelectorAll(".mg-target").forEach((b) => {
           b.addEventListener("click", () => {
@@ -1181,18 +1210,17 @@ export function initUI(game, opts = {}) {
             resolved = true;
             const chosen = b.getAttribute("data-it");
             if (chosen === target) {
-              hits += 1;
               b.classList.add("hit");
             } else {
               b.classList.add("miss");
             }
-            minigameTimer = setTimeout(nextRound, 400);
+            onResult(chosen === target);
           });
         });
         minigameTimer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            nextRound();
+            onResult(false);
           }
         }, cfg.timePerRound || 3000);
       }

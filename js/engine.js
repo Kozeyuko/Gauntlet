@@ -17,6 +17,7 @@ import {
   jobXpForLevel,
   JOB_AUTO_RATE,
   JOB_AUTO_COOLDOWN_MS,
+  jobActionRate,
   RIVALS,
   INSIDE,
   RANKS,
@@ -520,6 +521,26 @@ export function createGame(state, opts = {}) {
     logMsg(`${job.name} shift: +${totalPay.toFixed(2)} Cash${newLevel > oldLevel ? ", LEVEL UP!" : ""}.`, "job");
     updatePotential();
     return { success: true, pay: totalPay, xp, level: newLevel, levelUp: newLevel > oldLevel };
+  }
+
+  function doJobAction(jobKey, combo, success) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return { success: false };
+    const level = jobLevel(jobKey);
+    const rate = jobActionRate(combo);
+    let pay = 0;
+    let xp = 0;
+    if (success) {
+      pay = Math.max(0.1, jobPay(job, level) * rate);
+      xp = job.xpPerShift * rate;
+      const chaBonus = attrValue("Cha") * 0.5;
+      pay += chaBonus;
+      state.Money = num(state.Money) + pay;
+      addJobXp(jobKey, xp);
+    }
+    updatePotential();
+    const newLevel = jobLevel(jobKey);
+    return { success, pay, xp, combo, rate, level: newLevel };
   }
 
   function doAutoJob(jobKey) {
@@ -2266,7 +2287,7 @@ export function createGame(state, opts = {}) {
     trainingAt, setTaskList, addTask, removeTask,
     trainTier, trainTierName, trainTierProgress,
     // jobs
-    jobLevel, jobXp, doJobShift, doAutoJob, jobCooldownRemaining, jobCanWork,
+    jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, jobCanWork,
     setAutoJob, clearAutoJob, autoJobActive,
     // arena modes
     beginTourneyFight, beginGuFight,
