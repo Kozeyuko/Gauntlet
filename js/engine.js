@@ -186,6 +186,7 @@ export const PERSISTENT_KEYS = [
   "StyleKnowledge", "KnownSkills", "Build",
   "JobXp", "JobLevel", "JobCooldowns",
   "InFight", "AutoBattle",
+  "AutoJobKey",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
   "Inventory", "TaskList", "TaskRepeat",
@@ -210,6 +211,7 @@ export function freshState() {
     JobXp: "", JobLevel: "", JobCooldowns: {},
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     AutoRun: false,
+    AutoJobKey: "",
     Roamers: {},
     Name: "You",
     Inventory: [],
@@ -502,15 +504,15 @@ export function createGame(state, opts = {}) {
     state.Stamina = num(state.Stamina) - cost;
     const fullPay = jobPay(job, level);
     const score = Math.max(0, Math.min(1, performanceScore));
-    const pay = Math.max(1, Math.round(fullPay * score));
+    const pay = Math.max(1, fullPay * score);
     const xp = Math.max(1, Math.round(job.xpPerShift * score));
-    const chaBonus = Math.floor(attrValue("Cha") * 0.5);
+    const chaBonus = attrValue("Cha") * 0.5;
     const totalPay = pay + chaBonus;
     state.Money = num(state.Money) + totalPay;
     const oldLevel = level;
     addJobXp(jobKey, xp);
     const newLevel = jobLevel(jobKey);
-    logMsg(`${job.name} shift: +${totalPay} Cash${newLevel > oldLevel ? ", LEVEL UP!" : ""}.`, "job");
+    logMsg(`${job.name} shift: +${totalPay.toFixed(2)} Cash${newLevel > oldLevel ? ", LEVEL UP!" : ""}.`, "job");
     updatePotential();
     return { success: true, pay: totalPay, xp, level: newLevel, levelUp: newLevel > oldLevel };
   }
@@ -554,6 +556,21 @@ export function createGame(state, opts = {}) {
     const last = Number(cooldowns[jobKey]) || 0;
     const now = getNow();
     return Math.max(0, last + JOB_AUTO_COOLDOWN_MS - now);
+  }
+
+  function setAutoJob(jobKey) {
+    if (jobKey && !JOBS.find((j) => j.key === jobKey)) return false;
+    state.AutoJobKey = jobKey || "";
+    return true;
+  }
+
+  function clearAutoJob() {
+    state.AutoJobKey = "";
+    return true;
+  }
+
+  function autoJobActive() {
+    return state.AutoJobKey || null;
   }
 
   function jobCanWork(jobKey) {
@@ -2244,6 +2261,7 @@ export function createGame(state, opts = {}) {
     trainTier, trainTierName, trainTierProgress,
     // jobs
     jobLevel, jobXp, doJobShift, doAutoJob, jobCooldownRemaining, jobCanWork,
+    setAutoJob, clearAutoJob, autoJobActive,
     // arena modes
     beginTourneyFight, beginGuFight,
     // combat

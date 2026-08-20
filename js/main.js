@@ -68,3 +68,14 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") persist();
 });
 window.addEventListener("pagehide", persist);
+
+// Global auto-job: fires every 10s if an auto-job is set.
+setInterval(() => {
+  const active = game.autoJobActive();
+  if (active) {
+    const result = game.doAutoJob(active);
+    if (result && result.success) {
+      // UI update is handled by the next render cycle or autosave
+    }
+  }
+}, 10000);

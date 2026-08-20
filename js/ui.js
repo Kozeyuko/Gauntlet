@@ -42,6 +42,10 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+function fmtCash(n) {
+  return "$" + (Number(n) || 0).toFixed(2);
+}
+
 const reducedMotion =
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
@@ -352,7 +356,7 @@ export function initUI(game, opts = {}) {
 
   function renderHeader() {
     el.hName.textContent = String(state.Name || "You");
-    el.hMoney.textContent = String(Math.floor(Number(state.Money) || 0));
+    el.hMoney.textContent = fmtCash(state.Money);
     el.hAge.textContent = fmtAge(Number(state.AgeDays) || 0);
     el.hLives.textContent = String(Math.floor(Number(state.Lives) || 0));
     el.hWins.textContent = String(Math.floor(Number(state.Wins) || 0));
@@ -371,7 +375,7 @@ export function initUI(game, opts = {}) {
     setBar(el.barHealth, el.barHealthTxt, Number(state.Health) || 0, game.maxHealth());
     setBar(el.barStamina, el.barStaminaTxt, Number(state.Stamina) || 0, game.maxStamina());
     setBar(el.barNutrition, el.barNutritionTxt, Number(state.Nutrition) || 0, game.maxNutrition());
-    el.hMoneyLeft.textContent = String(Math.floor(Number(state.Money) || 0));
+    el.hMoneyLeft.textContent = fmtCash(state.Money);
   }
 
   function renderAttrs() {
@@ -483,7 +487,7 @@ export function initUI(game, opts = {}) {
         name: r.name,
         style: `Style: ${styleName(r.style)}`,
         line: r.line,
-        stats: `${fmtStats(r.stats)} · Reward ${r.rewardMoney} Cash`,
+        stats: `${fmtStats(r.stats)} · Reward ${fmtCash(r.rewardMoney)}`,
         fightLabel: "FIGHT",
         mode: "ladder",
         learnStyleId: r.style,
@@ -622,7 +626,7 @@ export function initUI(game, opts = {}) {
     maybeOpenRivalForEncounter();
     maybeOpenUpdateLog();
     const cost = game.rebirthCost ? game.rebirthCost() : 0;
-    el.btnReincarnate.textContent = `REBIRTH (${cost} Cash)`;
+    el.btnReincarnate.textContent = `REBIRTH (${fmtCash(cost)})`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
     if (el.jobsOverlay.classList.contains("show") && el.jobList.style.display !== "none") renderJobs();
     if (el.locOverlay.classList.contains("show") && openLocKey) renderLocActivities(openLocKey);
@@ -740,7 +744,7 @@ export function initUI(game, opts = {}) {
       let meta = "";
       if (entry) {
         meta += `<span class="lr-gain">×${entry.gain.toFixed(1)}</span>`;
-        meta += `<span class="lr-cost${canAfford ? "" : " red"}">${entry.cost > 0 ? entry.cost + " Cash" : "Free"}</span>`;
+        meta += `<span class="lr-cost${canAfford ? "" : " red"}">${entry.cost > 0 ? fmtCash(entry.cost) : "Free"}</span>`;
         meta += `<span class="lr-stam">${act.cost} STA</span>`;
       } else if (actKey === "Rest") {
         meta += `<span class="lr-cost">Free</span>`;
@@ -816,7 +820,7 @@ export function initUI(game, opts = {}) {
       row.innerHTML = `
         <div class="gmain">
           <div class="gnm">${r.name} ${r.beaten ? "✓" : ""}</div>
-          <div class="gsub">${st ? st.name : styleId} · reward ${r.rewardMoney} Cash · ${r.rewardXp} XP${!r.unlocked ? " (locked)" : ""}</div>
+          <div class="gsub">${st ? st.name : styleId} · reward ${fmtCash(r.rewardMoney)} · ${r.rewardXp} XP${!r.unlocked ? " (locked)" : ""}</div>
         </div>`;
       if (!r.beaten && r.unlocked) {
         const btn = document.createElement("button");
@@ -871,7 +875,7 @@ export function initUI(game, opts = {}) {
           <span class="lr-stat">${label}</span>
         </span>
         <span class="lr-meta">
-          <span class="lr-cost${canBuy ? "" : " red"}">${t.cost} Cash</span>
+          <span class="lr-cost${canBuy ? "" : " red"}">${fmtCash(t.cost)}</span>
           ${consumable && stock > 0 ? `<span class="lr-stam">${stock} uses</span>` : ""}
         </span>`;
       b.addEventListener("click", () => {
@@ -987,6 +991,7 @@ export function initUI(game, opts = {}) {
 
   function renderJobs() {
     el.jobList.innerHTML = "";
+    const activeAuto = game.autoJobActive();
     for (const j of JOBS) {
       const lvl = game.jobLevel(j.key);
       const xp = game.jobXp(j.key);
@@ -995,9 +1000,10 @@ export function initUI(game, opts = {}) {
       const cost = jobStaminaCost(j, lvl);
       const cd = game.jobCooldownRemaining(j.key);
       const canAfford = num(state.Stamina) >= cost;
+      const isAutoActive = activeAuto === j.key;
 
       const card = document.createElement("div");
-      card.className = "jobcard";
+      card.className = "jobcard" + (isAutoActive ? " auto-active" : "");
       card.innerHTML = `
         <div class="jhead">
           <span>${j.name}</span>
@@ -1008,12 +1014,15 @@ export function initUI(game, opts = {}) {
         <div class="jmeta">
           <span>XP: ${xp} / ${needed}</span> · 
           <span>Cost: ${cost} STA</span> · 
-          <span>Pay: ~${pay} Cash</span>
+          <span>Pay: ~${fmtCash(pay)}</span>
         </div>
         <div class="jbtns">
           <button class="btn small-btn work-btn" ${canAfford ? "" : "disabled"}>WORK SHIFT</button>
           <button class="btn small-btn auto-btn" ${canAfford && cd <= 0 ? "" : "disabled"}>
             ${cd > 0 ? `AUTO (${Math.ceil(cd / 1000)}s)` : "AUTO (50%)"}
+          </button>
+          <button class="btn small-btn auto-toggle-btn ${isAutoActive ? "on" : ""}">
+            ${isAutoActive ? "AUTO: ON" : "AUTO: OFF"}
           </button>
         </div>
       `;
@@ -1023,8 +1032,23 @@ export function initUI(game, opts = {}) {
         game.doAutoJob(j.key);
         render();
       });
+      card.querySelector(".auto-toggle-btn").addEventListener("click", () => {
+        if (isAutoActive) {
+          game.clearAutoJob();
+        } else {
+          game.setAutoJob(j.key);
+        }
+        render();
+      });
 
       el.jobList.appendChild(card);
+    }
+    if (activeAuto) {
+      const activeJob = JOBS.find((j) => j.key === activeAuto);
+      const status = document.createElement("div");
+      status.className = "auto-job-status";
+      status.textContent = `AUTO: ${activeJob ? activeJob.name : activeAuto}`;
+      el.jobList.appendChild(status);
     }
   }
 
@@ -1271,7 +1295,7 @@ export function initUI(game, opts = {}) {
     renderStoreTabs();
     const items = getStoreItems();
     el.storeName.textContent = storeTab === "clinic" ? "Clinic" : "Convenience Store";
-    el.storeCash.textContent = String(Math.floor(num(state.Money)));
+    el.storeCash.textContent = fmtCash(state.Money);
     if (storeTab === "clinic") {
       el.storeNotice.style.display = "";
       el.storeNotice.textContent = "No training programs here. · No style taught here.";
@@ -1307,7 +1331,7 @@ export function initUI(game, opts = {}) {
             render();
           });
         } else {
-          btn.textContent = `${item.price} Cash`;
+          btn.textContent = `${fmtCash(item.price)}`;
           btn.addEventListener("click", () => {
             game.buyEquipment(item.key);
             renderStore();
@@ -1316,7 +1340,7 @@ export function initUI(game, opts = {}) {
           });
         }
       } else {
-        btn.textContent = `${item.price} Cash`;
+        btn.textContent = `${fmtCash(item.price)}`;
         btn.addEventListener("click", () => {
           game.buyItem(item.key);
           renderStore();
