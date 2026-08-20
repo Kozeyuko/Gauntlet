@@ -22,6 +22,8 @@ import {
   MAX_RIVAL,
   MAX_TOTAL,
   styleTier,
+  GAME_VERSION,
+  UPDATE_LOG,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -223,6 +225,10 @@ export function initUI(game, opts = {}) {
     btnTasklist: $("btnTasklist"), taskOverlay: $("taskOverlay"),
     taskQueue: $("taskQueue"), taskActivityList: $("taskActivityList"),
     btnTaskRepeat: $("btnTaskRepeat"), btnTaskClose: $("btnTaskClose"),
+    // update log
+    updateOverlay: $("updateOverlay"), btnUpdateLog: $("btnUpdateLog"),
+    btnUpdateClose: $("btnUpdateClose"), updateList: $("updateList"),
+    updateHeader: $("updateHeader"),
   };
 
   // ------------------------------------------------------------ build static grids --
@@ -588,6 +594,7 @@ export function initUI(game, opts = {}) {
     renderLog();
     renderLooking();
     maybeOpenRivalForEncounter();
+    maybeOpenUpdateLog();
     const cost = game.rebirthCost ? game.rebirthCost() : 0;
     el.btnReincarnate.textContent = `REBIRTH (${cost} Cash)`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
@@ -604,6 +611,16 @@ export function initUI(game, opts = {}) {
       }
     } else {
       encounterShown = false;
+    }
+  }
+
+  let updateLogAutoOpened = false;
+  function maybeOpenUpdateLog() {
+    if (updateLogAutoOpened) return;
+    if (game.shouldShowUpdateLog && game.shouldShowUpdateLog()) {
+      updateLogAutoOpened = true;
+      state.SeenVersion = game.GAME_VERSION;
+      openUpdateLog(game.GAME_VERSION);
     }
   }
 
@@ -1320,6 +1337,41 @@ export function initUI(game, opts = {}) {
   el.btnTaskRepeat.addEventListener("click", () => {
     state.TaskRepeat = state.TaskRepeat !== true;
     renderTasklist();
+  });
+
+  // ------------------------------------------------------------ update log overlay --
+  function renderUpdateLog(highlightVersion) {
+    el.updateList.innerHTML = "";
+    for (const entry of UPDATE_LOG) {
+      const row = document.createElement("div");
+      row.className = "updaterow";
+      if (entry.v === highlightVersion) row.classList.add("highlight");
+      const v = document.createElement("span");
+      v.className = "updatev";
+      v.textContent = `v${entry.v}`;
+      const t = document.createElement("span");
+      t.className = "updatetxt";
+      t.textContent = entry.text;
+      row.appendChild(v);
+      row.appendChild(t);
+      el.updateList.appendChild(row);
+    }
+  }
+
+  function openUpdateLog(highlightVersion) {
+    if (highlightVersion) {
+      el.updateHeader.textContent = `What's new in v${highlightVersion}`;
+    } else {
+      el.updateHeader.textContent = "What's New";
+    }
+    renderUpdateLog(highlightVersion);
+    el.updateOverlay.classList.add("show");
+  }
+
+  el.btnUpdateLog.addEventListener("click", () => openUpdateLog());
+  el.btnUpdateClose.addEventListener("click", () => el.updateOverlay.classList.remove("show"));
+  el.updateOverlay.addEventListener("click", (e) => {
+    if (e.target === el.updateOverlay) el.updateOverlay.classList.remove("show");
   });
 
   // ------------------------------------------------------------ result overlay --

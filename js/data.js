@@ -36,6 +36,12 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
+export const GAME_VERSION = 3;
+export const UPDATE_LOG = [
+  { v: 3, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
+  { v: 2, text: "Feat: jobs system, arena modes w/ Gu ritual + Formless style, chained roamers, rebirth & death aptitudes." },
+  { v: 1, text: "Launch: train, fight rivals, learn styles, reincarnate." },
+];
 export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 

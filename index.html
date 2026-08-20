@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Bit · Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
 
@@ -25,6 +25,7 @@
     <button class="btn small-btn" id="btnJobs">JOBS</button>
     <button class="btn small-btn" id="btnRival">RIVAL</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
+    <button class="btn small-btn" id="btnUpdateLog">UPDATES</button>
   </div>
 </header>
 
@@ -321,6 +322,9 @@
         <button class="btn small-btn" id="btnThemeLight">Light</button>
       </div>
     </div>
+    <div class="optrow">
+      <span class="small" style="margin-right:auto">GAUNTLET v3</span>
+    </div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
     </div>
@@ -374,6 +378,18 @@
   </div>
 </div>
 
+<!-- ============ UPDATE LOG OVERLAY ============ -->
+<div class="overlay" id="updateOverlay">
+  <div class="modal">
+    <h2 id="updateHeader">What's New</h2>
+    <div class="sub">Game update history.</div>
+    <div id="updateList"></div>
+    <div class="acts">
+      <button class="btn" id="btnUpdateClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ NAME PROMPT (first launch) ============ -->
 <div class="overlay" id="nameOverlay">
   <div class="modal">
@@ -386,6 +402,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

@@ -52,6 +52,7 @@ import {
   CUSTOM_MAX_SKILLS,
   SELF_TRAIN_MULT,
   DATA_VERSION,
+  GAME_VERSION,
   MAX_GHOSTS,
   MAX_RIVAL,
   MAX_TOTAL,
@@ -180,12 +181,13 @@ export const PERSISTENT_KEYS = [
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
   "Inventory", "TaskList", "TaskRepeat",
+  "SeenVersion",
 ];
 
 // ------------------------------------------------------------------ STATE --
 export function freshState() {
   const st = {
-    Str: 1, Tou: 1, Spd: 1, Int: 1, Cha: 1,
+    Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0,
     StrAp: 1, TouAp: 1, SpdAp: 1, IntAp: 1, ChaAp: 1,
     Health: 100, Stamina: 100, Nutrition: 100,
     Money: START_MONEY, AgeDays: START_AGE_DAYS, Lives: 0, Wins: 0,
@@ -201,6 +203,7 @@ export function freshState() {
     Inventory: [],
     TaskList: [],
     TaskRepeat: false,
+    SeenVersion: 0,
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -261,6 +264,7 @@ export function createGame(state, opts = {}) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   }
+  function shouldShowUpdateLog() { return num(state.SeenVersion) < GAME_VERSION; }
   function maxHealth() { return 100 + Math.max(0, attrValue("Tou") - 1) * 10; }
   function maxStamina() { return 100 + Math.max(0, attrValue("Spd") - 1) * 8; }
   function maxNutrition() { return 100 + Math.max(0, attrValue("Int") - 1) * 5; }
@@ -637,7 +641,7 @@ export function createGame(state, opts = {}) {
       state[a.id + "Ap"] = newAp;
       gains[a.id] = newAp;
     }
-    for (const a of ATTRIBUTES) state[a.id] = 1;
+    for (const a of ATTRIBUTES) state[a.id] = 0;
     state.TempBoosts = { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 };
     state.Health = maxHealth();
     state.Stamina = maxStamina();
@@ -669,7 +673,7 @@ export function createGame(state, opts = {}) {
     const mult = 1 + (pot / 100);
     for (const a of ATTRIBUTES) {
       state[a.id + "Ap"] = attrApt(a.id) * mult;
-      state[a.id] = 1;
+      state[a.id] = 0;
     }
     state.TempBoosts = { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 };
     state.Health = maxHealth();
@@ -1784,6 +1788,8 @@ export function createGame(state, opts = {}) {
     beginTourneyFight, beginGuFight,
     // combat
     fight, beginFight, fightMove, activateUlt, forfeit,
+    // version
+    shouldShowUpdateLog, GAME_VERSION,
     // ghosts
     listGhosts, fightGhost,
     // roamers

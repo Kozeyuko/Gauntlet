@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -44,7 +44,7 @@ function boostedState() {
 console.log("== Fresh state ==");
 {
   const s = freshState();
-  assert(s.Str === 1 && s.Tou === 1 && s.Spd === 1 && s.Int === 1 && s.Cha === 1, "values all start at 1");
+  assert(s.Str === 0 && s.Tou === 0 && s.Spd === 0 && s.Int === 0 && s.Cha === 0, "values all start at 0");
   assert(s.StrAp === 1 && s.TouAp === 1 && s.SpdAp === 1 && s.IntAp === 1 && s.ChaAp === 1, "aptitudes all start at 1");
   assert(s.Money === 30, "Money starts at 30");
   assert(s.AgeDays === 6570, "AgeDays starts at 6570");
@@ -59,7 +59,7 @@ console.log("== Training day at Home (Pushups) ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.setActivity("Pushups");
   g.doDay();
-  assertClose(state.Str, 1.06, "Str ≈ 1.06 (0.10 × 0.6 × 1)");
+  assertClose(state.Str, 0.06, "Str ≈ 0.06 (0.10 × 0.6 × 1)");
   assertClose(state.Stamina, 90, "Stamina = 90 (100 − 10)");
 }
 
@@ -71,7 +71,7 @@ console.log("== Rank payout ==");
   g.updatePotential();
   assertClose(state.PotRankName === "F", true, "PotRankName is 'F'");
   assert(state.Money >= 30 + 2, `Money >= 32 (got ${state.Money})`);
-  assert(g.potential() === 33, "potential is 33");
+  assert(g.potential() === 30, "potential is 30");
 }
 
 console.log("== Reincarnation & Death Aptitudes ==");
@@ -82,7 +82,7 @@ console.log("== Reincarnation & Death Aptitudes ==");
   state.Str = 10;
   g.reincarnate("you died in combat"); // Death: converts (10 - 1) * 0.15 = 1.35 gain
   assertClose(state.StrAp, 2.35, "StrAp = 2.35 after death with Str 10 (1.0 + 1.35)");
-  assert(state.Str === 1, "Str reset to 1");
+  assert(state.Str === 0, "Str reset to 0");
   assert(state.Styles === "Brawling", "Styles kept");
   assert(state.Money === 30, "Money reset to 30");
   state.Str = 30;
@@ -420,7 +420,7 @@ console.log("== Home Pushups: free, Str grows ==");
   g.setActivity("Pushups");
   const moneyBefore = state.Money;
   g.doDay();
-  assert(state.Str > 1, "Str grows");
+  assert(state.Str > 0, "Str grows");
   assert(state.Money === moneyBefore, "cost 0 (no cash charged)");
 }
 
@@ -991,6 +991,34 @@ console.log("== Tasklist: too tired falls back to Rest ==");
   const logText = state.Log.map((e) => e.t).join(" ");
   assert(logText.includes("Too tired") || logText.toLowerCase().includes("rest"), "fell back to Rest when too tired");
   assert(state.TaskList.length === 0, "task consumed despite fallback");
+}
+
+console.log("== Version: GAME_VERSION is positive ==");
+{
+  assert(typeof GAME_VERSION === "number" && GAME_VERSION > 0, `GAME_VERSION > 0 (got ${GAME_VERSION})`);
+}
+
+console.log("== Version: freshState SeenVersion is 0 ==");
+{
+  const s = freshState();
+  assert(s.SeenVersion === 0, `fresh SeenVersion === 0 (got ${s.SeenVersion})`);
+}
+
+console.log("== Version: shouldShowUpdateLog true when SeenVersion < GAME_VERSION ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.shouldShowUpdateLog() === true, "shouldShowUpdateLog true for fresh state");
+  state.SeenVersion = GAME_VERSION;
+  assert(g.shouldShowUpdateLog() === false, "shouldShowUpdateLog false after SeenVersion = GAME_VERSION");
+}
+
+console.log("== Version: UPDATE_LOG is a non-empty array ==");
+{
+  assert(Array.isArray(UPDATE_LOG) && UPDATE_LOG.length > 0, "UPDATE_LOG is non-empty array");
+  for (const entry of UPDATE_LOG) {
+    assert(typeof entry.v === "number" && typeof entry.text === "string", "each entry has v and text");
+  }
 }
 
 console.log("");
