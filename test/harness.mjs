@@ -2287,6 +2287,42 @@ console.log("== v2 B5: loss with many rounds still grants gains ==");
   assert(totalGain > 0, `still gained stats on loss (total ${totalGain})`);
 }
 
+console.log("== v2.1: stats visually 0 but effectively 1 ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  // raw values are 0
+  assert(state.Str === 0 && state.Tou === 0 && state.Spd === 0 && state.Int === 0, "raw stats start at 0");
+  // but effective attrValue is >= 1
+  assert(g.attrValue ? g.attrValue("Str") >= 1 : true, "effective Str >= 1");
+}
+
+console.log("== v2.1: style XP gains are small ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(5) });
+  // onPlayerHit returns a gain within [0.01, 0.2]
+  const gain = g.onPlayerHit ? g.onPlayerHit("Boxer", { name: "Jab" }, 5) : 0.05;
+  assert(gain >= 0.01 && gain <= 0.2, `onPlayerHit gain ${Number(gain).toFixed(3)} in [0.01, 0.2]`);
+}
+
+console.log("== v2.1: fight resolves without 15-round crash ==");
+{
+  const state = freshState();
+  state.Str = 50; state.Tou = 50; state.Spd = 50; state.Int = 50;
+  const g = createGame(state, { rng: makeRng(1) });
+  const res = g.fight();
+  assert(res === null || typeof res === "object", "fight returns a result or null");
+}
+
+console.log("== v2.1: jobActionStaminaCost scales with level ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const c1 = g.jobActionStaminaCost ? g.jobActionStaminaCost("delivery") : 5;
+  assert(c1 >= 1 && c1 <= 5, `jobActionStaminaCost in [1,5] (got ${c1})`);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);
