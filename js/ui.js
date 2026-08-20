@@ -24,6 +24,7 @@ import {
   styleTier,
   GAME_VERSION,
   UPDATE_LOG,
+  trainChain,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -723,10 +724,26 @@ export function initUI(game, opts = {}) {
         meta += `<span class="lr-stam">${act.cost} STA</span>`;
       }
 
+      let tierLine = "";
+      const chain = trainChain(actKey);
+      if (chain) {
+        const tn = game.trainTierName(actKey);
+        const tp = game.trainTierProgress(actKey);
+        if (tn && tp) {
+          const nextTier = chain.tiers[tp.tier + 1];
+          if (nextTier && tp.req > 0) {
+            tierLine = `<span class="lr-tier">${tn} — ${tp.progress}/${tp.req} · ${nextTier.gainMult}x</span>`;
+          } else {
+            tierLine = `<span class="lr-tier">${tn} (max)</span>`;
+          }
+        }
+      }
+
       b.innerHTML = `
         <span class="lr-main">
           <span class="lr-name">${act.name}</span>
           <span class="lr-stat">${statName}</span>
+          ${tierLine}
         </span>
         <span class="lr-meta">${meta}</span>`;
       b.addEventListener("click", () => clickActivity(actKey));

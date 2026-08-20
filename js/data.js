@@ -304,6 +304,44 @@ export const TRAINING = {
   },
 };
 
+export const TRAIN_CHAINS = {
+  Pushups: {
+    attr: "Str",
+    tiers: [
+      { name: "Pushups",           gainMult: 1.0, costMult: 1.0, req: 0 },
+      { name: "Clapping Pushups",  gainMult: 1.35, costMult: 1.2, req: 20 },
+      { name: "One-Arm Pushups",   gainMult: 1.75, costMult: 1.4, req: 50 },
+      { name: "Handstand Pushups", gainMult: 2.3,  costMult: 1.7, req: 100 },
+    ],
+  },
+  Situps: { attr: "Tou", tiers: [
+      { name: "Situps",              gainMult: 1.0,  costMult: 1.0, req: 0 },
+      { name: "Hanging Leg Raises",  gainMult: 1.35, costMult: 1.2, req: 20 },
+      { name: "Dragon Flags",        gainMult: 1.75, costMult: 1.4, req: 50 },
+    ] },
+  Squats: { attr: "Spd", tiers: [
+      { name: "Squats",              gainMult: 1.0,  costMult: 1.0, req: 0 },
+      { name: "Pistol Squats",       gainMult: 1.35, costMult: 1.2, req: 20 },
+      { name: "Jump Squats",         gainMult: 1.75, costMult: 1.4, req: 50 },
+    ] },
+  Roadworks: { attr: "Spd", tiers: [
+      { name: "Roadworks",           gainMult: 1.0,  costMult: 1.0, req: 0 },
+      { name: "Sprint Carries",      gainMult: 1.35, costMult: 1.2, req: 25 },
+      { name: "Hill Sprints",        gainMult: 1.75, costMult: 1.4, req: 60 },
+    ] },
+  ShadowBoxing: { attr: "Int", tiers: [
+      { name: "Shadow Boxing",       gainMult: 1.0,  costMult: 1.0, req: 0 },
+      { name: "Footwork Drills",     gainMult: 1.35, costMult: 1.2, req: 20 },
+      { name: "Speed Bag Rhythms",   gainMult: 1.75, costMult: 1.4, req: 50 },
+    ] },
+  HeavyBag: { attr: "Str", tiers: [
+      { name: "Heavy Bag",           gainMult: 1.0,  costMult: 1.0, req: 0 },
+      { name: "Power Bag",           gainMult: 1.35, costMult: 1.2, req: 25 },
+      { name: "Sledge Hammer",       gainMult: 1.75, costMult: 1.4, req: 60 },
+    ] },
+};
+export function trainChain(activityKey) { return TRAIN_CHAINS[activityKey] || null; }
+
 export const STYLE_TIER_MULT = { 1: 1.0, 2: 1.15, 3: 1.3 };
 export function styleTier(styleId) { return STYLES[styleId]?.tier || 1; }
 

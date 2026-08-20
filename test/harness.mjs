@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -1019,6 +1019,140 @@ console.log("== Version: UPDATE_LOG is a non-empty array ==");
   for (const entry of UPDATE_LOG) {
     assert(typeof entry.v === "number" && typeof entry.text === "string", "each entry has v and text");
   }
+}
+
+console.log("== Training ladder: fresh state tier 0 ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.trainTier("Pushups") === 0, "fresh trainTier('Pushups') === 0");
+  assert(g.trainTierName("Pushups") === "Pushups", "fresh trainTierName('Pushups') === 'Pushups'");
+  const tp = g.trainTierProgress("Pushups");
+  assert(tp.tier === 0 && tp.progress === 0 && tp.req === 0, "fresh progress is {0, 0, 0}");
+}
+
+console.log("== Training ladder: tier 0 gainMult 1.0 (baseline) ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setActivity("Pushups");
+  g.doDay();
+  // Expected: 0.10 * 0.6 * 1.0 * 1.0 * 1 (home gain, no buff) = 0.06
+  assertClose(state.Str, 0.06, "tier 0 Str gain = 0.06");
+}
+
+console.log("== Training ladder: tier advances after req sessions ==");
+{
+  const state = freshState();
+  state.TrainProgress.Pushups = 19;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setActivity("Pushups");
+  g.doDay();
+  assert(g.trainTier("Pushups") === 1, "tier advanced to 1");
+  assert(g.trainTierName("Pushups") === "Clapping Pushups", "tier 1 name is Clapping Pushups");
+  const tp = g.trainTierProgress("Pushups");
+  assert(tp.progress === 0, "progress reset to 0");
+  assert(tp.req === 20, "next req is 20");
+  assert(String(state.LastMsg).includes("Tier up"), "log includes Tier up");
+}
+
+console.log("== Training ladder: non-ladder activity unchanged ==");
+{
+  const state = freshState();
+  state.Stamina = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setLocation("spar");
+  g.setActivity("Sparring");
+  g.doDay();
+  // Sparring has no chain, should behave normally
+  assert(state.Tou > 0, "Sparring still trains Tou");
+  assert(!state.TrainTiers["Sparring"], "Sparring has no TrainTiers entry");
+  assert(!state.TrainProgress["Sparring"], "Sparring has no TrainProgress entry");
+}
+
+console.log("== Training ladder: tier 1 costs more stamina ==");
+{
+  const state = freshState();
+  state.TrainTiers.Pushups = 1;
+  state.TrainProgress.Pushups = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setLocation("spar");
+  g.setActivity("Pushups");
+  const stamBefore = state.Stamina;
+  g.doDay();
+  // tier 1 costMult = 1.2, base cost = 10, so stamina cost = ceil(10 * 1.2) = 12
+  assert(state.Stamina < stamBefore, "stamina decreased");
+  const stamCost = stamBefore - state.Stamina;
+  assert(stamCost === 12, `tier 1 stamina cost is 12 (got ${stamCost})`);
+}
+
+console.log("== Training ladder: tier 1 gainMult applied ==");
+{
+  const state = freshState();
+  state.TrainTiers.Pushups = 1;
+  state.TrainProgress.Pushups = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setActivity("Pushups");
+  const strBefore = state.Str;
+  g.doDay();
+  // tier 1: gainMult 1.35, home gain 0.6, so 0.10 * 0.6 * 1.35 = 0.081
+  const gained = state.Str - strBefore;
+  assertClose(gained, 0.081, "tier 1 Str gain = 0.081");
+}
+
+console.log("== Training ladder: TRAIN_CHAINS table has 6 activities ==");
+{
+  const keys = Object.keys(TRAIN_CHAINS);
+  assert(keys.length === 6, `TRAIN_CHAINS has 6 entries (got ${keys.length})`);
+  for (const key of keys) {
+    const chain = TRAIN_CHAINS[key];
+    assert(chain.tiers.length >= 2, `${key} has at least 2 tiers`);
+    assert(chain.tiers[0].gainMult === 1.0, `${key} tier 0 gainMult is 1.0`);
+    assert(chain.tiers[0].costMult === 1.0, `${key} tier 0 costMult is 1.0`);
+    assert(chain.tiers[0].req === 0, `${key} tier 0 req is 0`);
+  }
+}
+
+console.log("== Training ladder: trainChain returns null for non-ladder ==");
+{
+  assert(trainChain("Sparring") === null, "Sparring has no chain");
+  assert(trainChain("Running") === null, "Running has no chain");
+  assert(trainChain("Rest") === null, "Rest has no chain");
+  assert(trainChain("OddJobs") === null, "OddJobs has no chain");
+}
+
+console.log("== Training ladder: already at max tier stays at max ==");
+{
+  const state = freshState();
+  const chain = TRAIN_CHAINS.Pushups;
+  const maxTier = chain.tiers.length - 1;
+  state.TrainTiers.Pushups = maxTier;
+  state.TrainProgress.Pushups = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  g.setActivity("Pushups");
+  g.doDay();
+  assert(g.trainTier("Pushups") === maxTier, "still at max tier");
+  assert(g.trainTierProgress("Pushups").progress === 0, "progress stays 0 at max");
+}
+
+console.log("== Training ladder: snapshot preserves tiers ==");
+{
+  const state = freshState();
+  state.TrainTiers.Pushups = 1;
+  state.TrainProgress.Pushups = 10;
+  const snap = snapshot(state);
+  assert(snap.TrainTiers.Pushups === 1, "snapshot has TrainTiers.Pushups = 1");
+  assert(snap.TrainProgress.Pushups === 10, "snapshot has TrainProgress.Pushups = 10");
+  const state2 = freshState();
+  restore(state2, snap);
+  assert(state2.TrainTiers.Pushups === 1, "restored TrainTiers.Pushups = 1");
+  assert(state2.TrainProgress.Pushups === 10, "restored TrainProgress.Pushups = 10");
 }
 
 console.log("");

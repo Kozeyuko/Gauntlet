@@ -60,6 +60,7 @@ import {
   ROAMER_COOLDOWN_MS,
   STYLE_TIER_MULT,
   styleTier,
+  trainChain,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -182,6 +183,7 @@ export const PERSISTENT_KEYS = [
   "Log", "Roamers", "Name",
   "Inventory", "TaskList", "TaskRepeat",
   "SeenVersion",
+  "TrainTiers", "TrainProgress",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -204,6 +206,8 @@ export function freshState() {
     TaskList: [],
     TaskRepeat: false,
     SeenVersion: 0,
+    TrainTiers: {},
+    TrainProgress: {},
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -1617,6 +1621,24 @@ export function createGame(state, opts = {}) {
     return TRAINING[locKey] || {};
   }
 
+  function trainTier(activityKey) {
+    return state.TrainTiers[activityKey] || 0;
+  }
+
+  function trainTierName(activityKey) {
+    const chain = trainChain(activityKey);
+    if (!chain) return null;
+    return chain.tiers[trainTier(activityKey)].name;
+  }
+
+  function trainTierProgress(activityKey) {
+    const chain = trainChain(activityKey);
+    if (!chain) return null;
+    const tier = trainTier(activityKey);
+    const t = chain.tiers[tier];
+    return { tier, progress: state.TrainProgress[activityKey] || 0, req: t.req };
+  }
+
   // ---- the day ----
   function doDay() {
     if (num(state.Health) <= 0) return;
@@ -1686,12 +1708,18 @@ export function createGame(state, opts = {}) {
       logMsg(`Odd jobs: +${money} Cash.`, "money");
     } else if (act.attr) {
       const entry = trainingAt(locKey)[actKey];
-      state.Money = num(state.Money) - entry.cost;
+      const chain = trainChain(actKey);
+      const tierIdx = chain ? trainTier(actKey) : 0;
+      const tier = chain ? chain.tiers[tierIdx] : null;
+      const gainMult = tier ? tier.gainMult : 1.0;
+      const costMult = tier ? tier.costMult : 1.0;
+      state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
       const double = hasBuff("weights") ? 2 : 1;
-      const gain = act.gain * entry.gain * attrApt(act.attr) * double;
+      const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * double;
       state[act.attr] = num(state[act.attr]) + gain;
       let cost = act.cost;
       if (actKey === "Running") cost = Math.floor(cost * 1.5);
+      cost = Math.ceil(cost * costMult);
       state.Stamina = stamina - cost;
       if (act.staminaBonus) state.Stamina = Math.min(maxStamina(), num(state.Stamina) + act.staminaBonus);
       const attrName = ATTRIBUTES.find((a) => a.id === act.attr).name;
@@ -1700,7 +1728,20 @@ export function createGame(state, opts = {}) {
         addStyleXp(loc.styleGym, STYLEXP_TRAIN);
         sxp = ` — style mastery +${STYLEXP_TRAIN}`;
       }
-      logMsg(`Training: +${gain.toFixed(2)} ${attrName} at ${locName} (x${entry.gain.toFixed(1)}, ${entry.cost} Cash).${sxp}`, "train");
+      const tierLabel = tier ? ` [${tier.name}]` : "";
+      logMsg(`Training: +${gain.toFixed(2)} ${attrName} at ${locName}${tierLabel} (x${entry.gain.toFixed(1)}, ${Math.ceil(entry.cost * costMult)} Cash).${sxp}`, "train");
+
+      if (chain) {
+        if (tierIdx + 1 < chain.tiers.length) {
+          state.TrainProgress[actKey] = (state.TrainProgress[actKey] || 0) + 1;
+          const nextTier = chain.tiers[tierIdx + 1];
+          if (state.TrainProgress[actKey] >= nextTier.req) {
+            state.TrainTiers[actKey] = tierIdx + 1;
+            state.TrainProgress[actKey] = 0;
+            logMsg(`Tier up! ${tier.name} → ${nextTier.name}. Training improved!`, "train");
+          }
+        }
+      }
 
       if (state.Looking === true && locName !== "Home" && locName !== "Clinic" && R() < ENC_CHANCE) {
         state.Encounter = 1;
@@ -1782,6 +1823,7 @@ export function createGame(state, opts = {}) {
     setName, hardReset,
     setAutoBattle, buyItem, useItem, autoEatFood, inventory,
     trainingAt, setTaskList, addTask, removeTask,
+    trainTier, trainTierName, trainTierProgress,
     // jobs
     jobLevel, jobXp, doJobShift, doAutoJob, jobCooldownRemaining, jobCanWork,
     // arena modes

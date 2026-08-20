@@ -810,6 +810,7 @@ header {
 .locrow .lr-cost { font-size: 11px; color: var(--gold); font-variant-numeric: tabular-nums; }
 .locrow .lr-cost.red { color: var(--red); }
 .locrow .lr-stam { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.locrow .lr-tier { font-size: 11px; color: var(--blue); font-variant-numeric: tabular-nums; margin-top: 2px; }
 .locrow.cantafford { opacity: .45; }
 .locrow.cantafford .lr-name,
 .locrow.cantafford .lr-stat { color: var(--muted); }
