@@ -215,6 +215,14 @@ export function initUI(game, opts = {}) {
     btnResultClose: $("btnResultClose"),
     // name prompt
     nameOverlay: $("nameOverlay"), nameInput: $("nameInput"), btnNameBegin: $("btnNameBegin"),
+    // inventory
+    btnInventory: $("btnInventory"), inventoryOverlay: $("inventoryOverlay"),
+    inventoryList: $("inventoryList"), inventoryEmpty: $("inventoryEmpty"),
+    btnInventoryClose: $("btnInventoryClose"),
+    // tasklist
+    btnTasklist: $("btnTasklist"), taskOverlay: $("taskOverlay"),
+    taskQueue: $("taskQueue"), taskActivityList: $("taskActivityList"),
+    btnTaskRepeat: $("btnTaskRepeat"), btnTaskClose: $("btnTaskClose"),
   };
 
   // ------------------------------------------------------------ build static grids --
@@ -1188,6 +1196,130 @@ export function initUI(game, opts = {}) {
   el.btnBuildClose.addEventListener("click", () => el.buildOverlay.classList.remove("show"));
   el.buildOverlay.addEventListener("click", (e) => {
     if (e.target === el.buildOverlay) el.buildOverlay.classList.remove("show");
+  });
+
+  // ------------------------------------------------------------ inventory overlay --
+  function renderInventory() {
+    const inv = game.inventory();
+    el.inventoryList.innerHTML = "";
+    if (inv.length === 0) {
+      el.inventoryEmpty.style.display = "";
+      return;
+    }
+    el.inventoryEmpty.style.display = "none";
+    for (const entry of inv) {
+      const item = [...CSTORE_ITEMS, ...CLINIC_ITEMS].find((i) => i.key === entry.key);
+      if (!item || item.buff) continue;
+      const row = document.createElement("div");
+      row.className = "invrow";
+      const main = document.createElement("div");
+      main.className = "smain";
+      const nm = document.createElement("div");
+      nm.className = "snm";
+      nm.textContent = item.name;
+      const sub = document.createElement("div");
+      sub.className = "ssub";
+      sub.textContent = item.desc;
+      main.appendChild(nm);
+      main.appendChild(sub);
+      const qty = document.createElement("span");
+      qty.className = "invqty";
+      qty.textContent = `×${entry.qty}`;
+      row.appendChild(main);
+      row.appendChild(qty);
+      if (!item.buff) {
+        const btn = document.createElement("button");
+        btn.className = "btn small-btn";
+        btn.textContent = "USE";
+        btn.disabled = entry.qty <= 0;
+        btn.addEventListener("click", () => {
+          game.useItem(entry.key);
+          renderInventory();
+          render();
+        });
+        row.appendChild(btn);
+      }
+      el.inventoryList.appendChild(row);
+    }
+  }
+
+  function openInventory() {
+    renderInventory();
+    el.inventoryOverlay.classList.add("show");
+  }
+
+  el.btnInventory.addEventListener("click", openInventory);
+  el.btnInventoryClose.addEventListener("click", () => el.inventoryOverlay.classList.remove("show"));
+  el.inventoryOverlay.addEventListener("click", (e) => {
+    if (e.target === el.inventoryOverlay) el.inventoryOverlay.classList.remove("show");
+  });
+
+  // ------------------------------------------------------------ tasklist overlay --
+  function renderTasklist() {
+    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+    el.taskQueue.innerHTML = "";
+    if (tl.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No tasks in queue. Add activities below.";
+      el.taskQueue.appendChild(empty);
+    } else {
+      for (let i = 0; i < tl.length; i++) {
+        const act = ACTIVITIES[tl[i]];
+        const row = document.createElement("div");
+        row.className = "taskrow";
+        const num = document.createElement("span");
+        num.className = "tnum";
+        num.textContent = `${i + 1}.`;
+        const nm = document.createElement("span");
+        nm.className = "tname";
+        nm.textContent = act ? act.name : tl[i];
+        row.appendChild(num);
+        row.appendChild(nm);
+        const rm = document.createElement("button");
+        rm.className = "tremove";
+        rm.textContent = "×";
+        rm.addEventListener("click", () => {
+          game.removeTask(i);
+          renderTasklist();
+          render();
+        });
+        row.appendChild(rm);
+        el.taskQueue.appendChild(row);
+      }
+    }
+    const repeatOn = state.TaskRepeat === true;
+    el.btnTaskRepeat.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
+    el.btnTaskRepeat.classList.toggle("on", repeatOn);
+
+    el.taskActivityList.innerHTML = "";
+    for (const key of Object.keys(ACTIVITIES)) {
+      const act = ACTIVITIES[key];
+      const b = document.createElement("button");
+      b.className = "btn small-btn";
+      b.textContent = act.name;
+      b.addEventListener("click", () => {
+        game.addTask(key);
+        renderTasklist();
+        render();
+      });
+      el.taskActivityList.appendChild(b);
+    }
+  }
+
+  function openTasklist() {
+    renderTasklist();
+    el.taskOverlay.classList.add("show");
+  }
+
+  el.btnTasklist.addEventListener("click", openTasklist);
+  el.btnTaskClose.addEventListener("click", () => el.taskOverlay.classList.remove("show"));
+  el.taskOverlay.addEventListener("click", (e) => {
+    if (e.target === el.taskOverlay) el.taskOverlay.classList.remove("show");
+  });
+  el.btnTaskRepeat.addEventListener("click", () => {
+    state.TaskRepeat = state.TaskRepeat !== true;
+    renderTasklist();
   });
 
   // ------------------------------------------------------------ result overlay --

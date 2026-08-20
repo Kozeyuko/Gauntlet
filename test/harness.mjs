@@ -483,12 +483,17 @@ console.log("== Buying from cstore and clinic ==");
   g.updatePotential(); // establish rank so buyItem's updatePotential adds nothing
   const moneyBefore = state.Money;
   assert(g.buyItem("rice") === true, "buyItem('rice') succeeds");
-  assert(state.Nutrition > 50, "rice restores Nutrition");
+  assert(state.Nutrition === 50, "rice goes to inventory (no instant Nutrition gain)");
+  const inv = g.inventory();
+  const rice = inv.find((e) => e.key === "rice");
+  assert(!!rice && rice.qty === 1, "rice is in inventory with qty 1");
   assert(state.Money === moneyBefore - 5, "rice costs 5 Cash");
   const hpBefore = state.Health;
   assert(g.buyItem("bandages") === true, "buyItem('bandages') succeeds");
-  assert(state.Health > hpBefore, "bandages restore Health");
-  assert(String(state.LastMsg).includes("Bought Bandages"), "bandages logged as bought");
+  assert(state.Health === hpBefore, "bandages go to inventory (no instant Health gain)");
+  const band = inv.find((e) => e.key === "bandages");
+  assert(!!band && band.qty === 1, "bandages in inventory");
+  assert(String(state.LastMsg).includes("in inventory"), "log says 'in inventory'");
 }
 
 console.log("== Player name in combat view ==");
@@ -799,6 +804,193 @@ console.log("== Tier: all styles have a tier property ==");
   for (const [id, st] of Object.entries(STYLES)) {
     assert(typeof st.tier === "number" && st.tier >= 1 && st.tier <= 3, `${id} has valid tier ${st.tier}`);
   }
+}
+
+// ---- PART A: Inventory tests ----
+console.log("== Inventory: buying rice adds to inventory (no instant Nutrition) ==");
+{
+  const state = freshState();
+  state.Nutrition = 50;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  assert(state.Nutrition === 50, "Nutrition unchanged after buy");
+  assert(g.inventory().length === 1, "inventory has 1 entry");
+  assert(g.inventory()[0].key === "rice" && g.inventory()[0].qty === 1, "rice qty 1");
+}
+
+console.log("== Inventory: buying duplicate rice stacks qty ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  g.buyItem("rice");
+  assert(g.inventory().length === 1, "still 1 entry (stacked)");
+  assert(g.inventory()[0].qty === 2, "rice qty 2");
+}
+
+console.log("== Inventory: useItem applies effect and decrements qty ==");
+{
+  const state = freshState();
+  state.Nutrition = 50;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  g.useItem("rice");
+  assert(state.Nutrition === 70, "Nutrition gained 20 from useItem");
+  assert(g.inventory().length === 0, "inventory empty after use (qty was 1)");
+}
+
+console.log("== Inventory: useItem on bandages restores Health ==");
+{
+  const state = freshState();
+  state.Health = 50;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("bandages");
+  g.useItem("bandages");
+  assert(state.Health === 75, "Health gained 25 from bandages");
+  assert(g.inventory().length === 0, "inventory empty");
+}
+
+console.log("== Inventory: useItem returns false for unknown key ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.useItem("rice") === false, "useItem with no inventory returns false");
+}
+
+console.log("== Inventory: weights (buff) apply instantly ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("weights");
+  assert(g.inventory().length === 0, "weights not in inventory");
+  assert(Array.isArray(state.StoreBuffs) && state.StoreBuffs.length === 1, "StoreBuffs has weights");
+}
+
+console.log("== Inventory: autoEatFood consumes rice when Nutrition <= 30 ==");
+{
+  const state = freshState();
+  state.Nutrition = 30;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  g.autoEatFood();
+  assert(state.Nutrition === 50, "Nutrition = 50 after auto-eat (+20)");
+  assert(g.inventory().length === 0, "rice consumed");
+  assert(String(state.LastMsg).includes("Ate rice"), "log mentions ate rice");
+}
+
+console.log("== Inventory: autoEatFood skips when no rice ==");
+{
+  const state = freshState();
+  state.Nutrition = 20;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.autoEatFood();
+  assert(state.Nutrition === 20, "Nutrition unchanged (no rice)");
+}
+
+console.log("== Inventory: autoEatFood skips when Nutrition > 30 ==");
+{
+  const state = freshState();
+  state.Nutrition = 50;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  g.autoEatFood();
+  assert(state.Nutrition === 50, "Nutrition unchanged (above threshold)");
+  assert(g.inventory()[0].qty === 1, "rice still in inventory");
+}
+
+console.log("== Inventory: autoEatFood fires at start of doDay ==");
+{
+  const state = freshState();
+  state.Nutrition = 30;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.buyItem("rice");
+  g.buyItem("rice");
+  g.doDay();
+  // auto-eat should have consumed one rice, then doDay's -1 nutrition
+  assert(state.Nutrition === 49, "Nutrition = 30 + 20 (auto-eat) - 1 (day decay) = 49");
+  assert(g.inventory().length === 1, "one rice left");
+  assert(g.inventory()[0].qty === 1, "rice qty 1 remaining");
+}
+
+// ---- PART B: Tasklist tests ----
+console.log("== Tasklist: doDay advances through entries in order ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups", "Situps", "Squats"], false);
+  g.updatePotential(); // establish rank
+  g.doDay();
+  assert(state.Activity !== "Pushups" || state.TaskList.length === 2, "tasklist used Pushups");
+  assert(state.TaskList.length === 2, "TaskList has 2 remaining");
+  assert(state.TaskList[0] === "Situps", "next is Situps");
+  g.doDay();
+  assert(state.TaskList.length === 1, "TaskList has 1 remaining");
+  assert(state.TaskList[0] === "Squats", "next is Squats");
+  g.doDay();
+  assert(state.TaskList.length === 0, "TaskList empty after 3 days");
+}
+
+console.log("== Tasklist: TaskRepeat cycles the sequence ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups", "Situps"], true);
+  g.updatePotential();
+  g.doDay();
+  assert(state.TaskList.length === 2, "repeat: still 2 entries");
+  assert(state.TaskList[0] === "Situps" && state.TaskList[1] === "Pushups", "Pushups rotated to end");
+  g.doDay();
+  assert(state.TaskList[0] === "Pushups" && state.TaskList[1] === "Situps", "Situps rotated; cycle complete");
+}
+
+console.log("== Tasklist: empty TaskList falls back to Activity ==");
+{
+  const state = freshState();
+  state.Activity = "Pushups";
+  const g = createGame(state, { rng: makeRng(1) });
+  g.updatePotential();
+  const strBefore = state.Str;
+  g.doDay();
+  assert(state.Str > strBefore, "Pushups trained (Str grew)");
+}
+
+console.log("== Tasklist: setTaskList validates against ACTIVITIES ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups", "Bogus", "Situps"], false);
+  assert(state.TaskList.length === 2, "invalid entries filtered");
+  assert(state.TaskList[0] === "Pushups" && state.TaskList[1] === "Situps", "only valid entries kept");
+}
+
+console.log("== Tasklist: addTask caps at 20 ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  for (let i = 0; i < 22; i++) g.addTask("Pushups");
+  assert(state.TaskList.length === 20, "capped at 20");
+}
+
+console.log("== Tasklist: removeTask works ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups", "Situps", "Squats"], false);
+  g.removeTask(1);
+  assert(state.TaskList.length === 2, "removed one");
+  assert(state.TaskList[1] === "Squats", "Situps removed, Squats shifted");
+}
+
+console.log("== Tasklist: too tired falls back to Rest ==");
+{
+  const state = freshState();
+  state.Stamina = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups"], false);
+  g.doDay();
+  const logText = state.Log.map((e) => e.t).join(" ");
+  assert(logText.includes("Too tired") || logText.toLowerCase().includes("rest"), "fell back to Rest when too tired");
+  assert(state.TaskList.length === 0, "task consumed despite fallback");
 }
 
 console.log("");

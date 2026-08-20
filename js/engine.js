@@ -179,6 +179,7 @@ export const PERSISTENT_KEYS = [
   "InFight", "AutoBattle",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
+  "Inventory", "TaskList", "TaskRepeat",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -197,6 +198,9 @@ export function freshState() {
     AutoRun: false,
     Roamers: {},
     Name: "You",
+    Inventory: [],
+    TaskList: [],
+    TaskRepeat: false,
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -1509,33 +1513,99 @@ export function createGame(state, opts = {}) {
       return false;
     }
     state.Money = num(state.Money) - item.price;
-    const effects = [];
+
+    // Buff items (weights) apply instantly as before
+    if (item.buff) {
+      if (!state.StoreBuffs) state.StoreBuffs = [];
+      state.StoreBuffs.push({ name: item.buff, daysLeft: item.days });
+      logMsg(`Bought ${item.name} for ${item.price} Cash. Training gains doubled for ${item.days} days.`, "store");
+      clampVitals();
+      updatePotential();
+      return true;
+    }
+
+    // Consumable items: add to inventory
+    if (!Array.isArray(state.Inventory)) state.Inventory = [];
+    const inv = state.Inventory;
+    const existing = inv.find((e) => e.key === item.key);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      inv.push({ key: item.key, qty: 1 });
+    }
+    logMsg(`Bought ${item.name} — in inventory (qty ${existing ? existing.qty : 1}).`, "store");
+    return true;
+  }
+
+  function useItem(key) {
+    const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
+    const entry = inv.find((e) => e.key === key);
+    if (!entry || entry.qty <= 0) return false;
+    const item = ALL_STORE_ITEMS.find((i) => i.key === key);
+    if (!item) return false;
+    if (item.buff) return false; // buff items are not usable from inventory
     if (item.nutrition) {
       state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
-      effects.push(`+${item.nutrition} Nutrition`);
     }
     if (item.health) {
       state.Health = clamp(num(state.Health) + item.health, 0, maxHealth());
-      effects.push(`+${item.health} Health`);
     }
     if (item.stamina) {
       state.Stamina = clamp(num(state.Stamina) + item.stamina, 0, maxStamina());
-      effects.push(`+${item.stamina} Stamina`);
     }
     if (item.stat) {
       if (!state.TempBoosts) state.TempBoosts = {};
       state.TempBoosts[item.stat] = num(state.TempBoosts[item.stat]) + item.amount;
-      const attrName = ATTRIBUTES.find((a) => a.id === item.stat).name;
-      effects.push(`+${item.amount} ${attrName} for this life`);
     }
-    if (item.buff) {
-      if (!state.StoreBuffs) state.StoreBuffs = [];
-      state.StoreBuffs.push({ name: item.buff, daysLeft: item.days });
-      effects.push(`Training gains doubled for ${item.days} days`);
+    entry.qty -= 1;
+    if (entry.qty <= 0) {
+      state.Inventory = inv.filter((e) => e.qty > 0);
     }
-    logMsg(`Bought ${item.name} for ${item.price} Cash.${effects.length ? " " + effects.join(", ") + "." : ""}`, "store");
+    logMsg(`Used ${item.name}.`, "store");
     clampVitals();
     updatePotential();
+    return true;
+  }
+
+  function autoEatFood() {
+    if (num(state.Nutrition) > 30) return;
+    const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
+    const rice = inv.find((e) => e.key === "rice");
+    if (!rice || rice.qty <= 0) return;
+    state.Nutrition = clamp(num(state.Nutrition) + 20, 0, maxNutrition());
+    rice.qty -= 1;
+    if (rice.qty <= 0) {
+      state.Inventory = inv.filter((e) => e.qty > 0);
+    }
+    logMsg("Ate rice from inventory (+20 Nutrition).", "eat");
+  }
+
+  function inventory() {
+    return Array.isArray(state.Inventory) ? state.Inventory : [];
+  }
+
+  // ---- tasklist ----
+  function setTaskList(list, repeat) {
+    const valid = [];
+    for (const k of list) {
+      if (ACTIVITIES[k]) valid.push(k);
+    }
+    state.TaskList = valid.slice(0, 20);
+    state.TaskRepeat = repeat === true;
+  }
+
+  function addTask(activityKey) {
+    if (!ACTIVITIES[activityKey]) return false;
+    if (!Array.isArray(state.TaskList)) state.TaskList = [];
+    if (state.TaskList.length >= 20) return false;
+    state.TaskList.push(activityKey);
+    return true;
+  }
+
+  function removeTask(index) {
+    if (!Array.isArray(state.TaskList)) return false;
+    if (index < 0 || index >= state.TaskList.length) return false;
+    state.TaskList.splice(index, 1);
     return true;
   }
 
@@ -1549,6 +1619,7 @@ export function createGame(state, opts = {}) {
     if (state.InFight) return;
 
     // 1) Nutrition
+    autoEatFood();
     let nutrition = num(state.Nutrition) - 1;
     if (nutrition <= 0) {
       const money = num(state.Money);
@@ -1565,7 +1636,15 @@ export function createGame(state, opts = {}) {
     state.Nutrition = clamp(nutrition, 0, maxNutrition());
 
     // 2) Activity
-    let actKey = String(state.Activity ?? "Rest");
+    const taskList = Array.isArray(state.TaskList) ? state.TaskList : [];
+    let usedTask = false;
+    let actKey;
+    if (taskList.length > 0) {
+      actKey = String(taskList[0] ?? "Rest");
+      usedTask = true;
+    } else {
+      actKey = String(state.Activity ?? "Rest");
+    }
     actKey = ACTIVITY_ALIAS[actKey] || actKey;
     let act = ACTIVITIES[actKey] || ACTIVITIES.Rest;
     const stamina = num(state.Stamina);
@@ -1628,6 +1707,16 @@ export function createGame(state, opts = {}) {
     // 3) Age
     state.AgeDays = num(state.AgeDays) + 1;
 
+    // Advance tasklist
+    if (usedTask && taskList.length > 0) {
+      if (state.TaskRepeat) {
+        const used = taskList.shift();
+        if (used) taskList.push(used);
+      } else {
+        taskList.shift();
+      }
+    }
+
     // 4) Lifespan
     state.Lifespan = Math.min(60, BASE_LIFESPAN + attrValue("Tou") / 2);
 
@@ -1687,7 +1776,8 @@ export function createGame(state, opts = {}) {
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, rebirthCost,
     setName, hardReset,
-    setAutoBattle, buyItem, trainingAt,
+    setAutoBattle, buyItem, useItem, autoEatFood, inventory,
+    trainingAt, setTaskList, addTask, removeTask,
     // jobs
     jobLevel, jobXp, doJobShift, doAutoJob, jobCooldownRemaining, jobCanWork,
     // arena modes

@@ -57,6 +57,10 @@
       <div class="knowgrid" id="stylesGrid"></div>
       <div class="small knowncount" id="knownSkillCount"></div>
       <button class="btn small-btn buildbtn" id="btnBuild">BUILD CUSTOM</button>
+      <div class="btnrow" style="margin-top:8px">
+        <button class="btn small-btn" id="btnInventory">INVENTORY</button>
+        <button class="btn small-btn" id="btnTasklist">TASKLIST</button>
+      </div>
       <div class="small" id="activeStyleInfo"></div>
       <div class="small stylenote">Knowledge grows when you get hit. Fight to master styles.</div>
     </section>
@@ -334,6 +338,38 @@
     <div class="acts">
       <button class="btn small-btn" id="btnLogClear">Clear</button>
       <button class="btn" id="btnLogClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INVENTORY OVERLAY ============ -->
+<div class="overlay" id="inventoryOverlay">
+  <div class="modal">
+    <h2>Inventory</h2>
+    <div class="sub">Consumables stored for later use. Food (rice) is eaten automatically when hungry.</div>
+    <div class="storelist" id="inventoryList"></div>
+    <div class="small" id="inventoryEmpty" style="display:none">No items in inventory.</div>
+    <div class="acts">
+      <button class="btn" id="btnInventoryClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TASKLIST OVERLAY ============ -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal">
+    <h2>Task List</h2>
+    <div class="sub">Build an ordered activity queue. Tasks auto-play each day tick in order.</div>
+    <div id="taskQueue"></div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn small-btn" id="btnTaskRepeat">Repeat: OFF</button>
+    </div>
+    <section class="panel" style="margin-top:10px">
+      <h3>Add Activity</h3>
+      <div id="taskActivityList"></div>
+    </section>
+    <div class="acts">
+      <button class="btn" id="btnTaskClose">Close</button>
     </div>
   </div>
 </div>

@@ -1020,3 +1020,35 @@ header {
   header { padding-top: calc(10px + env(safe-area-inset-top)); }
   #footer { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
 }
+
+/* ---------- inventory overlay ---------- */
+.invrow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px;
+}
+.invrow .smain { flex: 1; min-width: 0; }
+.invrow .snm { font-weight: 600; font-size: 14px; }
+.invrow .ssub { font-size: 11px; color: var(--muted); }
+.invrow .sprice { font-size: 11px; color: var(--gold); white-space: nowrap; }
+.invrow .invqty { font-size: 12px; color: var(--gold); white-space: nowrap; font-weight: 600; margin-left: 4px; }
+
+/* ---------- tasklist overlay ---------- */
+.taskqueue { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.taskrow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px;
+}
+.taskrow .tmain { flex: 1; min-width: 0; }
+.taskrow .tnum { font-size: 10px; color: var(--muted); min-width: 20px; }
+.taskrow .tname { font-weight: 600; font-size: 14px; }
+.taskrow .tremove {
+  background: none; border: 1px solid var(--line); color: var(--red);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 13px; font-weight: 700;
+}
+.taskrow .tremove:hover { border-color: var(--red); }
+.taskactivity { display: flex; flex-direction: column; gap: 4px; }
+.taskactivity .btn { width: 100%; text-align: left; padding: 8px 10px; font-size: 12px; }
+.taskstatus { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+#btnTaskRepeat.on { border-color: var(--green); color: var(--green); }
