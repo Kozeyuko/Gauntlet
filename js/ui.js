@@ -27,6 +27,7 @@ import {
   trainChain,
   GYM_TRAINING,
   MAIN_GYM,
+  EQUIPMENT,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -613,6 +614,7 @@ export function initUI(game, opts = {}) {
     renderMap();
     renderRival();
     renderQuickRival();
+    renderEquipmentPanel();
     renderLog();
     renderLooking();
     maybeOpenRivalForEncounter();
@@ -815,7 +817,17 @@ export function initUI(game, opts = {}) {
       if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
       return;
     }
-    if (key !== MAIN_GYM) {
+    // Show at MAIN_GYM or Home (for home-based items)
+    const isHome = key === "home";
+    const isGym = key === MAIN_GYM;
+    if (!isGym && !isHome) {
+      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
+      return;
+    }
+    const items = isHome
+      ? GYM_TRAINING.filter((t) => t.home)
+      : GYM_TRAINING.filter((t) => !t.home);
+    if (items.length === 0) {
       if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
       return;
     }
@@ -823,26 +835,30 @@ export function initUI(game, opts = {}) {
     if (!el.buyTrainingList) return;
     el.buyTrainingList.innerHTML = "";
     const money = num(state.Money);
-    for (const t of GYM_TRAINING) {
+    for (const t of items) {
       const owned = game.hasTraining(t.key);
-      const canBuy = !owned && money >= t.cost;
+      const consumable = t.unlock === "consumable";
+      const stock = consumable ? (state.Consumables[t.key] || 0) : 0;
+      const canBuy = money >= t.cost;
       const b = document.createElement("button");
-      b.className = "btn locrow" + (owned ? " owned" : (canBuy ? "" : " cantafford"));
+      b.className = "btn locrow" + (owned && !consumable ? " owned" : (canBuy ? "" : " cantafford"));
+      const label = owned && !consumable
+        ? "Owned"
+        : (consumable ? `Stock: ${stock}` : (t.requires && !state.OwnedItems.includes(t.requires) ? `Needs ${t.requiresName}` : "Buy"));
       b.innerHTML = `
         <span class="lr-main">
           <span class="lr-name">${t.name}</span>
-          <span class="lr-stat">${owned ? "Purchased" : "Unlocked"}</span>
+          <span class="lr-stat">${label}</span>
         </span>
         <span class="lr-meta">
-          <span class="lr-cost${canBuy || owned ? "" : " red"}">${owned ? "Owned" : t.cost + " Cash"}</span>
+          <span class="lr-cost${canBuy ? "" : " red"}">${t.cost} Cash</span>
+          ${consumable && stock > 0 ? `<span class="lr-stam">${stock} uses</span>` : ""}
         </span>`;
-      if (!owned) {
-        b.addEventListener("click", () => {
-          game.buyTraining(t.key);
-          renderBuyTraining(key);
-          render();
-        });
-      }
+      b.addEventListener("click", () => {
+        game.buyTraining(t.key);
+        renderBuyTraining(key);
+        render();
+      });
       el.buyTrainingList.appendChild(b);
     }
   }
@@ -857,7 +873,92 @@ export function initUI(game, opts = {}) {
     renderLocActivities(key);
     renderLocStyles(key);
     renderBuyTraining(key);
+    // Cook panel at Home
+    if (isHome && el.cookPanel) {
+      renderCookPanel();
+      el.cookPanel.style.display = "";
+    } else if (el.cookPanel) {
+      el.cookPanel.style.display = "none";
+    }
     el.locOverlay.classList.add("show");
+  }
+
+  function renderCookPanel() {
+    if (!el.cookList) return;
+    el.cookList.innerHTML = "";
+    const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
+    const recipes = CSTORE_ITEMS.filter((i) => i.cookTo);
+    for (const raw of recipes) {
+      const entry = inv.find((e) => e.key === raw.key);
+      const qty = entry ? entry.qty : 0;
+      const cooked = CSTORE_ITEMS.find((i) => i.key === raw.cookTo);
+      const row = document.createElement("div");
+      row.className = "storerow";
+      const main = document.createElement("div");
+      main.className = "smain";
+      const nm = document.createElement("div");
+      nm.className = "snm";
+      nm.textContent = `${raw.name} → ${cooked ? cooked.name : raw.cookTo}`;
+      const sub = document.createElement("div");
+      sub.className = "ssub";
+      sub.textContent = `In inventory: ${qty}`;
+      main.appendChild(nm);
+      main.appendChild(sub);
+      const btn = document.createElement("button");
+      btn.className = "btn small-btn" + (qty > 0 ? "" : " cantafford");
+      btn.textContent = "COOK";
+      btn.addEventListener("click", () => {
+        game.cookItem(raw.key);
+        renderCookPanel();
+        render();
+      });
+      row.appendChild(main);
+      row.appendChild(btn);
+      el.cookList.appendChild(row);
+    }
+  }
+
+  function renderEquipmentPanel() {
+    if (!el.equipmentList) return;
+    el.equipmentList.innerHTML = "";
+    const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
+    const equipped = state.Equipment || {};
+    if (owned.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No equipment owned. Buy at the store.";
+      el.equipmentList.appendChild(empty);
+      return;
+    }
+    for (const key of owned) {
+      const item = EQUIPMENT.find((e) => e.key === key);
+      if (!item) continue;
+      const isEquipped = equipped[item.slot] === key;
+      const row = document.createElement("div");
+      row.className = "storerow";
+      const main = document.createElement("div");
+      main.className = "smain";
+      const nm = document.createElement("div");
+      nm.className = "snm";
+      nm.textContent = `${item.name} (${item.slot})`;
+      const sub = document.createElement("div");
+      sub.className = "ssub";
+      sub.textContent = item.desc;
+      main.appendChild(nm);
+      main.appendChild(sub);
+      const btn = document.createElement("button");
+      btn.className = "btn small-btn" + (isEquipped ? " owned" : "");
+      btn.textContent = isEquipped ? "UNEQUIP" : "EQUIP";
+      btn.addEventListener("click", () => {
+        if (isEquipped) game.unequipItem(key);
+        else game.equipItem(key);
+        renderEquipmentPanel();
+        render();
+      });
+      row.appendChild(main);
+      row.appendChild(btn);
+      el.equipmentList.appendChild(row);
+    }
   }
 
   // ------------------------------------------------------------ Jobs UI & Minigames --
@@ -1104,11 +1205,53 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ store overlay --
   let storeType = "cstore";
+  let storeTab = "food";
+  const STORE_TABS = ["food", "drinks", "gear", "clinic"];
+
+  function renderStoreTabs() {
+    if (!el.storeTabs) return;
+    el.storeTabs.innerHTML = "";
+    for (const tab of STORE_TABS) {
+      const btn = document.createElement("button");
+      btn.className = "store-tab" + (storeTab === tab ? " active" : "");
+      btn.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
+      btn.addEventListener("click", () => {
+        storeTab = tab;
+        storeType = tab === "clinic" ? "clinic" : "cstore";
+        renderStore();
+      });
+      el.storeTabs.appendChild(btn);
+    }
+  }
+
+  function getStoreItems() {
+    if (storeType === "clinic") return CLINIC_ITEMS;
+    if (storeTab === "gear") {
+      const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
+      const equipped = state.Equipment || {};
+      const gearItems = EQUIPMENT.map((e) => ({
+        key: e.key, name: e.name, desc: e.desc, price: e.cost,
+        _isEquip: true, _owned: owned.includes(e.key),
+        _equipped: equipped[e.slot] === e.key, _slot: e.slot,
+      }));
+      const matItems = CSTORE_ITEMS.filter((i) => i.permanent && !i.notSold);
+      return [...gearItems, ...matItems];
+    }
+    return CSTORE_ITEMS.filter((i) => {
+      if (i.notSold) return false;
+      if (i.permanent) return false;
+      if (storeTab === "food") return i.nutrition || i.raw || i.key === "rice";
+      if (storeTab === "drinks") return i.stat;
+      return true;
+    });
+  }
+
   function renderStore() {
-    const items = storeType === "clinic" ? CLINIC_ITEMS : CSTORE_ITEMS;
-    el.storeName.textContent = storeType === "clinic" ? "Clinic" : "Convenience Store";
+    renderStoreTabs();
+    const items = getStoreItems();
+    el.storeName.textContent = storeTab === "clinic" ? "Clinic" : "Convenience Store";
     el.storeCash.textContent = String(Math.floor(num(state.Money)));
-    if (storeType === "clinic") {
+    if (storeTab === "clinic") {
       el.storeNotice.style.display = "";
       el.storeNotice.textContent = "No training programs here. · No style taught here.";
     } else {
@@ -1131,12 +1274,37 @@ export function initUI(game, opts = {}) {
       main.appendChild(sub);
       const btn = document.createElement("button");
       btn.className = "btn small-btn";
-      btn.textContent = `${item.price} Cash`;
-      btn.addEventListener("click", () => {
-        game.buyItem(item.key);
-        renderStore();
-        render();
-      });
+      if (item._isEquip) {
+        if (item._owned) {
+          btn.textContent = item._equipped ? "UNEQUIP" : "EQUIP";
+          btn.className += item._equipped ? " owned" : "";
+          btn.addEventListener("click", () => {
+            if (item._equipped) game.unequipItem(item.key);
+            else game.equipItem(item.key);
+            renderStore();
+            renderEquipmentPanel();
+            render();
+          });
+        } else {
+          btn.textContent = `${item.price} Cash`;
+          btn.addEventListener("click", () => {
+            game.buyEquipment(item.key);
+            renderStore();
+            renderEquipmentPanel();
+            render();
+          });
+        }
+      } else {
+        btn.textContent = `${item.price} Cash`;
+        btn.addEventListener("click", () => {
+          game.buyItem(item.key);
+          renderStore();
+          render();
+        });
+      }
+      const money = num(state.Money);
+      if (!item._isEquip && money < item.price) btn.classList.add("cantafford");
+      if (item._isEquip && !item._owned && money < item.price) btn.classList.add("cantafford");
       row.appendChild(main);
       row.appendChild(btn);
       el.storeList.appendChild(row);
@@ -1145,6 +1313,7 @@ export function initUI(game, opts = {}) {
 
   function openStore(type) {
     storeType = type || "cstore";
+    storeTab = type === "clinic" ? "clinic" : "food";
     renderStore();
     el.storeOverlay.classList.add("show");
   }

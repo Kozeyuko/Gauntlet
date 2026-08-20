@@ -1106,3 +1106,16 @@ header {
 .taskrow.locked, .small-btn.locked { opacity: 0.4; cursor: not-allowed; }
 #btnTaskAdvance.on, #btnTaskAuto.on { border-color: var(--green); color: var(--green); }
 .locrow.owned { opacity: 0.5; cursor: default; }
+/* ---------- store tabs ---------- */
+.store-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.store-tab {
+  padding: 6px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.store-tab.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
+.store-tab:hover:not(.active) { border-color: var(--gold-dim); color: var(--text); }

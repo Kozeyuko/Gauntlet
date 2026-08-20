@@ -155,7 +155,14 @@ export const CSTORE_ITEMS = [
   { key: "focus", name: "Focus tea", desc: "+5 Intelligence for this life", price: 15, stat: "Int", amount: 5 },
   { key: "heart", name: "Heart tonic", desc: "+5 Toughness for this life", price: 20, stat: "Tou", amount: 5 },
   { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5 },
-  { key: "weights", name: "Training weights", desc: "Double training gains for 3 days", price: 30, buff: "weights", days: 3 },
+  { key: "rawmeat", name: "Raw Meat", desc: "Cook at home for Grilled Meat", price: 4, raw: true, cookTo: "grilledmeat" },
+  { key: "rawchicken", name: "Raw Chicken", desc: "Cook at home for Fried Chicken", price: 5, raw: true, cookTo: "chicken" },
+  { key: "hotdog", name: "Hot Dog", desc: "Restores 25 Nutrition", price: 6, nutrition: 25 },
+  { key: "pizza", name: "Pizza Slice", desc: "Restores 40 Nutrition", price: 8, nutrition: 40 },
+  { key: "chicken", name: "Fried Chicken", desc: "Restores 35 Nutrition", price: 7, nutrition: 35 },
+  { key: "tacos", name: "Tacos", desc: "Restores 45 Nutrition", price: 9, nutrition: 45 },
+  { key: "grilledmeat", name: "Grilled Meat", desc: "Restores 50 Nutrition", price: 0, nutrition: 50, notSold: true },
+  { key: "mat", name: "Old Training Mat", desc: "Required for Shadow Boxing training", price: 15, permanent: true },
 ];
 
 // Clinic: cheap medical/healing items.
@@ -646,8 +653,26 @@ export const IMAGINED_NPCS = [
 export const ENCOUNTER_NAMES = ["Street Fighter", "Drifter", "Bouncer", "Thug", "Rival in the Crowd"];
 
 export const GYM_TRAINING = [
-  { key: "Pushups", name: "Pushups (Str)", cost: 10 },
-  { key: "Situps",  name: "Situps (Tou)", cost: 10 },
+  { key: "Pushups",       name: "Pushups (Str)",        cost: 10, unlock: "permanent" },
+  { key: "Situps",        name: "Situps (Tou)",         cost: 10, unlock: "permanent" },
+  { key: "Squats",        name: "Squats (Spd)",         cost: 15, unlock: "permanent" },
+  { key: "ShadowBoxing",  name: "Shadow Boxing (Int)",  cost: 20, unlock: "permanent",
+    requires: "mat", requiresName: "Old Training Mat" },
+  { key: "HeavyBag",      name: "Heavy Bag (Str)",      cost: 25, unlock: "permanent",
+    home: true },
+  { key: "Roadworks",     name: "Roadworks (Spd)",      cost: 8,  unlock: "consumable",
+    uses: 10, desc: "One Roadworks session pack. Grants +8 Spd gain per use." },
+];
+
+export const EQUIPMENT = [
+  { key: "training_weights", name: "Training Weights", slot: "body",
+    desc: "+50% to all training gains.", cost: 30, buffMult: 1.5 },
+  { key: "weighted_vest", name: "Weighted Vest", slot: "body",
+    desc: "+30% training gains.", cost: 40, buffMult: 1.3 },
+  { key: "ankle_weights", name: "Ankle Weights", slot: "legs",
+    desc: "+40% Speed training gains.", cost: 25, buffMult: 1.4, attrs: ["Spd"] },
+  { key: "breathing_mask", name: "Breathing Mask", slot: "head",
+    desc: "+20% all training gains.", cost: 35, buffMult: 1.2 },
 ];
 export const MAIN_GYM = "spar";
 

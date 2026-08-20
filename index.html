@@ -65,9 +65,11 @@
       <div class="small" id="activeStyleInfo"></div>
       <div class="small stylenote">Knowledge grows when you get hit. Fight to master styles.</div>
     </section>
+    <section class="panel" id="equipmentPanel">
+      <h3>Equipment</h3>
+      <div class="loclist" id="equipmentList"></div>
+    </section>
   </aside>
-
-  <!-- CENTER: city map -->
   <section id="citymap" aria-label="City map"></section>
 
   <!-- RIGHT: news + rival quick card + life/save -->
@@ -186,6 +188,10 @@
       <h3>Buy Training</h3>
       <div class="loclist" id="buyTrainingList"></div>
     </section>
+    <section class="panel" id="cookPanel" style="display:none">
+      <h3>Cook</h3>
+      <div class="loclist" id="cookList"></div>
+    </section>
     <div class="acts">
       <button class="btn" id="btnLocClose">Close</button>
     </div>
@@ -296,6 +302,7 @@
   <div class="modal">
     <h2 id="storeName">Store</h2>
     <div class="sub">Cash: <span id="storeCash">30</span></div>
+    <div class="store-tabs" id="storeTabs"></div>
     <div class="small storenotice" id="storeNotice" style="display:none"></div>
     <div class="storelist" id="storeList"></div>
     <div class="acts">

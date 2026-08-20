@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -857,13 +857,56 @@ console.log("== Inventory: useItem returns false for unknown key ==");
   assert(g.useItem("rice") === false, "useItem with no inventory returns false");
 }
 
-console.log("== Inventory: weights (buff) apply instantly ==");
+console.log("== Inventory: buying raw meat adds to inventory ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
-  g.buyItem("weights");
-  assert(g.inventory().length === 0, "weights not in inventory");
-  assert(Array.isArray(state.StoreBuffs) && state.StoreBuffs.length === 1, "StoreBuffs has weights");
+  g.buyItem("rawmeat");
+  assert(g.inventory().length === 1, "rawmeat in inventory");
+  assert(g.inventory()[0].key === "rawmeat", "rawmeat key");
+  assert(g.inventory()[0].qty === 1, "rawmeat qty 1");
+}
+
+console.log("== Inventory: cookItem converts raw to cooked ==");
+{
+  const state = freshState();
+  state.Inventory = [{ key: "rawmeat", qty: 1 }];
+  const g = createGame(state, { rng: makeRng(1) });
+  const cooked = g.cookItem("rawmeat");
+  assert(cooked === true, "cookItem returns true");
+  assert(g.inventory().find((e) => e.key === "rawmeat") === undefined, "rawmeat consumed");
+  const meat = g.inventory().find((e) => e.key === "grilledmeat");
+  assert(meat && meat.qty === 1, "grilledmeat in inventory");
+}
+
+console.log("== Equipment: buy + equip + unequip ==");
+{
+  const state = freshState();
+  state.Money = 200;
+  const g = createGame(state, { rng: makeRng(1) });
+  const bought = g.buyEquipment("training_weights");
+  assert(bought === true, "buyEquipment returns true");
+  assert(state.OwnedEquipment.includes("training_weights"), "owned after buy");
+  assert(state.Equipment.body === "training_weights", "auto-equipped to body");
+  assert(state.Money === 170, "money deducted by 30");
+  g.unequipItem("training_weights");
+  assert(state.Equipment.body === undefined, "unequipped");
+  g.equipItem("training_weights");
+  assert(state.Equipment.body === "training_weights", "re-equipped");
+}
+
+console.log("== Equipment: trainingEquipMult ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.trainingEquipMult("Str") === 1, "no equipment = 1x");
+  state.Equipment = { body: "training_weights" };
+  assert(g.trainingEquipMult("Str") === 1.5, "training weights = 1.5x");
+  state.Equipment = { legs: "ankle_weights" };
+  assert(g.trainingEquipMult("Spd") === 1.4, "ankle weights = 1.4x Spd");
+  assert(g.trainingEquipMult("Str") === 1, "ankle weights don't affect Str");
+  state.Equipment = { body: "training_weights", legs: "ankle_weights" };
+  assertClose(g.trainingEquipMult("Spd"), 1.5 * 1.4, "stacked equipment multipliers");
 }
 
 console.log("== Inventory: autoEatFood consumes rice when Nutrition <= 30 ==");
@@ -1202,10 +1245,17 @@ console.log("== Part A: shouldShowUpdateLog false when current ==");
 console.log("== Part B: GYM_TRAINING data ==");
 {
   assert(Array.isArray(GYM_TRAINING), "GYM_TRAINING is array");
-  assert(GYM_TRAINING.length === 2, "two gym trainings");
+  assert(GYM_TRAINING.length === 6, "six gym trainings");
   assert(GYM_TRAINING[0].key === "Pushups", "first is Pushups");
   assert(GYM_TRAINING[1].key === "Situps", "second is Situps");
+  assert(GYM_TRAINING[2].key === "Squats", "third is Squats");
+  assert(GYM_TRAINING[3].key === "ShadowBoxing", "fourth is ShadowBoxing");
+  assert(GYM_TRAINING[4].key === "HeavyBag", "fifth is HeavyBag");
+  assert(GYM_TRAINING[5].key === "Roadworks", "sixth is Roadworks");
   assert(typeof GYM_TRAINING[0].cost === "number", "has cost");
+  assert(GYM_TRAINING[0].unlock === "permanent", "Pushups is permanent");
+  assert(GYM_TRAINING[5].unlock === "consumable", "Roadworks is consumable");
+  assert(GYM_TRAINING[5].uses === 10, "Roadworks has 10 uses");
 }
 
 console.log("== Part B: MAIN_GYM ==");
@@ -1217,8 +1267,11 @@ console.log("== Part B: MAIN_GYM ==");
 console.log("== Part B: PurchasedTraining in freshState ==");
 {
   const s = freshState();
-  assert(Array.isArray(s.PurchasedTraining), "PurchasedTraining is array");
-  assert(s.PurchasedTraining.length === 0, "starts empty");
+  assert(Array.isArray(s.OwnedTraining), "OwnedTraining is array");
+  assert(s.OwnedTraining.length === 0, "starts empty");
+  assert(s.Consumables && typeof s.Consumables === "object", "Consumables is object");
+  assert(Array.isArray(s.OwnedEquipment), "OwnedEquipment is array");
+  assert(Array.isArray(s.OwnedItems), "OwnedItems is array");
 }
 
 console.log("== Part B: buyTraining / hasTraining ==");
@@ -1278,6 +1331,57 @@ console.log("== Part B: addTask gates on training purchase ==");
   g.buyTraining("Pushups");
   const added2 = g.addTask("Pushups");
   assert(added2 === true, "can add Pushups after purchase");
+}
+
+console.log("== Part B: Roadworks consumable ==");
+{
+  const state = boostedState();
+  state.Location = "spar";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.hasTraining("Roadworks") === false, "no Roadworks initially");
+  const bought = g.buyTraining("Roadworks");
+  assert(bought === true, "buyRoadworks returns true");
+  assert(state.Consumables.Roadworks === 10, "Roadworks stock = 10");
+  assert(g.hasTraining("Roadworks") === true, "has Roadworks after purchase");
+  assert(state.Money === 92, "money deducted by 8");
+  // can buy again to stack
+  g.buyTraining("Roadworks");
+  assert(state.Consumables.Roadworks === 20, "stacked to 20");
+}
+
+console.log("== Part B: autoEatFood eats prepared food ==");
+{
+  const state = freshState();
+  state.Nutrition = 20;
+  state.Inventory = [{ key: "hotdog", qty: 1 }];
+  const g = createGame(state, { rng: makeRng(1) });
+  g.autoEatFood();
+  assert(state.Nutrition === 45, "Nutrition = 45 after hotdog (+25)");
+  assert(state.Inventory.length === 0, "hotdog consumed");
+}
+
+console.log("== Part B: autoEatFood skips raw food ==");
+{
+  const state = freshState();
+  state.Nutrition = 20;
+  state.Inventory = [{ key: "rawmeat", qty: 1 }];
+  const g = createGame(state, { rng: makeRng(1) });
+  g.autoEatFood();
+  assert(state.Nutrition === 20, "Nutrition unchanged, raw skipped");
+  assert(state.Inventory.length === 1, "rawmeat not consumed");
+}
+
+console.log("== Part B: permanent item goes to OwnedItems ==");
+{
+  const state = freshState();
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  const mBefore = state.Money;
+  g.buyItem("mat");
+  assert(state.OwnedItems.includes("mat"), "mat in OwnedItems");
+  assert(state.Inventory.length === 0, "mat not in inventory");
+  assert(state.Money < mBefore, "money decreased after buying mat");
 }
 
 // ================================================================

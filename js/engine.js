@@ -64,6 +64,7 @@ import {
   versionCompare,
   GYM_TRAINING,
   MAIN_GYM,
+  EQUIPMENT,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -188,6 +189,7 @@ export const PERSISTENT_KEYS = [
   "SeenVersion",
   "TrainTiers", "TrainProgress",
   "PurchasedTraining",
+  "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -213,6 +215,11 @@ export function freshState() {
     TrainTiers: {},
     TrainProgress: {},
     PurchasedTraining: [],
+    OwnedTraining: [],
+    Consumables: {},
+    Equipment: {},
+    OwnedEquipment: [],
+    OwnedItems: [],
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -246,6 +253,18 @@ export function restore(state, saved) {
       state.TaskList = state.TaskList.map((s) => ({ act: s, n: 1 }));
     }
   }
+  // Migrate old PurchasedTraining → OwnedTraining
+  if (Array.isArray(state.PurchasedTraining) && state.PurchasedTraining.length > 0) {
+    if (!Array.isArray(state.OwnedTraining)) state.OwnedTraining = [];
+    for (const k of state.PurchasedTraining) {
+      if (!state.OwnedTraining.includes(k)) state.OwnedTraining.push(k);
+    }
+  }
+  if (!Array.isArray(state.OwnedTraining)) state.OwnedTraining = [];
+  if (!state.Consumables || typeof state.Consumables !== "object") state.Consumables = {};
+  if (!state.Equipment || typeof state.Equipment !== "object") state.Equipment = {};
+  if (!Array.isArray(state.OwnedEquipment)) state.OwnedEquipment = [];
+  if (!Array.isArray(state.OwnedItems)) state.OwnedItems = [];
   return restored;
 }
 
@@ -1567,11 +1586,11 @@ export function createGame(state, opts = {}) {
     }
     state.Money = num(state.Money) - item.price;
 
-    // Buff items (weights) apply instantly as before
-    if (item.buff) {
-      if (!state.StoreBuffs) state.StoreBuffs = [];
-      state.StoreBuffs.push({ name: item.buff, daysLeft: item.days });
-      logMsg(`Bought ${item.name} for ${item.price} Cash. Training gains doubled for ${item.days} days.`, "store");
+    // Permanent items (e.g. mat) go to OwnedItems
+    if (item.permanent) {
+      if (!Array.isArray(state.OwnedItems)) state.OwnedItems = [];
+      if (!state.OwnedItems.includes(key)) state.OwnedItems.push(key);
+      logMsg(`Bought ${item.name} for ${item.price} Cash.`, "store");
       clampVitals();
       updatePotential();
       return true;
@@ -1596,7 +1615,8 @@ export function createGame(state, opts = {}) {
     if (!entry || entry.qty <= 0) return false;
     const item = ALL_STORE_ITEMS.find((i) => i.key === key);
     if (!item) return false;
-    if (item.buff) return false; // buff items are not usable from inventory
+    if (item.permanent) return false;
+    if (item.raw) return false;
     if (item.nutrition) {
       state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
     }
@@ -1623,14 +1643,53 @@ export function createGame(state, opts = {}) {
   function autoEatFood() {
     if (num(state.Nutrition) > 30) return;
     const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
+    // Try rice first
     const rice = inv.find((e) => e.key === "rice");
-    if (!rice || rice.qty <= 0) return;
-    state.Nutrition = clamp(num(state.Nutrition) + 20, 0, maxNutrition());
-    rice.qty -= 1;
-    if (rice.qty <= 0) {
+    if (rice && rice.qty > 0) {
+      state.Nutrition = clamp(num(state.Nutrition) + 20, 0, maxNutrition());
+      rice.qty -= 1;
+      if (rice.qty <= 0) {
+        state.Inventory = inv.filter((e) => e.qty > 0);
+      }
+      logMsg("Ate rice from inventory (+20 Nutrition).", "eat");
+      return;
+    }
+    // Try any non-raw prepared food
+    for (const e of inv) {
+      if (e.qty <= 0) continue;
+      const item = ALL_STORE_ITEMS.find((i) => i.key === e.key);
+      if (!item || item.raw || !item.nutrition) continue;
+      state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
+      e.qty -= 1;
+      if (e.qty <= 0) {
+        state.Inventory = inv.filter((x) => x.qty > 0);
+      }
+      logMsg(`Ate ${item.name} from inventory (+${item.nutrition} Nutrition).`, "eat");
+      return;
+    }
+  }
+
+  function cookItem(rawKey) {
+    const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
+    const entry = inv.find((e) => e.key === rawKey);
+    if (!entry || entry.qty <= 0) return false;
+    const rawItem = ALL_STORE_ITEMS.find((i) => i.key === rawKey);
+    if (!rawItem || !rawItem.cookTo) return false;
+    entry.qty -= 1;
+    if (entry.qty <= 0) {
       state.Inventory = inv.filter((e) => e.qty > 0);
     }
-    logMsg("Ate rice from inventory (+20 Nutrition).", "eat");
+    const cookedKey = rawItem.cookTo;
+    if (!Array.isArray(state.Inventory)) state.Inventory = [];
+    const existing = state.Inventory.find((e) => e.key === cookedKey);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      state.Inventory.push({ key: cookedKey, qty: 1 });
+    }
+    const cookedItem = ALL_STORE_ITEMS.find((i) => i.key === cookedKey);
+    logMsg(`Cooked ${rawItem.name} into ${cookedItem ? cookedItem.name : cookedKey}.`, "eat");
+    return true;
   }
 
   function inventory() {
@@ -1672,26 +1731,100 @@ export function createGame(state, opts = {}) {
   function buyTraining(activityKey) {
     const item = GYM_TRAINING.find((t) => t.key === activityKey);
     if (!item) return false;
-    if (!Array.isArray(state.PurchasedTraining)) state.PurchasedTraining = [];
-    if (state.PurchasedTraining.includes(activityKey)) return false;
     if (num(state.Money) < item.cost) {
       logMsg(`Not enough Cash to buy ${item.name} training (${item.cost} Cash).`);
       return false;
     }
-    state.Money = num(state.Money) - item.cost;
-    state.PurchasedTraining.push(activityKey);
-    logMsg(`Bought ${item.name} training for ${item.cost} Cash.`, "store");
+    if (item.unlock === "permanent") {
+      if (!Array.isArray(state.OwnedTraining)) state.OwnedTraining = [];
+      if (state.OwnedTraining.includes(activityKey)) return false;
+      state.Money = num(state.Money) - item.cost;
+      state.OwnedTraining.push(activityKey);
+      logMsg(`Bought ${item.name} training for ${item.cost} Cash.`, "store");
+    } else if (item.unlock === "consumable") {
+      state.Money = num(state.Money) - item.cost;
+      if (!state.Consumables) state.Consumables = {};
+      state.Consumables[activityKey] = (state.Consumables[activityKey] || 0) + (item.uses || 1);
+      logMsg(`Bought ${item.name} x${item.uses || 1} for ${item.cost} Cash.`, "store");
+    } else {
+      return false;
+    }
     return true;
   }
 
   function hasTraining(activityKey) {
-    if (!GYM_TRAINING.some((t) => t.key === activityKey)) return true;
-    return Array.isArray(state.PurchasedTraining) && state.PurchasedTraining.includes(activityKey);
+    const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
+    if (!gymEntry) return true;
+    if (gymEntry.unlock === "permanent") {
+      return Array.isArray(state.OwnedTraining) && state.OwnedTraining.includes(activityKey);
+    } else if (gymEntry.unlock === "consumable") {
+      return state.Consumables && (state.Consumables[activityKey] || 0) > 0;
+    }
+    return false;
   }
 
   function canAddToTask(activityKey) {
-    if (GYM_TRAINING.some((t) => t.key === activityKey)) return hasTraining(activityKey);
+    if (!ACTIVITIES[activityKey]) return false;
+    const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
+    if (!gymEntry) return true;
+    if (gymEntry.unlock === "permanent") {
+      return Array.isArray(state.OwnedTraining) && state.OwnedTraining.includes(activityKey);
+    } else if (gymEntry.unlock === "consumable") {
+      return state.Consumables && (state.Consumables[activityKey] || 0) > 0;
+    }
+    return false;
+  }
+
+  // ---- equipment ----
+  function buyEquipment(key) {
+    const item = EQUIPMENT.find((e) => e.key === key);
+    if (!item) return false;
+    if (!Array.isArray(state.OwnedEquipment)) state.OwnedEquipment = [];
+    if (state.OwnedEquipment.includes(key)) return false;
+    if (num(state.Money) < item.cost) {
+      logMsg(`Not enough Cash to buy ${item.name} (${item.cost} Cash).`);
+      return false;
+    }
+    state.Money = num(state.Money) - item.cost;
+    state.OwnedEquipment.push(key);
+    if (!state.Equipment) state.Equipment = {};
+    state.Equipment[item.slot] = key;
+    logMsg(`Bought and equipped ${item.name}.`, "store");
     return true;
+  }
+
+  function equipItem(key) {
+    if (!Array.isArray(state.OwnedEquipment) || !state.OwnedEquipment.includes(key)) return false;
+    const item = EQUIPMENT.find((e) => e.key === key);
+    if (!item) return false;
+    if (!state.Equipment) state.Equipment = {};
+    if (state.Equipment[item.slot] === key) return false;
+    state.Equipment[item.slot] = key;
+    logMsg(`Equipped ${item.name}.`);
+    return true;
+  }
+
+  function unequipItem(key) {
+    const item = EQUIPMENT.find((e) => e.key === key);
+    if (!item) return false;
+    if (!state.Equipment) state.Equipment = {};
+    if (state.Equipment[item.slot] !== key) return false;
+    delete state.Equipment[item.slot];
+    logMsg(`Unequipped ${item.name}.`);
+    return true;
+  }
+
+  function trainingEquipMult(attr) {
+    if (!state.Equipment) return 1;
+    let mult = 1;
+    for (const item of EQUIPMENT) {
+      if (state.Equipment[item.slot] === item.key) {
+        if (!item.attrs || item.attrs.includes(attr)) {
+          mult *= item.buffMult;
+        }
+      }
+    }
+    return mult;
   }
 
   function trainingAt(locKey) {
@@ -1722,6 +1855,13 @@ export function createGame(state, opts = {}) {
     if (tl.length === 0) return;
     const first = tl[0];
     if (!first || typeof first !== "object") { tl.shift(); return; }
+    // Decrement consumable training stock if applicable
+    const gymEntry = GYM_TRAINING.find((t) => t.key === first.act);
+    if (gymEntry && gymEntry.unlock === "consumable" && state.Consumables) {
+      if ((state.Consumables[first.act] || 0) > 0) {
+        state.Consumables[first.act] -= 1;
+      }
+    }
     if (first.n > 1) {
       first.n -= 1;
     } else {
@@ -1813,8 +1953,8 @@ export function createGame(state, opts = {}) {
       const gainMult = tier ? tier.gainMult : 1.0;
       const costMult = tier ? tier.costMult : 1.0;
       state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
-      const double = hasBuff("weights") ? 2 : 1;
-      const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * double;
+      const equipMult = trainingEquipMult(act.attr);
+      const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * equipMult;
       state[act.attr] = num(state[act.attr]) + gain;
       let cost = act.cost;
       if (actKey === "Running") cost = Math.floor(cost * 1.5);
@@ -1924,8 +2064,8 @@ export function createGame(state, opts = {}) {
         const gainMult = tier ? tier.gainMult : 1.0;
         const costMult = tier ? tier.costMult : 1.0;
         state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
-        const double = hasBuff("weights") ? 2 : 1;
-        const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * double;
+        const equipMult = trainingEquipMult(act.attr);
+        const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * equipMult;
         state[act.attr] = num(state[act.attr]) + gain;
         let cost = act.cost;
         if (actKey === "Running") cost = Math.floor(cost * 1.5);
@@ -2013,7 +2153,7 @@ export function createGame(state, opts = {}) {
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, rebirthCost,
     setName, hardReset,
-    setAutoBattle, buyItem, useItem, autoEatFood, inventory,
+    setAutoBattle, buyItem, useItem, autoEatFood, inventory, cookItem,
     trainingAt, setTaskList, addTask, removeTask,
     trainTier, trainTierName, trainTierProgress,
     // jobs
@@ -2032,6 +2172,8 @@ export function createGame(state, opts = {}) {
     doDay, advanceDay, advanceNDays,
     // gym training
     buyTraining, hasTraining, canAddToTask,
+    // equipment
+    buyEquipment, equipItem, unequipItem, trainingEquipMult,
     // tasklist
     taskList,
     // save codes
