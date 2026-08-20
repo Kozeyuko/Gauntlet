@@ -778,6 +778,8 @@ header {
 .ghostrow .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .ghostrow .tag.shadow { color: var(--purple); border-color: #5a4a72; }
 .ghostrow .tag.echo { color: var(--blue); border-color: #3a5a7a; }
+.ghostrow.defeated { opacity: .55; cursor: default; border-color: var(--line); }
+.ghostrow.locked { opacity: .35; cursor: not-allowed; }
 .ghostempty { text-align: center; padding: 24px 0; display: none; }
 
 /* ---------- location overlay: tier badge + training programs ---------- */

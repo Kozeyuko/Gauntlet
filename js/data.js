@@ -564,6 +564,42 @@ export const INSIDE = [
     line: "He doesn't react. He is already where the blow isn't." },
 ];
 
+// ------------------------------------------------------------------ LOCATION RIVALS --
+export const LOC_RIVAL_TIERS = {
+  1: { mult: 1.0, base: 1 },
+  2: { mult: 1.6, base: 5 },
+  3: { mult: 2.6, base: 10 },
+  4: { mult: 4.0, base: 18 },
+};
+
+export function locationRivals(locKey) {
+  const loc = LOCATIONS[locKey];
+  if (!loc || !loc.styleGym) return [];
+  const tier = loc.tier || 1;
+  const cfg = LOC_RIVAL_TIERS[tier] || LOC_RIVAL_TIERS[1];
+  const baseRival = RIVALS[Math.min(cfg.base, RIVALS.length - 1)];
+  const fighters = [];
+  for (let k = 1; k <= 5; k++) {
+    const esc = 0.7 + k * 0.18;
+    const stats = {};
+    for (const attr of ["Str", "Tou", "Spd", "Int", "Cha"]) {
+      stats[attr] = Math.max(1, Math.floor(baseRival.stats[attr] * cfg.mult * esc));
+    }
+    const rewardMoney = Math.max(1, Math.round(baseRival.rewardMoney * cfg.mult * (0.8 + k * 0.1)));
+    const rewardXp = Math.max(1, Math.round(baseRival.rewardXp * cfg.mult * (0.8 + k * 0.1)));
+    fighters.push({
+      n: k,
+      name: `${loc.name} Fighter ${k}`,
+      style: loc.styleGym,
+      stats,
+      rewardMoney,
+      rewardXp,
+      line: `A ${tier >= 3 ? "legendary" : tier >= 2 ? "skilled" : "tough"} fighter training at ${loc.name}.`,
+    });
+  }
+  return fighters;
+}
+
 export const MAX_RIVAL = RIVALS.length;
 export const MAX_INSIDE = INSIDE.length;
 export const MAX_TOTAL = MAX_RIVAL + MAX_INSIDE;

@@ -65,6 +65,8 @@ import {
   GYM_TRAINING,
   MAIN_GYM,
   EQUIPMENT,
+  LOC_RIVAL_TIERS,
+  locationRivals,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -190,6 +192,7 @@ export const PERSISTENT_KEYS = [
   "TrainTiers", "TrainProgress",
   "PurchasedTraining",
   "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
+  "LocationFights", "UnlockedTiers",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -220,6 +223,8 @@ export function freshState() {
     Equipment: {},
     OwnedEquipment: [],
     OwnedItems: [],
+    LocationFights: {},
+    UnlockedTiers: {},
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -974,6 +979,31 @@ export function createGame(state, opts = {}) {
         addStyleXp(activeStyle(), num(extra.styleXp) || 4);
         applyFightGains(true);
         logMsg(`You won Bout ${extra.chainStep || 1} of ${extra.name}. +${reward} Cash.`, "fight");
+      } else if (mode === "location") {
+        const reward = num(extra.rewardMoney);
+        state.Money = num(state.Money) + reward;
+        state.Wins = num(state.Wins) + 1;
+        addStyleXp(activeStyle(), 6 + (extra.n || 1) * 2);
+        applyFightGains(true);
+        const locKey = extra.locKey;
+        if (locKey && !state.LocationFights) state.LocationFights = {};
+        if (locKey && !state.LocationFights[locKey]) state.LocationFights[locKey] = [];
+        if (locKey && Array.isArray(state.LocationFights[locKey])) {
+          if (!state.LocationFights[locKey].includes(extra.n)) state.LocationFights[locKey].push(extra.n);
+        }
+        logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds! +${reward} Cash.`, "fight");
+        if (locKey && Array.isArray(state.LocationFights[locKey]) && state.LocationFights[locKey].length >= 5) {
+          const loc = LOCATIONS[locKey];
+          if (loc && loc.tier) {
+            const nextTier = loc.tier + 1;
+            if (!state.UnlockedTiers) state.UnlockedTiers = {};
+            const nextLocKey = Object.keys(LOCATIONS).find(k => LOCATIONS[k].tier === nextTier && LOCATIONS[k].styleGym);
+            if (nextLocKey && !state.UnlockedTiers[nextLocKey]) {
+              state.UnlockedTiers[nextLocKey] = true;
+              logMsg(`All fighters at ${loc.name} cleared! The gates of ${LOCATIONS[nextLocKey].name} open.`, "fight");
+            }
+          }
+        }
       } else if (mode === "tourney") {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
@@ -1019,6 +1049,10 @@ export function createGame(state, opts = {}) {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
         logMsg(`DEFEAT by ${extra.name}, a roaming fighter. You took ${dmg} damage.`, "fight");
+      } else if (mode === "location") {
+        addStyleXp(activeStyle(), STYLEXP_LOSS);
+        applyFightGains(false);
+        logMsg(`DEFEAT by ${extra.name} at ${extra.locName || "the gym"}. You took ${dmg} damage.`, "fight");
       } else {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false);
@@ -2137,6 +2171,52 @@ export function createGame(state, opts = {}) {
     state.AutoBattle = on === true;
   }
 
+  function locationFightsBeaten(locKey) {
+    return Array.isArray(state.LocationFights?.[locKey]) ? state.LocationFights[locKey].length : 0;
+  }
+
+  function canFightLocation(locKey, n) {
+    if (n <= 1) return true;
+    const beaten = state.LocationFights?.[locKey] || [];
+    return beaten.includes(n - 1);
+  }
+
+  function locationFightList(locKey) {
+    const loc = LOCATIONS[locKey];
+    if (!loc) return [];
+    const rivals = locationRivals(locKey);
+    const beaten = state.LocationFights?.[locKey] || [];
+    return rivals.map((r) => ({
+      ...r,
+      beaten: beaten.includes(r.n),
+      unlocked: canFightLocation(locKey, r.n),
+    }));
+  }
+
+  function beginLocationFight(locKey, n) {
+    if (num(state.Health) <= 0) return null;
+    if (battle) return null;
+    if (!canFightLocation(locKey, n)) return null;
+    const rivals = locationRivals(locKey);
+    const foe = rivals[n - 1];
+    if (!foe) return null;
+    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const foeCombatant = makeCombatant(foe.stats, foe.style);
+    const extra = { ...foe, locKey, locName: LOCATIONS[locKey]?.name || locKey };
+    if (!extra.style) extra.style = foe.style;
+    battle = { me, foe: foeCombatant, mode: "location", extra, idx: 0, bet: 0, pot: potential(), round: 0 };
+    state.InFight = true;
+    const view = combatantToView(me, foeCombatant);
+    view.foeName = foe.name;
+    view.foeStyleName = STYLES[foe.style].name;
+    view.playerStyleName = STYLES[activeStyle()].name;
+    view.mode = "location";
+    view.round = 0;
+    view.auto = state.AutoBattle === true;
+    view.events = [];
+    return view;
+  }
+
   return {
     state,
     rng: R,
@@ -2172,6 +2252,8 @@ export function createGame(state, opts = {}) {
     doDay, advanceDay, advanceNDays,
     // gym training
     buyTraining, hasTraining, canAddToTask,
+    // location rivals
+    locationFightsBeaten, canFightLocation, locationFightList, beginLocationFight,
     // equipment
     buyEquipment, equipItem, unequipItem, trainingEquipMult,
     // tasklist

@@ -194,7 +194,7 @@ export function initUI(game, opts = {}) {
     btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
     // location overlay
     locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"),
-    locStyles: $("locStyles"), btnLocClose: $("btnLocClose"),
+    locFightersTitle: $("locFightersTitle"), locFightersList: $("locFightersList"), btnLocClose: $("btnLocClose"),
     // logger
     btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
     logStats: $("logStats"), btnLogClear: $("btnLogClear"), btnLogClose: $("btnLogClose"),
@@ -787,11 +787,16 @@ export function initUI(game, opts = {}) {
     addRow("OddJobs");
   }
 
-  function renderLocStyles(key) {
+  function renderLocFighters(key) {
     const loc = LOCATIONS[key];
-    el.locStyles.innerHTML = "";
+    if (!el.locFightersList || !el.locFightersTitle) return;
+    el.locFightersList.innerHTML = "";
     if (!loc.styleGym) {
-      el.locStyles.innerHTML = `<div class="small">No style taught here.</div>`;
+      el.locFightersTitle.textContent = "Style";
+      const div = document.createElement("div");
+      div.className = "small";
+      div.textContent = "No style taught here.";
+      el.locFightersList.appendChild(div);
       return;
     }
     const styleId = loc.styleGym;
@@ -801,15 +806,28 @@ export function initUI(game, opts = {}) {
     let tier = 0;
     for (let i = 0; i < MASTERY_TIERS.length; i++) if (xp >= MASTERY_TIERS[i]) tier = i + 1;
     const next = MASTERY_TIERS[tier] || null;
-    const row = document.createElement("div");
-    row.className = "ghostrow";
-    row.innerHTML = `
-      <div class="gmain">
-        <div class="gnm">${st ? st.name : styleId}</div>
-        <div class="gsub">${learned ? "Learned" : "Not yet learned"} · mastery ${xp}${next ? " / " + next : " (max)"}</div>
-      </div>
-      <span class="tag ${learned ? "echo" : "shadow"}">${learned ? "LEARNED" : "LOCKED"}</span>`;
-    el.locStyles.appendChild(row);
+    el.locFightersTitle.textContent = `Fighters (${game.locationFightsBeaten(key)}/5 cleared)`;
+    const rivals = game.locationFightList(key);
+    for (const r of rivals) {
+      const row = document.createElement("div");
+      row.className = "ghostrow" + (r.beaten ? " defeated" : (!r.unlocked ? " locked" : ""));
+      row.innerHTML = `
+        <div class="gmain">
+          <div class="gnm">${r.name} ${r.beaten ? "✓" : ""}</div>
+          <div class="gsub">${st ? st.name : styleId} · reward ${r.rewardMoney} Cash · ${r.rewardXp} XP${!r.unlocked ? " (locked)" : ""}</div>
+        </div>`;
+      if (!r.beaten && r.unlocked) {
+        const btn = document.createElement("button");
+        btn.className = "btn small-btn";
+        btn.textContent = "FIGHT";
+        btn.addEventListener("click", () => {
+          const view = game.beginLocationFight(key, r.n);
+          if (view) renderCombat(view);
+        });
+        row.appendChild(btn);
+      }
+      el.locFightersList.appendChild(row);
+    }
   }
 
   function renderBuyTraining(key) {
@@ -871,7 +889,7 @@ export function initUI(game, opts = {}) {
     el.locFlavor.textContent = LOC_DESC[key] || "";
     renderLocTier(key);
     renderLocActivities(key);
-    renderLocStyles(key);
+    renderLocFighters(key);
     renderBuyTraining(key);
     // Cook panel at Home
     if (isHome && el.cookPanel) {
