@@ -212,6 +212,7 @@ header {
 }
 .bldg.here .blbl { color: var(--gold); }
 .bldg.locked { cursor: not-allowed; }
+.bldg.hidden { display: none; }
 .bldg.locked .pin { background: #20252c; border-color: var(--line); opacity: .55; box-shadow: none; }
 .bldg.locked .blbl { opacity: .55; }
 .bldg .lock {
@@ -404,6 +405,9 @@ header {
 }
 .barrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .barrow:last-child { margin-bottom: 0; }
+.barrow.money { font-size: 13px; font-weight: 700; color: var(--gold); }
+.barrow.money .barlbl { color: var(--muted); }
+.barrow.money b { margin-left: auto; }
 .barlbl { width: 32px; font-size: 11px; font-weight: 700; color: var(--muted); }
 
 /* ---------- attributes ---------- */

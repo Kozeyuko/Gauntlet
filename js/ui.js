@@ -140,6 +140,7 @@ export function initUI(game, opts = {}) {
     barHealth: $("barHealth"), barHealthTxt: $("barHealthTxt"),
     barStamina: $("barStamina"), barStaminaTxt: $("barStaminaTxt"),
     barNutrition: $("barNutrition"), barNutritionTxt: $("barNutritionTxt"),
+    hMoneyLeft: $("hMoneyLeft"),
     attrsBody: $("attrsBody"),
     activitiesGrid: $("activitiesGrid"),
     stylesGrid: $("stylesGrid"),
@@ -313,7 +314,7 @@ export function initUI(game, opts = {}) {
   function buildingBaseTip(key) {
     const loc = LOCATIONS[key];
     const d = LOC_DESC[key] || "";
-    return d ? `${loc.label}. ${d}` : loc.label;
+    return d ? `${loc.name}. ${d}` : loc.name;
   }
 
   function renderHeader() {
@@ -337,6 +338,7 @@ export function initUI(game, opts = {}) {
     setBar(el.barHealth, el.barHealthTxt, Number(state.Health) || 0, game.maxHealth());
     setBar(el.barStamina, el.barStaminaTxt, Number(state.Stamina) || 0, game.maxStamina());
     setBar(el.barNutrition, el.barNutritionTxt, Number(state.Nutrition) || 0, game.maxNutrition());
+    el.hMoneyLeft.textContent = String(Math.floor(Number(state.Money) || 0));
   }
 
   function renderAttrs() {
@@ -391,15 +393,12 @@ export function initUI(game, opts = {}) {
     for (const key of Object.keys(buildingEls)) {
       const b = buildingEls[key];
       const loc = LOCATIONS[key];
-      const locked = rivalIdx <= loc.unlock;
-      b.classList.toggle("locked", locked);
+      let hidden = rivalIdx <= loc.unlock;
+      if (key === "inside") hidden = rivalIdx <= MAX_RIVAL;
+      b.classList.toggle("locked", hidden);
+      b.classList.toggle("hidden", hidden);
       b.classList.toggle("here", key === state.Location);
-      if (locked) {
-        b.setAttribute("data-tip",
-          key === "inside"
-            ? "The Inside — locked. Opens after the Master (Rival 8)."
-            : `${loc.label} — locked. Unlocks at Rival ${loc.unlock + 1}.`);
-      } else {
+      if (!hidden) {
         b.setAttribute("data-tip", buildingBaseTip(key));
       }
     }
@@ -1073,23 +1072,30 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ custom build editor --
   function renderBuildPreview() {
+    const allCbs = Array.from(el.buildSkillList.querySelectorAll("input[type=checkbox]"));
+    const checkedCbs = allCbs.filter((cb) => cb.checked);
+    if (checkedCbs.length >= CUSTOM_MAX_SKILLS) {
+      allCbs.forEach((cb) => { if (!cb.checked) cb.disabled = true; });
+    } else {
+      allCbs.forEach((cb) => { cb.disabled = false; });
+    }
+    const counter = `Extra skills: ${Math.min(checkedCbs.length, CUSTOM_MAX_SKILLS)}/${CUSTOM_MAX_SKILLS}`;
     const radio = el.buildBaseList.querySelector("input:checked");
     if (!radio) {
-      el.buildPreview.textContent = "Pick a base style to preview your build.";
+      el.buildPreview.textContent = `${counter} — Pick a base style to preview your build.`;
       return;
     }
     const base = radio.value;
-    const checked = Array.from(el.buildSkillList.querySelectorAll("input:checked")).map((cb) => cb.value);
-    const extras = checked.slice(0, CUSTOM_MAX_SKILLS);
+    const checked = checkedCbs.map((cb) => cb.value).slice(0, CUSTOM_MAX_SKILLS);
     const baseStyle = STYLES[base];
-    const dmgMult = baseStyle.dmg * (1 - CUSTOM_SKILL_PENALTY * extras.length);
-    const moves = extras.length
-      ? extras.map((key) => {
+    const dmgMult = baseStyle.dmg * (1 - CUSTOM_SKILL_PENALTY * checked.length);
+    const moves = checked.length
+      ? checked.map((key) => {
           const sk = lookupSkill(key);
           return sk ? `${sk.name} ×${(sk.mult || 1).toFixed(2)}` : key;
         }).join(", ")
       : "base style moves";
-    el.buildPreview.textContent = `${styleName(base)} — dmg ×${dmgMult.toFixed(2)} · moves: ${moves}`;
+    el.buildPreview.textContent = `${counter} — ${styleName(base)} — dmg ×${dmgMult.toFixed(2)} · moves: ${moves}`;
   }
 
   function openBuildEditor() {
@@ -1166,6 +1172,8 @@ export function initUI(game, opts = {}) {
       state.ActiveStyle = base; // reverting/clearing the build falls back to the base style
       el.buildOverlay.classList.remove("show");
       render();
+    } else {
+      el.buildPreview.textContent = "Couldn't save \u2014 base style not mastered, or a chosen move isn't learned.";
     }
   }
 
