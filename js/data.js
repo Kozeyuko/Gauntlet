@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.1;
+export const GAME_VERSION = 2.2;
 export const UPDATE_LOG = [
+  { v: 2.2, text: "v2.2: fast map travel (20-30s baseline, ~1s at high Speed), dashed route line + ETA box while traveling, no random fights while walking (use the Searching-for-Trouble toggle), randomized NPC stats by tier (tier 1 low / 2 mid / 3 high), central locations (gym, store, clinic, job board) moved near home, and news is now a floating box in the top-left opened from the NEWS button." },
   { v: 2.1, text: "v2.1: jobs manual play is indefinite (no round cap, stamina cost scales 5→1 by level, ends on 3 fails or quit), stats display 0 but work as 1, slower style mastery, no fight round cap (win by KO or stamina drain), map movement follows streets with reliable arrival, tasks persist on the tab until removed, auto button shows true state, Statistics menu, mobile layout fixes." },
   { v: 2.0, text: "v2: decimal cash, auto-work jobs, City Gym store, tasklist UI, traversable city map, job rework, stat-gain rework, gyms fight-only (training via purchased programs), removed 60s auto-work button, mobile zoom fix." },
   { v: 1.01, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
