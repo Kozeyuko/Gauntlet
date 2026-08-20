@@ -524,6 +524,7 @@ export function createGame(state, opts = {}) {
     const chaBonus = attrValue("Cha") * 0.5;
     const totalPay = pay + chaBonus;
     state.Money = num(state.Money) + totalPay;
+    state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
     const oldLevel = level;
     addJobXp(jobKey, xp);
     const newLevel = jobLevel(jobKey);
@@ -545,6 +546,7 @@ export function createGame(state, opts = {}) {
       const chaBonus = attrValue("Cha") * 0.5;
       pay += chaBonus;
       state.Money = num(state.Money) + pay;
+      state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
       addJobXp(jobKey, xp);
     }
     updatePotential();
@@ -576,6 +578,7 @@ export function createGame(state, opts = {}) {
     const chaBonus = Math.floor(attrValue("Cha") * 0.5);
     const totalPay = pay + chaBonus;
     state.Money = num(state.Money) + totalPay;
+    state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
     const oldLevel = level;
     addJobXp(jobKey, xp);
     const newLevel = jobLevel(jobKey);
@@ -882,6 +885,10 @@ export function createGame(state, opts = {}) {
     let round = 0;
     const MAX_ROUNDS = 15;
     const events = [];
+    let attacksLanded = 0;
+    let dodges = 0;
+    let dmgDealt = 0;
+    let dmgTaken = 0;
     while (round < MAX_ROUNDS && me.hp > 0 && foe.hp > 0) {
       round += 1;
       me.stam -= me.drain;
@@ -907,6 +914,11 @@ export function createGame(state, opts = {}) {
         const skill = pickSkill(att);
         att.skillName = skill.name;
         const ev = strikeEvent(att, def, skill, att === me, R);
+        if (att === me) {
+          if (!ev.dodged) { attacksLanded++; dmgDealt += ev.damage; }
+        } else {
+          if (ev.dodged) { dodges++; } else { dmgTaken += ev.damage; }
+        }
         if (att !== me) {
           const gain = onPlayerHit(foeStyle, skill, ev.damage);
           if (gain > 0) {
@@ -921,7 +933,7 @@ export function createGame(state, opts = {}) {
       selfTrainTick(activeStyle());
       stampEvents(events, roundStart, round, me, foe);
     }
-    return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName, events };
+    return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName, events, attacksLanded, dodges, dmgDealt, dmgTaken, foeStats };
   }
 
   function meHpLost(result) {
@@ -931,14 +943,27 @@ export function createGame(state, opts = {}) {
     return Math.floor((1 - hpLeft / maxHp) * 30) + 5;
   }
 
-  function applyFightGains(win) {
-    const gains = { Str: 0.20, Tou: 0.15, Spd: 0.15, Int: 0.10 };
-    for (const id of Object.keys(gains)) {
-      state[id] = num(state[id]) + gains[id] * attrApt(id);
-    }
-    if (!win) {
-      state.Tou = num(state.Tou) + 0.05 * attrApt("Tou");
-    }
+  function applyFightGains(win, foeStats, result) {
+    foeStats = foeStats || {};
+    result = result || {};
+    const myMaxHp = HP_BASE + attrValue("Tou") * HP_PER_TOU;
+    const foeMaxHp = HP_BASE + (foeStats.Tou || 0) * HP_PER_TOU;
+    const dmgTaken = result.dmgTaken || 0;
+    const dmgDealt = result.dmgDealt || 0;
+    const attacksLanded = result.attacksLanded || 0;
+    const dodges = result.dodges || 0;
+    const rounds = result.rounds || 1;
+    const dmgTakenFrac = Math.min(1, dmgTaken / Math.max(1, myMaxHp));
+    const dmgDealtFrac = Math.min(1, dmgDealt / Math.max(1, foeMaxHp));
+    const foePowerMult = 1 + ((foeStats.Str || 0) + (foeStats.Tou || 0)) / 200;
+    const touGain = 0.15 * dmgTakenFrac * foePowerMult;
+    const strGain = 0.20 * dmgDealtFrac * (1 + (foeStats.Tou || 0) / 100);
+    const spdGain = 0.02 * (attacksLanded + dodges * 1.5);
+    const intGain = 0.02 * rounds;
+    state.Str = num(state.Str) + strGain * attrApt("Str");
+    state.Tou = num(state.Tou) + touGain * attrApt("Tou");
+    state.Spd = num(state.Spd) + spdGain * attrApt("Spd");
+    state.Int = num(state.Int) + intGain * attrApt("Int");
   }
 
   // ---- foe setup ----
@@ -999,7 +1024,7 @@ export function createGame(state, opts = {}) {
         const learned = styleKnowledge(extra.style) >= KNOWLEDGE_LEARNED;
         if (idx < MAX_RIVAL) state.RivalIdx = idx + 1;
         addStyleXp(activeStyle(), 6 + idx * 2);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         captureGhost();
         if (learned) {
           logMsg(`VICTORY over ${extra.name} in ${result.rounds} rounds! You learned ${STYLES[extra.style].name}!`, "fight");
@@ -1012,7 +1037,7 @@ export function createGame(state, opts = {}) {
         state.Money = num(state.Money) + extra.pay;
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 20 + (idx - MAX_RIVAL) * 8);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         if (idx < MAX_TOTAL) {
           state.RivalIdx = idx + 1;
           logMsg(`INSIDE VICTORY over ${extra.name}! +${extra.pay} Cash. Next monster: ${INSIDE[idx - MAX_RIVAL].name}.`, "fight");
@@ -1024,20 +1049,20 @@ export function createGame(state, opts = {}) {
         state.Money = num(state.Money) + moneyGain;
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 4 + Math.floor((extra.potential || 0) / 100));
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`, "fight");
       } else if (mode === "roamer") {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
         addStyleXp(activeStyle(), num(extra.styleXp) || 4);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         logMsg(`You won Bout ${extra.chainStep || 1} of ${extra.name}. +${reward} Cash.`, "fight");
       } else if (mode === "location") {
         const reward = num(extra.rewardMoney);
         state.Money = num(state.Money) + reward;
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 6 + (extra.n || 1) * 2);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         const locKey = extra.locKey;
         if (locKey && !state.LocationFights) state.LocationFights = {};
         if (locKey && !state.LocationFights[locKey]) state.LocationFights[locKey] = [];
@@ -1061,12 +1086,12 @@ export function createGame(state, opts = {}) {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
         addStyleXp(activeStyle(), 10);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         logMsg(`TOURNAMENT ROUND ${extra.round} VICTORY! +${reward} Cash.`, "fight");
       } else if (mode === "gu") {
         const wave = extra.wave || 1;
         addStyleXp(activeStyle(), 15);
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         if (wave >= 5) {
           state.Money = num(state.Money) + 500;
           learnStyle("Formless");
@@ -1079,7 +1104,7 @@ export function createGame(state, opts = {}) {
         const moneyGain = 5 + Math.floor(pot / 20);
         state.Money = num(state.Money) + moneyGain;
         addStyleXp(activeStyle(), 3 + Math.floor(pot / 50));
-        applyFightGains(true);
+        applyFightGains(true, result.foeStats, result);
         logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Cash.`, "fight");
       }
       updatePotential();
@@ -1088,27 +1113,27 @@ export function createGame(state, opts = {}) {
       state.Health = num(state.Health) - dmg;
       if (mode === "inside") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`The Inside eats you alive — ${extra.name} takes the ${bet} Cash pot. You took ${dmg} damage.`, "fight");
       } else if (mode === "encounter") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`DEFEAT by a street fighter after ${result.rounds} rounds. You took ${dmg} damage. Tou trained from the beating.`, "fight");
       } else if (mode === "ghost") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`The ghost of ${extra.name || "a fighter"} was too much. ${result.rounds} rounds in, you took ${dmg} damage. Their echo still stands.`, "fight");
       } else if (mode === "roamer") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`DEFEAT by ${extra.name}, a roaming fighter. You took ${dmg} damage.`, "fight");
       } else if (mode === "location") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`DEFEAT by ${extra.name} at ${extra.locName || "the gym"}. You took ${dmg} damage.`, "fight");
       } else {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
-        applyFightGains(false);
+        applyFightGains(false, result.foeStats, result);
         logMsg(`DEFEAT by ${extra.name} after ${result.rounds} rounds. You took ${dmg} damage. Train and try again.`, "fight");
       }
       if (num(state.Health) <= 0) {
@@ -1245,7 +1270,7 @@ export function createGame(state, opts = {}) {
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
     if (!extra.style) extra.style = foeStyle;
-    battle = { me, foe, mode: "ghost", extra, idx: 0, bet: 0, pot: potential(), round: 0 };
+    battle = { me, foe, mode: "ghost", extra, idx: 0, bet: 0, pot: potential(), round: 0, foeStats };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = foeLabel + " (IMAGINED)";
@@ -1365,7 +1390,7 @@ export function createGame(state, opts = {}) {
     const built = buildChainedRoamer(roamer, step);
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(built.stats, built.style);
-    battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0 };
+    battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0, foeStats: built.stats };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = built.name;
@@ -1406,7 +1431,7 @@ export function createGame(state, opts = {}) {
     };
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
-    battle = { me, foe, mode: "tourney", extra, idx: 0, bet: 0, pot, round: 0 };
+    battle = { me, foe, mode: "tourney", extra, idx: 0, bet: 0, pot, round: 0, foeStats };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = foeName;
@@ -1444,7 +1469,7 @@ export function createGame(state, opts = {}) {
     };
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
-    battle = { me, foe, mode: "gu", extra, idx: 0, bet: 0, pot, round: 0 };
+    battle = { me, foe, mode: "gu", extra, idx: 0, bet: 0, pot, round: 0, foeStats };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = foeName;
@@ -1487,7 +1512,7 @@ export function createGame(state, opts = {}) {
     const foe = makeCombatant(setup.foeStats, setup.foeStyle);
     const extra = setup.extra;
     if (!extra.style) extra.style = setup.foeStyle;
-    battle = { me, foe, mode: setup.mode, extra, idx: setup.idx, bet: setup.bet, pot: potential(), round: 0 };
+    battle = { me, foe, mode: setup.mode, extra, idx: setup.idx, bet: setup.bet, pot: potential(), round: 0, foeStats: setup.foeStats };
     state.InFight = true;
     const view = combatantToView(me, foe);
     view.foeName = setup.foeName;
@@ -1529,6 +1554,13 @@ export function createGame(state, opts = {}) {
       return null;
     }
 
+    if (battle.attacksLanded === undefined) {
+      battle.attacksLanded = 0;
+      battle.dodges = 0;
+      battle.dmgDealt = 0;
+      battle.dmgTaken = 0;
+    }
+
     let chosen = null;
     for (const s of me.skills) { if (s.name === skillName) { chosen = s; break; } }
     if (!chosen) chosen = pickSkill(me);
@@ -1560,6 +1592,11 @@ export function createGame(state, opts = {}) {
     tickStatuses(foe, events);
     const doStrike = (att, def, skill, isPlayer) => {
       const ev = strikeEvent(att, def, skill, isPlayer, R);
+      if (isPlayer) {
+        if (!ev.dodged) { battle.attacksLanded++; battle.dmgDealt += ev.damage; }
+      } else {
+        if (ev.dodged) { battle.dodges++; } else { battle.dmgTaken += ev.damage; }
+      }
       if (!isPlayer) {
         const foeStyleId = battle.extra.style || "Brawling";
         const gain = onPlayerHit(foeStyleId, skill, ev.damage);
@@ -1589,7 +1626,13 @@ export function createGame(state, opts = {}) {
     if (finished) {
       if (me.hp <= 0 && foe.hp <= 0) me.hp = 0;
       const won = me.hp > foe.hp;
-      const result = { win: won, rounds: roundNum, playerHpLeft: Math.max(0, me.hp), playerSkill: chosen.name, foeSkill: foeSkill.name };
+      const result = {
+        win: won, rounds: roundNum, playerHpLeft: Math.max(0, me.hp),
+        playerSkill: chosen.name, foeSkill: foeSkill.name,
+        attacksLanded: battle.attacksLanded, dodges: battle.dodges,
+        dmgDealt: battle.dmgDealt, dmgTaken: battle.dmgTaken,
+        foeStats: battle.foeStats,
+      };
       concludeFight(battle.mode, battle.extra, battle.idx, battle.pot, battle.bet, result);
       battle = null;
       state.InFight = false;
@@ -1610,7 +1653,7 @@ export function createGame(state, opts = {}) {
 
   function forfeit() {
     if (!battle) return;
-    const result = { win: false, rounds: battle.round, playerHpLeft: 0, playerSkill: "Forfeit", foeSkill: "—" };
+    const result = { win: false, rounds: battle.round, playerHpLeft: 0, playerSkill: "Forfeit", foeSkill: "—", attacksLanded: 0, dodges: 0, dmgDealt: 0, dmgTaken: 0, foeStats: battle.foeStats };
     concludeFight(battle.mode, battle.extra, battle.idx, battle.pot, battle.bet, result);
     battle = null;
     state.InFight = false;
@@ -1767,6 +1810,7 @@ export function createGame(state, opts = {}) {
       return false;
     }
     state.Money = num(state.Money) - item.price;
+    state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
 
     // Permanent items (e.g. mat) go to OwnedItems
     if (item.permanent) {
@@ -1933,6 +1977,7 @@ export function createGame(state, opts = {}) {
     } else {
       return false;
     }
+    state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
     return true;
   }
 
@@ -1971,6 +2016,7 @@ export function createGame(state, opts = {}) {
     }
     state.Money = num(state.Money) - item.cost;
     state.OwnedEquipment.push(key);
+    state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
     if (!state.Equipment) state.Equipment = {};
     state.Equipment[item.slot] = key;
     logMsg(`Bought and equipped ${item.name}.`, "store");
@@ -2353,7 +2399,7 @@ export function createGame(state, opts = {}) {
     const foeCombatant = makeCombatant(foe.stats, foe.style);
     const extra = { ...foe, locKey, locName: LOCATIONS[locKey]?.name || locKey };
     if (!extra.style) extra.style = foe.style;
-    battle = { me, foe: foeCombatant, mode: "location", extra, idx: 0, bet: 0, pot: potential(), round: 0 };
+    battle = { me, foe: foeCombatant, mode: "location", extra, idx: 0, bet: 0, pot: potential(), round: 0, foeStats: foe.stats };
     state.InFight = true;
     const view = combatantToView(me, foeCombatant);
     view.foeName = foe.name;

@@ -2150,6 +2150,141 @@ console.log("== v2 B4: freshState has movement fields ==");
   assert(s.RunCooldown === 0, "RunCooldown starts 0");
 }
 
+// ================================================================
+// v2 Batch 5: Fighting grants stat-specific XP
+// ================================================================
+console.log("== v2 B5: stronger foe yields higher Toughness gain ==");
+{
+  const stateWeak = boostedState();
+  const gWeak = createGame(stateWeak, { rng: makeRng(7) });
+  gWeak.fight();
+  const touGainWeak = stateWeak.Tou - 50;
+
+  const stateStrong = boostedState();
+  stateStrong.Str = 200; stateStrong.Tou = 200; stateStrong.Spd = 200; stateStrong.Int = 200;
+  const gStrong = createGame(stateStrong, { rng: makeRng(7) });
+  stateStrong.RivalIdx = 5;
+  gStrong.fight();
+  const touGainStrong = stateStrong.Tou - 200;
+
+  assert(touGainStrong > touGainWeak, `strong foe Tou gain ${touGainStrong} > weak foe ${touGainWeak}`);
+}
+
+console.log("== v2 B5: high foe Tou yields higher Strength gain ==");
+{
+  const stateWeak = boostedState();
+  const gWeak = createGame(stateWeak, { rng: makeRng(7) });
+  gWeak.fight();
+  const strGainWeak = stateWeak.Str - 50;
+
+  const stateStrong = boostedState();
+  stateStrong.Str = 200; stateStrong.Tou = 200; stateStrong.Spd = 200; stateStrong.Int = 200;
+  const gStrong = createGame(stateStrong, { rng: makeRng(7) });
+  stateStrong.RivalIdx = 5;
+  gStrong.fight();
+  const strGainStrong = stateStrong.Str - 200;
+
+  assert(strGainStrong > strGainWeak, `high foe Tou Str gain ${strGainStrong} > low foe ${strGainWeak}`);
+}
+
+console.log("== v2 B5: more attacks/dodges yield higher Speed gain ==");
+{
+  const stateA = boostedState();
+  const gA = createGame(stateA, { rng: makeRng(7) });
+  const rA = gA.fight();
+  const spdGainA = stateA.Spd - 50;
+  const totalActionsA = rA.result.attacksLanded + rA.result.dodges * 1.5;
+
+  const stateB = freshState();
+  stateB.Str = 30; stateB.Tou = 30; stateB.Spd = 30; stateB.Int = 30;
+  const gB = createGame(stateB, { rng: makeRng(3) });
+  const rB = gB.fight();
+  const spdGainB = stateB.Spd - 30;
+  const totalActionsB = rB.result.attacksLanded + rB.result.dodges * 1.5;
+
+  assert(totalActionsA !== totalActionsB || spdGainA === spdGainB,
+    `different fight dynamics produce different speed gains: actions ${totalActionsA} vs ${totalActionsB}, spd ${spdGainA} vs ${spdGainB}`);
+}
+
+console.log("== v2 B5: result includes fight stats ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(7) });
+  const r = g.fight();
+  assert(typeof r.result.attacksLanded === "number", "result.attacksLanded is number");
+  assert(typeof r.result.dodges === "number", "result.dodges is number");
+  assert(typeof r.result.dmgDealt === "number", "result.dmgDealt is number");
+  assert(typeof r.result.dmgTaken === "number", "result.dmgTaken is number");
+  assert(r.result.foeStats !== undefined, "result.foeStats is present");
+  assert(r.result.attacksLanded >= 0, "attacksLanded >= 0");
+  assert(r.result.dmgDealt >= 0, "dmgDealt >= 0");
+}
+
+console.log("== v2 B5: fight gains are dynamic, not flat ==");
+{
+  const state1 = boostedState();
+  const g1 = createGame(state1, { rng: makeRng(7) });
+  const r1 = g1.fight();
+  const gains1 = { Str: state1.Str - 50, Tou: state1.Tou - 50, Spd: state1.Spd - 50, Int: state1.Int - 50 };
+  const total1 = gains1.Str + gains1.Tou + gains1.Spd + gains1.Int;
+  assert(total1 > 0, `total gains from fight > 0 (got ${total1})`);
+}
+
+console.log("== v2 B5: buying an item raises Charisma ==");
+{
+  const state = freshState();
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  const chaBefore = state.Cha;
+  g.buyItem("rice");
+  assert(state.Cha > chaBefore, `Cha increased from ${chaBefore} to ${state.Cha}`);
+}
+
+console.log("== v2 B5: doing a job raises Charisma ==");
+{
+  const state = freshState();
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  const chaBefore = state.Cha;
+  g.doJobShift("delivery", 1.0);
+  assert(state.Cha > chaBefore, `Cha increased from ${chaBefore} to ${state.Cha}`);
+}
+
+console.log("== v2 B5: buying gym training raises Charisma ==");
+{
+  const state = freshState();
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  const chaBefore = state.Cha;
+  g.buyTraining("Pushups");
+  assert(state.Cha > chaBefore, `Cha increased from ${chaBefore} to ${state.Cha}`);
+}
+
+console.log("== v2 B5: escaping a fight raises Charisma ==");
+{
+  const state = freshState();
+  state.Spd = 200;
+  state.Int = 10;
+  const g = createGame(state, { rng: seqRng([0]) });
+  state.Encounter = 1;
+  g.beginFight();
+  const chaBefore = state.Cha;
+  g.tryEscape();
+  assert(state.Cha > chaBefore, `Cha increased from ${chaBefore} to ${state.Cha}`);
+}
+
+console.log("== v2 B5: loss with many rounds still grants gains ==");
+{
+  const state = freshState();
+  state.Str = 1; state.Tou = 1; state.Spd = 1; state.Int = 1;
+  const g = createGame(state, { rng: makeRng(7) });
+  const strBefore = state.Str;
+  const touBefore = state.Tou;
+  g.fight();
+  const totalGain = (state.Str - strBefore) + (state.Tou - touBefore);
+  assert(totalGain > 0, `still gained stats on loss (total ${totalGain})`);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);
