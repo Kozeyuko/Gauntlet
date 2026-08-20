@@ -942,21 +942,22 @@ console.log("== Inventory: autoEatFood fires at start of doDay ==");
 }
 
 // ---- PART B: Tasklist tests ----
-console.log("== Tasklist: doDay advances through entries in order ==");
+console.log("== Tasklist: doDay advances through entries in order (tasks persist) ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   g.setTaskList(["Pushups", "Situps", "Squats"], false);
   g.updatePotential(); // establish rank
   g.doDay();
-  assert(state.Activity !== "Pushups" || state.TaskList.length === 2, "tasklist used Pushups");
-  assert(state.TaskList.length === 2, "TaskList has 2 remaining");
-  assert(state.TaskList[0].act === "Situps", "next is Situps");
+  // Tasks persist; the current one's count decrements.
+  assert(state.TaskList.length === 3, "TaskList keeps all 3 entries (persist)");
+  assert(state.TaskList[0].n === 0 || state.TaskList[0].n === 1, "first task count decremented");
   g.doDay();
-  assert(state.TaskList.length === 1, "TaskList has 1 remaining");
-  assert(state.TaskList[0].act === "Squats", "next is Squats");
   g.doDay();
-  assert(state.TaskList.length === 0, "TaskList empty after 3 days");
+  assert(state.TaskList.length === 3, "TaskList still 3 entries after 3 days (persist)");
+  // All done: counts reset so it can repeat
+  const allReset = state.TaskList.every((t) => t.n >= 1);
+  assert(allReset, "counts reset when all tasks done");
 }
 
 console.log("== Tasklist: TaskRepeat cycles the sequence ==");
@@ -1022,7 +1023,7 @@ console.log("== Tasklist: too tired falls back to Rest ==");
   g.doDay();
   const logText = state.Log.map((e) => e.t).join(" ");
   assert(logText.includes("Too tired") || logText.toLowerCase().includes("rest"), "fell back to Rest when too tired");
-  assert(state.TaskList.length === 0, "task consumed despite fallback");
+  assert(state.TaskList.length === 1, "task persists despite fallback");
 }
 
 console.log("== Version: GAME_VERSION is positive ==");
@@ -1246,7 +1247,7 @@ console.log("== Part A: training via tasklist works regardless of location ==");
   g.setTaskList(["Pushups"], false);
   const tlBefore = state.Stamina;
   g.advanceDay();
-  assert(state.TaskList.length === 0, "task consumed");
+  assert(state.TaskList.length === 1, "task persists after advance");
   assert(state.Stamina < tlBefore, "Pushups trained (stamina spent) even at clinic");
 }
 
@@ -1443,7 +1444,7 @@ console.log("== Part C: advanceDay runs one day ==");
   const result = g.advanceDay();
   assert(result === true, "advanceDay returned true");
   assert(state.AgeDays === prevAge + 1, "aged by one day");
-  assert(g.taskList().length === 0, "task consumed (not repeated)");
+  assert(g.taskList().length === 1, "task persists (not repeated)");
 }
 
 console.log("== Part C: advanceDay with repeat ==");
@@ -1471,7 +1472,7 @@ console.log("== Part C: advanceDay decrements count ==");
   g.advanceDay();
   assert(g.taskList()[0].n === 1, "n decremented to 1");
   g.advanceDay();
-  assert(g.taskList().length === 0, "item consumed at n=0");
+  assert(g.taskList().length === 1, "item persists at n=0");
 }
 
 console.log("== Part C: advanceNDays ==");
@@ -1494,8 +1495,8 @@ console.log("== Part C: advanceNDays stops on empty ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.addTask("OddJobs", 2);
   const count = g.advanceNDays(10);
-  assert(count === 2, "stopped after 2 days");
-  assert(g.taskList().length === 0, "task list empty");
+  assert(count === 10, "advances all days (tasks persist and reset)");
+  assert(g.taskList().length === 1, "task persists (all done, not removed)");
 }
 
 console.log("== Part C: advanceDay returns false on empty list ==");
@@ -1825,12 +1826,13 @@ console.log("== Part D: TaskIndex advances through setTaskList ==");
   assert(state.TaskIndex === 0, "TaskIndex starts at 0");
   g.updatePotential();
   g.doDay();
-  assert(state.TaskIndex === 0, "TaskIndex stays at 0 in non-repeat (splice)");
-  assert(state.TaskList[0].act === "Situps", "first item removed, Situps now first");
+  assert(state.TaskList.length === 3, "all tasks persist after doDay");
+  assert(state.TaskList[0].act === "Pushups", "order preserved (Pushups first)");
   g.doDay();
-  assert(state.TaskList[0].act === "Squats", "Squats now first");
   g.doDay();
-  assert(state.TaskList.length === 0, "tasklist empty after 3 days");
+  assert(state.TaskList.length === 3, "tasklist still 3 after 3 days");
+  const allReset = state.TaskList.every((t) => t.n >= 1);
+  assert(allReset, "counts reset when all tasks done");
 }
 
 console.log("== Part D: stable task order across advanceDay with repeat ==");
@@ -1986,8 +1988,8 @@ console.log("== v2 B3: tasklist add/remove/advance still works ==");
   assert(g.taskList().length === 0, "task removed");
   g.setTaskList(["OddJobs", "Rest"], false);
   g.advanceDay();
-  assert(g.taskList().length === 1, "one task consumed");
-  assert(g.taskList()[0].act === "Rest", "next task is Rest");
+  assert(g.taskList().length === 2, "tasks persist after advance");
+  assert(g.taskList()[0].act === "OddJobs", "order preserved");
 }
 
 console.log("== v2 B4: beginMove sets MovingTo ==");
@@ -2079,9 +2081,9 @@ console.log("== v2 B4: movement grants Speed ==");
   assert(state.Spd > 0, `Speed increased from 0 to ${state.Spd}`);
 }
 
-console.log("== v2 B4: MOVE_ENC_CHANCE is 0.15 ==");
+console.log("== v2 B4: MOVE_ENC_CHANCE is 0.02 ==");
 {
-  assertClose(MOVE_ENC_CHANCE, 0.15, "MOVE_ENC_CHANCE is 0.15");
+  assertClose(MOVE_ENC_CHANCE, 0.02, "MOVE_ENC_CHANCE is 0.02");
 }
 
 console.log("== v2 B4: MOVE_BASE_SPEED is 1.0 ==");

@@ -1625,6 +1625,12 @@ export function initUI(game, opts = {}) {
     const repeatOn = state.TaskRepeat === true;
     el.btnTaskRepeatQuick.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
     el.btnTaskRepeatQuick.classList.toggle("on", repeatOn);
+    // Auto button: reflect whether taskAutoInterval is active.
+    if (el.btnTaskAutoQuick) {
+      const autoOn = !!taskAutoInterval;
+      el.btnTaskAutoQuick.textContent = `Auto: ${autoOn ? "ON" : "OFF"}`;
+      el.btnTaskAutoQuick.classList.toggle("on", autoOn);
+    }
     if (el.taskActivityListQuick) {
       el.taskActivityListQuick.innerHTML = "";
       for (const key of Object.keys(ACTIVITIES)) {
@@ -1678,7 +1684,9 @@ export function initUI(game, opts = {}) {
       } else {
         const ms = el.taskSpeedQuick ? Number(el.taskSpeedQuick.value) || 500 : 500;
         taskAutoInterval = setInterval(() => {
-          if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
+          const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+          const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
+          if (state.Health <= 0 || state.InFight || tl.length === 0 || allDone) {
             clearInterval(taskAutoInterval);
             taskAutoInterval = null;
             renderTasklistQuick();
@@ -1700,7 +1708,9 @@ export function initUI(game, opts = {}) {
     taskAutoInterval = null;
     const ms = Number(speedEl.value) || 500;
     taskAutoInterval = setInterval(() => {
-      if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
+      const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+      const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
+      if (state.Health <= 0 || state.InFight || tl.length === 0 || allDone) {
         clearInterval(taskAutoInterval);
         taskAutoInterval = null;
         renderTasklistQuick();

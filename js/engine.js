@@ -72,6 +72,7 @@ import {
   MAP_POS,
   MOVE_ENC_CHANCE,
   MOVE_BASE_SPEED,
+  computeRoute,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -242,6 +243,7 @@ export function freshState() {
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
+    routePath: null, routeIndex: 0, moveSegmentStartX: 0, moveSegmentStartY: 0,
   };
   const starter = STYLES.Brawling;
   st.StyleSkills = starter.skills.map((s) => s.name).join(",");
@@ -1712,8 +1714,13 @@ export function createGame(state, opts = {}) {
     if (!target) return false;
     state.MovingTo = locKey;
     state.MoveProgress = 0;
-    moveStartX = num(state.PlayerX);
-    moveStartY = num(state.PlayerY);
+    const sx = num(state.PlayerX), sy = num(state.PlayerY);
+    moveStartX = sx;
+    moveStartY = sy;
+    state.routePath = computeRoute(sx, sy, target[0], target[1]);
+    state.routeIndex = 0;
+    state.moveSegmentStartX = sx;
+    state.moveSegmentStartY = sy;
     return true;
   }
 
@@ -1724,28 +1731,51 @@ export function createGame(state, opts = {}) {
       arriveAt(state.MovingTo);
       return { arrived: true };
     }
-    const sx = moveStartX, sy = moveStartY;
-    const tx = target[0], ty = target[1];
-    const dx = tx - sx, dy = ty - sy;
-    const baseDistance = Math.sqrt(dx * dx + dy * dy);
-    if (baseDistance < 1) {
+    const path = state.routePath;
+    if (!path || path.length < 2) {
       arriveAt(state.MovingTo);
       return { arrived: true };
     }
+    // Advance along the current segment.
+    let idx = state.routeIndex || 0;
+    const sx = state.moveSegmentStartX, sy = state.moveSegmentStartY;
+    const wp = path[Math.min(idx + 1, path.length - 1)];
+    const tx = wp[0], ty = wp[1];
+    const dx = tx - sx, dy = ty - sy;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen < 1) {
+      // Segment done — advance to next.
+      state.routeIndex = idx + 1;
+      state.moveSegmentStartX = tx;
+      state.moveSegmentStartY = ty;
+      if (idx + 1 >= path.length - 1) {
+        arriveAt(state.MovingTo);
+        return { arrived: true };
+      }
+      return moveStep(dt);
+    }
     const spd = attrValue("Spd");
-    const travelTime = baseDistance / (MOVE_BASE_SPEED * (1 + spd * 0.05));
+    const travelTime = segLen / (MOVE_BASE_SPEED * (1 + spd * 0.05));
     const step = dt / Math.max(0.01, travelTime);
     state.MoveProgress = num(state.MoveProgress) + step;
     state.Spd = num(state.Spd) + 0.002 * attrApt("Spd");
+    // Encounter: pause but keep MovingTo so player resumes after fight.
     if (R() < MOVE_ENC_CHANCE && !state.InFight) {
       state.Encounter = 1;
-      state.MovingTo = null;
       state.MoveProgress = 0;
       return { encounter: true };
     }
     if (state.MoveProgress >= 1) {
-      arriveAt(state.MovingTo);
-      return { arrived: true };
+      // Segment complete — advance to next waypoint.
+      state.routeIndex = idx + 1;
+      state.moveSegmentStartX = tx;
+      state.moveSegmentStartY = ty;
+      state.MoveProgress = 0;
+      if (idx + 1 >= path.length - 1) {
+        arriveAt(state.MovingTo);
+        return { arrived: true };
+      }
+      return { moving: true, progress: 0 };
     }
     const t = Math.min(1, state.MoveProgress);
     state.PlayerX = sx + dx * t;
@@ -2100,7 +2130,7 @@ export function createGame(state, opts = {}) {
     const item = tl[idx];
     if (!item || typeof item !== "object") {
       if (state.TaskRepeat) { state.TaskIndex = 0; }
-      else { tl.splice(idx, 1); state.TaskIndex = 0; }
+      else { state.TaskIndex = 0; }
       return;
     }
     // Decrement consumable training stock if applicable
@@ -2120,8 +2150,18 @@ export function createGame(state, opts = {}) {
           for (const t of tl) { if (t && typeof t === "object") t.n = t.origN !== undefined ? t.origN : 1; }
         }
       } else {
-        tl.splice(idx, 1);
-        if (idx >= tl.length) state.TaskIndex = 0;
+        // Mark done but keep in list — don't splice.
+        item.n = 0;
+        // Advance to next unfinished task, or stop.
+        let next = idx + 1;
+        while (next < tl.length && tl[next].n <= 0) next++;
+        if (next < tl.length) {
+          state.TaskIndex = next;
+        } else {
+          state.TaskIndex = 0;
+          // All done — reset counts for potential re-use.
+          for (const t of tl) { if (t && typeof t === "object" && t.n <= 0) t.n = t.origN !== undefined ? t.origN : 1; }
+        }
       }
     }
   }

@@ -725,8 +725,72 @@ export const EQUIPMENT = [
 export const MAIN_GYM = "gym";
 
 // ------------------------------------------------------------------ MOVEMENT --
-export const MOVE_ENC_CHANCE = 0.15;
+export const MOVE_ENC_CHANCE = 0.02;
 export const MOVE_BASE_SPEED = 1.0;
+
+// Road network constants for pathfinding.
+const H_ROADS = [120, 300, 480];
+const V_ROADS_WEST = [150, 310];
+const V_ROADS_EAST = [640, 760, 880];
+const RIVER_LEFT = 460;
+const RIVER_RIGHT = 540;
+const BRIDGE_X = 500;
+const BRIDGE_Y = 300;
+
+function nearestIn(arr, val) {
+  let best = arr[0], bestD = Math.abs(val - arr[0]);
+  for (let i = 1; i < arr.length; i++) {
+    const d = Math.abs(val - arr[i]);
+    if (d < bestD) { best = arr[i]; bestD = d; }
+  }
+  return best;
+}
+
+function nearestVRoad(x) {
+  return x <= RIVER_LEFT
+    ? nearestIn(V_ROADS_WEST, x)
+    : nearestIn(V_ROADS_EAST, x);
+}
+
+function side(x) {
+  return x <= RIVER_LEFT ? "west" : x >= RIVER_RIGHT ? "east" : "bridge";
+}
+
+// Compute a list of [x,y] waypoints along the road network from (sx,sy) to (tx,ty).
+export function computeRoute(sx, sy, tx, ty) {
+  const pts = [[sx, sy]];
+  const sRoad = nearestIn(H_ROADS, sy);
+  const tRoad = nearestIn(H_ROADS, ty);
+  const sSide = side(sx), tSide = side(tx);
+  const sVRoad = nearestVRoad(sx);
+  const tVRoad = nearestVRoad(tx);
+
+  if (sSide === tSide) {
+    // Same side of the river — simple L-shaped routing.
+    if (Math.abs(sy - sRoad) > 1) pts.push([sx, sRoad]);
+    if (Math.abs(sx - sVRoad) > 1) pts.push([sVRoad, sRoad]);
+    if (Math.abs(sVRoad - tVRoad) > 1) pts.push([tVRoad, sRoad]);
+    if (Math.abs(sRoad - tRoad) > 1) pts.push([tVRoad, tRoad]);
+    if (Math.abs(tx - tVRoad) > 1) pts.push([tx, tRoad]);
+    if (Math.abs(ty - tRoad) > 1) pts.push([tx, ty]);
+  } else {
+    // Cross-river: must use the mid-road (y=300) bridge at x=500.
+    const midRoad = BRIDGE_Y;
+    if (Math.abs(sy - sRoad) > 1) pts.push([sx, sRoad]);
+    if (Math.abs(sx - sVRoad) > 1) pts.push([sVRoad, sRoad]);
+    if (Math.abs(sRoad - midRoad) > 1) pts.push([sVRoad, midRoad]);
+    if (Math.abs(sVRoad - BRIDGE_X) > 1) pts.push([BRIDGE_X, midRoad]);
+    if (Math.abs(BRIDGE_X - tVRoad) > 1) pts.push([tVRoad, midRoad]);
+    if (Math.abs(midRoad - tRoad) > 1) pts.push([tVRoad, tRoad]);
+    if (Math.abs(tx - tVRoad) > 1) pts.push([tx, tRoad]);
+    if (Math.abs(ty - tRoad) > 1) pts.push([tx, ty]);
+  }
+
+  // Always end at exact target.
+  const last = pts[pts.length - 1];
+  if (last[0] !== tx || last[1] !== ty) pts.push([tx, ty]);
+  return pts;
+}
 
 // Building centers (in the 1000×850 map space).
 export const MAP_POS = {
