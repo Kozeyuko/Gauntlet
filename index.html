@@ -60,7 +60,6 @@
       <button class="btn small-btn buildbtn" id="btnBuild">BUILD CUSTOM</button>
       <div class="btnrow" style="margin-top:8px">
         <button class="btn small-btn" id="btnInventory">INVENTORY</button>
-        <button class="btn small-btn" id="btnTasklist">TASKLIST</button>
       </div>
       <div class="small" id="activeStyleInfo"></div>
       <div class="small stylenote">Knowledge grows when you get hit. Fight to master styles.</div>
@@ -94,6 +93,10 @@
           <option value="1000">Slow</option>
         </select>
       </div>
+      <section class="panel" style="margin-top:10px">
+        <h3>Add Activity</h3>
+        <div id="taskActivityListQuick" class="taskactivity"></div>
+      </section>
     </section>
     <div class="footbtns">
       <button class="btn orange" id="btnReincarnate">REBIRTH</button>
@@ -194,14 +197,6 @@
     <section class="panel">
       <h3 id="locFightersTitle">Fighters</h3>
       <div class="loclist" id="locFightersList"></div>
-    </section>
-    <section class="panel" id="buyTrainingPanel" style="display:none">
-      <h3>Buy Training</h3>
-      <div class="loclist" id="buyTrainingList"></div>
-    </section>
-    <section class="panel" id="gymEquipPanel" style="display:none">
-      <h3>Equipment</h3>
-      <div class="loclist" id="gymEquipList"></div>
     </section>
     <section class="panel" id="cookPanel" style="display:none">
       <h3>Cook</h3>
@@ -385,33 +380,6 @@
     <div class="small" id="inventoryEmpty" style="display:none">No items in inventory.</div>
     <div class="acts">
       <button class="btn" id="btnInventoryClose">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============ TASKLIST OVERLAY ============ -->
-<div class="overlay" id="taskOverlay">
-  <div class="modal">
-    <h2>Task List</h2>
-    <div class="sub">Build an ordered activity queue. Tasks auto-play each day tick in order.</div>
-    <div id="taskQueue"></div>
-    <div class="btnrow" style="margin-top:10px">
-      <button class="btn small-btn" id="btnTaskRepeat">Repeat: OFF</button>
-      <button class="btn small-btn" id="btnTaskAdvance">ADVANCE DAY</button>
-      <button class="btn small-btn" id="btnTaskPlay">PLAY</button>
-      <button class="btn small-btn" id="btnTaskAuto">AUTO: OFF</button>
-      <select id="taskSpeed" class="small-btn">
-        <option value="100">Fast</option>
-        <option value="500" selected>Normal</option>
-        <option value="1000">Slow</option>
-      </select>
-    </div>
-    <section class="panel" style="margin-top:10px">
-      <h3>Add Activity</h3>
-      <div id="taskActivityList"></div>
-    </section>
-    <div class="acts">
-      <button class="btn" id="btnTaskClose">Close</button>
     </div>
   </div>
 </div>

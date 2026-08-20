@@ -1125,6 +1125,13 @@ header {
 .store-tab.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
 .store-tab:hover:not(.active) { border-color: var(--gold-dim); color: var(--text); }
 /* ---------- tasklist quick panel ---------- */
-.tasklist-panel .taskqueue { max-height: 180px; overflow-y: auto; }
+.tasklist-panel .taskqueue { max-height: 220px; overflow-y: auto; }
 .tasklist-panel .taskqueue .small { padding: 2px 0; }
+.tasklist-panel .taskactivity { display: flex; flex-direction: column; gap: 4px; }
+.tasklist-panel .taskactivity .btn { width: 100%; text-align: left; padding: 6px 8px; font-size: 11px; }
 #btnTaskAdvanceQuick.on, #btnTaskAutoQuick.on { border-color: var(--green); color: var(--green); }
+@media (max-width: 360px) {
+  .tasklist-panel { padding: 10px 12px; }
+  .tasklist-panel .taskqueue { max-height: 160px; }
+  .tasklist-panel .taskactivity .btn { font-size: 10px; padding: 5px 6px; }
+}

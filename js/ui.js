@@ -231,20 +231,12 @@ export function initUI(game, opts = {}) {
     btnInventory: $("btnInventory"), inventoryOverlay: $("inventoryOverlay"),
     inventoryList: $("inventoryList"), inventoryEmpty: $("inventoryEmpty"),
     btnInventoryClose: $("btnInventoryClose"),
-    // tasklist
-    btnTasklist: $("btnTasklist"), taskOverlay: $("taskOverlay"),
-    taskQueue: $("taskQueue"), taskActivityList: $("taskActivityList"),
-    btnTaskRepeat: $("btnTaskRepeat"), btnTaskClose: $("btnTaskClose"),
-    btnTaskAdvance: $("btnTaskAdvance"), btnTaskPlay: $("btnTaskPlay"),
-    btnTaskAuto: $("btnTaskAuto"), taskSpeed: $("taskSpeed"),
+    // tasklist quick (now the full editor)
+    taskActivityListQuick: $("taskActivityListQuick"),
     // update log
     updateOverlay: $("updateOverlay"), btnUpdateLog: $("btnUpdateLog"),
     btnUpdateClose: $("btnUpdateClose"), updateList: $("updateList"),
     updateHeader: $("updateHeader"),
-    // buy training
-    buyTrainingPanel: $("buyTrainingPanel"), buyTrainingList: $("buyTrainingList"),
-    // gym equip
-    gymEquipPanel: $("gymEquipPanel"), gymEquipList: $("gymEquipList"),
     // tasklist quick
     taskQueueQuick: $("taskQueueQuick"),
     btnTaskRepeatQuick: $("btnTaskRepeatQuick"), btnTaskAdvanceQuick: $("btnTaskAdvanceQuick"),
@@ -289,6 +281,7 @@ export function initUI(game, opts = {}) {
     game.setLocation(key);
     if (key === "cstore") { openStore("cstore"); return; }
     if (key === "clinic") { openStore("clinic"); return; }
+    if (key === MAIN_GYM) { openStore("gym"); return; }
     if (key === "jobboard") { openJobs(); return; }
     if (key === "arena") { openArena(); return; }
     openLocationOverlay(key);
@@ -812,95 +805,6 @@ export function initUI(game, opts = {}) {
     }
   }
 
-  function renderBuyTraining(key) {
-    if (!GYM_TRAINING || GYM_TRAINING.length === 0) {
-      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
-      return;
-    }
-    // Show at MAIN_GYM or Home (for home-based items)
-    const isHome = key === "home";
-    const isGym = key === MAIN_GYM;
-    if (!isGym && !isHome) {
-      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
-      return;
-    }
-    const items = isHome
-      ? GYM_TRAINING.filter((t) => t.home)
-      : GYM_TRAINING.filter((t) => !t.home);
-    if (items.length === 0) {
-      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
-      return;
-    }
-    if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "";
-    if (!el.buyTrainingList) return;
-    el.buyTrainingList.innerHTML = "";
-    const money = num(state.Money);
-    for (const t of items) {
-      const owned = game.hasTraining(t.key);
-      const consumable = t.unlock === "consumable";
-      const stock = consumable ? (state.Consumables[t.key] || 0) : 0;
-      const canBuy = money >= t.cost;
-      const b = document.createElement("button");
-      b.className = "btn locrow" + (owned && !consumable ? " owned" : (canBuy ? "" : " cantafford"));
-      const label = owned && !consumable
-        ? "Owned"
-        : (consumable ? `Stock: ${stock}` : (t.requires && !state.OwnedItems.includes(t.requires) ? `Needs ${t.requiresName}` : "Buy"));
-      b.innerHTML = `
-        <span class="lr-main">
-          <span class="lr-name">${t.name}</span>
-          <span class="lr-stat">${label}</span>
-        </span>
-        <span class="lr-meta">
-          <span class="lr-cost${canBuy ? "" : " red"}">${fmtCash(t.cost)}</span>
-          ${consumable && stock > 0 ? `<span class="lr-stam">${stock} uses</span>` : ""}
-        </span>`;
-      b.addEventListener("click", () => {
-        game.buyTraining(t.key);
-        renderBuyTraining(key);
-        render();
-      });
-      el.buyTrainingList.appendChild(b);
-    }
-  }
-
-  function renderGymEquip(key) {
-    if (!el.gymEquipPanel || !el.gymEquipList) return;
-    if (key !== MAIN_GYM) { el.gymEquipPanel.style.display = "none"; return; }
-    el.gymEquipPanel.style.display = "";
-    el.gymEquipList.innerHTML = "";
-    const money = num(state.Money);
-    const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
-    const equipped = state.Equipment || {};
-    for (const eq of EQUIPMENT) {
-      const isOwned = owned.includes(eq.key);
-      const isEquipped = equipped[eq.slot] === eq.key;
-      const canBuy = money >= eq.cost;
-      const b = document.createElement("button");
-      b.className = "btn locrow" + (isOwned ? " owned" : (canBuy ? "" : " cantafford"));
-      const label = isOwned ? (isEquipped ? "UNEQUIP" : "EQUIP") : "Buy";
-      b.innerHTML = `
-        <span class="lr-main">
-          <span class="lr-name">${eq.name}</span>
-          <span class="lr-stat">${label}</span>
-        </span>
-        <span class="lr-meta">
-          ${isOwned ? "" : `<span class="lr-cost${canBuy ? "" : " red"}">${fmtCash(eq.cost)}</span>`}
-        </span>`;
-      b.addEventListener("click", () => {
-        if (isOwned) {
-          if (isEquipped) game.unequipItem(eq.key);
-          else game.equipItem(eq.key);
-        } else {
-          game.buyItem(eq.key);
-        }
-        renderGymEquip(key);
-        renderEquipmentPanel();
-        render();
-      });
-      el.gymEquipList.appendChild(b);
-    }
-  }
-
   function openLocationOverlay(key) {
     const loc = LOCATIONS[key];
     if (!loc) return;
@@ -910,8 +814,6 @@ export function initUI(game, opts = {}) {
     renderLocTier(key);
     renderLocActivities(key);
     renderLocFighters(key);
-    renderBuyTraining(key);
-    renderGymEquip(key);
     // Cook panel at Home
     const isHome = key === "home";
     if (isHome && el.cookPanel) {
@@ -1286,7 +1188,7 @@ export function initUI(game, opts = {}) {
   let storeType = "cstore";
   let storeTab = "food";
   const STORE_TABS = ["food", "rawfood", "drinks", "clinic", "gear"];
-  const STORE_TYPE_TABS = { cstore: ["food", "rawfood", "drinks"], clinic: ["clinic"] };
+  const STORE_TYPE_TABS = { cstore: ["food", "rawfood", "drinks"], clinic: ["clinic"], gym: ["training", "gear"] };
 
   function renderStoreTabs() {
     if (!el.storeTabs) return;
@@ -1307,6 +1209,20 @@ export function initUI(game, opts = {}) {
   function getStoreItems() {
     if (storeType === "clinic") {
       return CLINIC_ITEMS.filter((i) => i.cat === storeTab || storeTab === "clinic");
+    }
+    if (storeType === "gym" && storeTab === "training") {
+      const money = num(state.Money);
+      return GYM_TRAINING.filter((t) => !t.home).map((t) => {
+        const owned = game.hasTraining(t.key);
+        const consumable = t.unlock === "consumable";
+        const stock = consumable ? (state.Consumables[t.key] || 0) : 0;
+        const locked = t.requires && !state.OwnedItems.includes(t.requires);
+        return {
+          key: t.key, name: t.name, desc: locked ? `Needs ${t.requiresName}` : (consumable ? `Stock: ${stock}` : (owned ? "Owned" : "")),
+          price: t.cost, cat: "training",
+          _isGymTraining: true, _owned: owned, _consumable: consumable, _stock: stock, _locked: locked,
+        };
+      });
     }
     if (storeTab === "gear") {
       const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
@@ -1329,7 +1245,7 @@ export function initUI(game, opts = {}) {
   function renderStore() {
     renderStoreTabs();
     const items = getStoreItems();
-    el.storeName.textContent = storeTab === "clinic" ? "Clinic" : "Convenience Store";
+    el.storeName.textContent = storeType === "gym" ? "City Gym" : (storeTab === "clinic" ? "Clinic" : "Convenience Store");
     el.storeCash.textContent = fmtCash(state.Money);
     if (storeTab === "clinic") {
       el.storeNotice.style.display = "";
@@ -1354,7 +1270,23 @@ export function initUI(game, opts = {}) {
       main.appendChild(sub);
       const btn = document.createElement("button");
       btn.className = "btn small-btn";
-      if (item._isEquip) {
+      if (item._isGymTraining) {
+        if (item._owned && !item._consumable) {
+          btn.textContent = "Owned";
+          btn.classList.add("owned");
+        } else if (item._locked) {
+          btn.textContent = `Needs item`;
+          btn.classList.add("cantafford");
+        } else {
+          btn.textContent = fmtCash(item.price);
+          if (num(state.Money) < item.price) btn.classList.add("cantafford");
+          btn.addEventListener("click", () => {
+            game.buyTraining(item.key);
+            renderStore();
+            render();
+          });
+        }
+      } else if (item._isEquip) {
         if (item._owned) {
           btn.textContent = item._equipped ? "UNEQUIP" : "EQUIP";
           btn.className += item._equipped ? " owned" : "";
@@ -1393,7 +1325,7 @@ export function initUI(game, opts = {}) {
 
   function openStore(type) {
     storeType = type || "cstore";
-    storeTab = type === "clinic" ? "clinic" : "food";
+    storeTab = type === "clinic" ? "clinic" : (type === "gym" ? "training" : "food");
     renderStore();
     el.storeOverlay.classList.add("show");
   }
@@ -1597,17 +1529,18 @@ export function initUI(game, opts = {}) {
     if (e.target === el.inventoryOverlay) el.inventoryOverlay.classList.remove("show");
   });
 
-  // ------------------------------------------------------------ tasklist overlay --
+  // ------------------------------------------------------------ tasklist (full editor in right column) --
   let taskAutoInterval = null;
 
-  function renderTasklist() {
+  function renderTasklistFull() {
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
-    el.taskQueue.innerHTML = "";
+    if (!el.taskQueueQuick) return;
+    el.taskQueueQuick.innerHTML = "";
     if (tl.length === 0) {
       const empty = document.createElement("div");
       empty.className = "small";
       empty.textContent = "No tasks in queue. Add activities below.";
-      el.taskQueue.appendChild(empty);
+      el.taskQueueQuick.appendChild(empty);
     } else {
       for (let i = 0; i < tl.length; i++) {
         const item = tl[i];
@@ -1633,7 +1566,7 @@ export function initUI(game, opts = {}) {
         btnDown.addEventListener("click", () => {
           if (item.n > 1) item.n--;
           else game.removeTask(i);
-          renderTasklist();
+          renderTasklistFull();
           render();
         });
         const btnUp = document.createElement("button");
@@ -1641,7 +1574,7 @@ export function initUI(game, opts = {}) {
         btnUp.textContent = "+";
         btnUp.addEventListener("click", () => {
           if (item.n < 99) item.n++;
-          renderTasklist();
+          renderTasklistFull();
           render();
         });
         row.appendChild(btnDown);
@@ -1651,128 +1584,38 @@ export function initUI(game, opts = {}) {
         rm.textContent = "×";
         rm.addEventListener("click", () => {
           game.removeTask(i);
-          renderTasklist();
+          renderTasklistFull();
           render();
         });
         row.appendChild(rm);
-        el.taskQueue.appendChild(row);
+        el.taskQueueQuick.appendChild(row);
       }
     }
     const repeatOn = state.TaskRepeat === true;
-    el.btnTaskRepeat.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
-    el.btnTaskRepeat.classList.toggle("on", repeatOn);
-
-    // Activity list — grey out locked trainings
-    el.taskActivityList.innerHTML = "";
-    for (const key of Object.keys(ACTIVITIES)) {
-      const act = ACTIVITIES[key];
-      const locked = !game.canAddToTask(key);
-      const b = document.createElement("button");
-      b.className = "btn small-btn" + (locked ? " locked" : "");
-      b.textContent = act.name;
-      if (locked) b.title = "Buy this training at the gym first";
-      b.addEventListener("click", () => {
-        if (game.addTask(key)) {
-          renderTasklist();
-          render();
-        }
-      });
-      el.taskActivityList.appendChild(b);
-    }
-  }
-
-  function openTasklist() {
-    renderTasklist();
-    el.taskOverlay.classList.add("show");
-  }
-
-  el.btnTasklist.addEventListener("click", openTasklist);
-  el.btnTaskClose.addEventListener("click", () => el.taskOverlay.classList.remove("show"));
-  el.taskOverlay.addEventListener("click", (e) => {
-    if (e.target === el.taskOverlay) el.taskOverlay.classList.remove("show");
-  });
-  el.btnTaskRepeat.addEventListener("click", () => {
-    state.TaskRepeat = state.TaskRepeat !== true;
-    renderTasklist();
-  });
-
-  if (el.btnTaskAdvance) {
-    el.btnTaskAdvance.addEventListener("click", () => {
-      game.advanceDay();
-      renderTasklist();
-      render();
-    });
-  }
-  if (el.btnTaskPlay) {
-    el.btnTaskPlay.addEventListener("click", () => {
-      game.doDay();
-      renderTasklist();
-      render();
-    });
-  }
-  if (el.btnTaskAuto) {
-    el.btnTaskAuto.addEventListener("click", () => {
-      if (taskAutoInterval) {
-        clearInterval(taskAutoInterval);
-        taskAutoInterval = null;
-        el.btnTaskAuto.classList.remove("on");
-        el.btnTaskAuto.textContent = "AUTO: OFF";
-      } else {
-        el.btnTaskAuto.classList.add("on");
-        el.btnTaskAuto.textContent = "AUTO: ON";
-        const ms = el.taskSpeed ? Number(el.taskSpeed.value) || 500 : 500;
-        taskAutoInterval = setInterval(() => {
-          if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
-            clearInterval(taskAutoInterval);
-            taskAutoInterval = null;
-            el.btnTaskAuto.classList.remove("on");
-            el.btnTaskAuto.textContent = "AUTO: OFF";
-            return;
+    el.btnTaskRepeatQuick.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
+    el.btnTaskRepeatQuick.classList.toggle("on", repeatOn);
+    if (el.taskActivityListQuick) {
+      el.taskActivityListQuick.innerHTML = "";
+      for (const key of Object.keys(ACTIVITIES)) {
+        const act = ACTIVITIES[key];
+        const locked = !game.canAddToTask(key);
+        const b = document.createElement("button");
+        b.className = "btn small-btn" + (locked ? " locked" : "");
+        b.textContent = act.name;
+        if (locked) b.title = "Buy this training at the gym first";
+        b.addEventListener("click", () => {
+          if (game.addTask(key)) {
+            renderTasklistFull();
+            render();
           }
-          game.doDay();
-          renderTasklist();
-          render();
-        }, ms);
+        });
+        el.taskActivityListQuick.appendChild(b);
       }
-    });
+    }
   }
 
   function renderTasklistQuick() {
-    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
-    if (!el.taskQueueQuick) return;
-    el.taskQueueQuick.innerHTML = "";
-    if (tl.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "small";
-      empty.textContent = "No tasks queued.";
-      el.taskQueueQuick.appendChild(empty);
-    } else {
-      const maxShow = Math.min(tl.length, 8);
-      for (let i = 0; i < maxShow; i++) {
-        const item = tl[i];
-        const act = ACTIVITIES[item.act];
-        const div = document.createElement("div");
-        div.className = "small";
-        div.textContent = `${i + 1}. ${act ? act.name : item.act} x${item.n}`;
-        el.taskQueueQuick.appendChild(div);
-      }
-      if (tl.length > maxShow) {
-        const more = document.createElement("div");
-        more.className = "small";
-        more.textContent = `... +${tl.length - maxShow} more`;
-        el.taskQueueQuick.appendChild(more);
-      }
-    }
-    const repeatOn = state.TaskRepeat === true;
-    if (el.btnTaskRepeatQuick) {
-      el.btnTaskRepeatQuick.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
-      el.btnTaskRepeatQuick.classList.toggle("on", repeatOn);
-    }
-    if (el.btnTaskAutoQuick) {
-      const autoOn = !!taskAutoInterval;
-      el.btnTaskAutoQuick.textContent = autoOn ? "AUTO: ON" : "AUTO: OFF";
-      el.btnTaskAutoQuick.classList.toggle("on", autoOn);
-    }
+    renderTasklistFull();
   }
 
   if (el.btnTaskRepeatQuick) {
@@ -1785,7 +1628,6 @@ export function initUI(game, opts = {}) {
     el.btnTaskAdvanceQuick.addEventListener("click", () => {
       game.advanceDay();
       renderTasklistQuick();
-      renderTasklist();
       render();
     });
   }
@@ -1793,7 +1635,6 @@ export function initUI(game, opts = {}) {
     el.btnTaskPlayQuick.addEventListener("click", () => {
       game.doDay();
       renderTasklistQuick();
-      renderTasklist();
       render();
     });
   }
@@ -1815,7 +1656,6 @@ export function initUI(game, opts = {}) {
           }
           game.doDay();
           renderTasklistQuick();
-          renderTasklist();
           render();
         }, ms);
         renderTasklistQuick();
@@ -1838,12 +1678,8 @@ export function initUI(game, opts = {}) {
       }
       game.doDay();
       renderTasklistQuick();
-      renderTasklist();
       render();
     }, ms);
-  }
-  if (el.taskSpeed) {
-    el.taskSpeed.addEventListener("change", () => restartAutoIfRunning(el.taskSpeed));
   }
   if (el.taskSpeedQuick) {
     el.taskSpeedQuick.addEventListener("change", () => restartAutoIfRunning(el.taskSpeedQuick));

@@ -1937,6 +1937,58 @@ console.log("== v2 B2: doJobAction combo is returned ==");
   assert(res.combo === 10, "combo 10 returned in result");
 }
 
+console.log("== v2 B3: City Gym is a store type with training + equipment tabs ==");
+{
+  const gymTabs = ["training", "gear"];
+  assert(gymTabs.length === 2, "gym has 2 tabs");
+  assert(gymTabs.includes("training"), "gym has training tab");
+  assert(gymTabs.includes("gear"), "gym has gear/equipment tab");
+}
+
+console.log("== v2 B3: GYM_TRAINING items have expected structure ==");
+{
+  for (const t of GYM_TRAINING) {
+    assert(typeof t.key === "string" && t.key.length > 0, `gym training '${t.key}' has key`);
+    assert(typeof t.cost === "number" && t.cost >= 0, `gym training '${t.key}' has cost`);
+    assert(typeof t.unlock === "string", `gym training '${t.key}' has unlock`);
+  }
+  const nonHome = GYM_TRAINING.filter((t) => !t.home);
+  assert(nonHome.length >= 4, "at least 4 gym trainings are non-home");
+}
+
+console.log("== v2 B3: EQUIPMENT items have cat: gear ==");
+{
+  for (const eq of EQUIPMENT) {
+    assert(eq.cat === "gear", `EQUIPMENT '${eq.key}' has cat: gear`);
+  }
+}
+
+console.log("== v2 B3: buying gym training works via engine ==");
+{
+  const state = freshState();
+  state.Money = 100;
+  state.Location = "gym";
+  const g = createGame(state, { rng: makeRng(1) });
+  const bought = g.buyTraining("Pushups");
+  assert(bought === true, "bought Pushups at gym");
+  assert(g.hasTraining("Pushups") === true, "has Pushups after purchase");
+  assert(state.Money === 90, "money deducted");
+}
+
+console.log("== v2 B3: tasklist add/remove/advance still works ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("OddJobs");
+  assert(g.taskList().length === 1, "task added");
+  g.removeTask(0);
+  assert(g.taskList().length === 0, "task removed");
+  g.setTaskList(["OddJobs", "Rest"], false);
+  g.advanceDay();
+  assert(g.taskList().length === 1, "one task consumed");
+  assert(g.taskList()[0].act === "Rest", "next task is Rest");
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);
