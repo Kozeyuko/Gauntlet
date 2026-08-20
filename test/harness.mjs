@@ -1029,6 +1029,7 @@ console.log("== Tasklist: too tired falls back to Rest ==");
 console.log("== Version: GAME_VERSION is positive ==");
 {
   assert(typeof GAME_VERSION === "number" && GAME_VERSION > 0, `GAME_VERSION > 0 (got ${GAME_VERSION})`);
+  assert(UPDATE_LOG[0].v === GAME_VERSION, "update log latest entry matches GAME_VERSION");
 }
 
 console.log("== Version: freshState SeenVersion is 0 ==");
