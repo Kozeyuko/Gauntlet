@@ -736,7 +736,7 @@ export const MAIN_GYM = "gym";
 
 // ------------------------------------------------------------------ MOVEMENT --
 export const MOVE_ENC_CHANCE = 0.02;
-export const MOVE_BASE_SPEED = 1.0;
+export const MOVE_BASE_SPEED = 32;   // map units per second at Speed 0 (farthest ~800u ≈ 25s)
 
 // Road network constants for pathfinding.
 const H_ROADS = [120, 300, 480];

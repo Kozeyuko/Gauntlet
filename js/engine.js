@@ -1755,12 +1755,12 @@ export function createGame(state, opts = {}) {
       return moveStep(dt);
     }
     const spd = attrValue("Spd");
-    const travelTime = segLen / (MOVE_BASE_SPEED * (1 + spd * 0.05));
+    const travelTime = segLen / (MOVE_BASE_SPEED * (1 + spd * 0.12));
     const step = dt / Math.max(0.01, travelTime);
     state.MoveProgress = num(state.MoveProgress) + step;
     state.Spd = num(state.Spd) + 0.002 * attrApt("Spd");
-    // Encounter: pause but keep MovingTo so player resumes after fight.
-    if (R() < MOVE_ENC_CHANCE && !state.InFight) {
+    // Encounter ONLY if "searching for trouble" is ON; otherwise walking is safe.
+    if (state.Looking === true && R() < MOVE_ENC_CHANCE && !state.InFight) {
       state.Encounter = 1;
       state.MoveProgress = 0;
       return { encounter: true };

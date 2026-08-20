@@ -30,6 +30,7 @@ import {
   MAIN_GYM,
   EQUIPMENT,
   MAP_POS,
+  MOVE_BASE_SPEED,
   STATUS_EFFECT_INFO,
 } from "./data.js";
 import { eventToString } from "./engine.js";
@@ -335,6 +336,20 @@ export function initUI(game, opts = {}) {
   playerMarker.innerHTML = `<span class="pm-dot"></span>`;
   mapLayer.appendChild(playerMarker);
 
+  // Dashed route line (SVG overlay) + ETA box
+  const routeSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  routeSvg.setAttribute("class", "route-svg");
+  routeSvg.setAttribute("viewBox", `0 0 ${MAP_W} ${MAP_H}`);
+  routeSvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  const routeLine = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  routeLine.setAttribute("class", "route-line");
+  routeSvg.appendChild(routeLine);
+  mapLayer.appendChild(routeSvg);
+  const etaBox = document.createElement("div");
+  etaBox.className = "eta-box";
+  etaBox.style.display = "none";
+  mapLayer.appendChild(etaBox);
+
   let pendingArrival = null;
 
   // ------------------------------------------------------------ render helpers --
@@ -467,9 +482,39 @@ export function initUI(game, opts = {}) {
       const dest = LOCATIONS[state.MovingTo];
       const pctDone = Math.round((num(state.MoveProgress) || 0) * 100);
       playerMarker.setAttribute("data-tip", `Traveling to ${dest ? dest.name : state.MovingTo}… ${pctDone}%`);
+      // Dashed route line + ETA
+      const path = state.routePath;
+      const pts = [];
+      if (Array.isArray(path) && path.length) {
+        pts.push([px, py]);
+        for (const wp of path) pts.push(wp);
+      } else if (dest && MAP_POS[state.MovingTo]) {
+        pts.push([px, py], MAP_POS[state.MovingTo]);
+      }
+      if (pts.length >= 2) {
+        routeLine.setAttribute("points", pts.map((p) => `${p[0]},${p[1]}`).join(" "));
+        routeSvg.style.display = "";
+      } else {
+        routeSvg.style.display = "none";
+      }
+      // ETA: remaining distance / speed
+      const spd = Math.max(1, num(state.Spd));
+      const speed = MOVE_BASE_SPEED * (1 + spd * 0.12);
+      let rem = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        rem += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+      }
+      rem *= (1 - Math.max(0, Math.min(1, num(state.MoveProgress))));
+      const etaSec = Math.max(0, Math.round(rem / Math.max(0.01, speed)));
+      etaBox.textContent = `~${etaSec}s`;
+      etaBox.style.display = "block";
+      etaBox.style.left = pct(px, MAP_W);
+      etaBox.style.top = `calc(${pct(py, MAP_H)} + 14px)`;
     } else {
       const here = LOCATIONS[state.Location];
       playerMarker.setAttribute("data-tip", here ? `At ${here.name}` : "");
+      routeSvg.style.display = "none";
+      etaBox.style.display = "none";
     }
     renderRoamers();
   }

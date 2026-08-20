@@ -2087,9 +2087,9 @@ console.log("== v2 B4: MOVE_ENC_CHANCE is 0.02 ==");
   assertClose(MOVE_ENC_CHANCE, 0.02, "MOVE_ENC_CHANCE is 0.02");
 }
 
-console.log("== v2 B4: MOVE_BASE_SPEED is 1.0 ==");
+console.log("== v2 B4: MOVE_BASE_SPEED is 32 (fast travel) ==");
 {
-  assertClose(MOVE_BASE_SPEED, 1.0, "MOVE_BASE_SPEED is 1.0");
+  assertClose(MOVE_BASE_SPEED, 32, "MOVE_BASE_SPEED is 32");
 }
 
 console.log("== v2 B4: tryEscape fails when not in fight ==");
