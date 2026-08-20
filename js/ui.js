@@ -127,6 +127,7 @@ export function initUI(game, opts = {}) {
   let autoRunTimer = null; // activity auto-run setTimeout handle
   let encounterShown = false; // rival overlay auto-open dedupe
   let openLocKey = null; // location key of the currently-open location overlay
+  let adminUnlocked = false;
 
   // ------------------------------------------------------------ element refs --
   const el = {
@@ -227,6 +228,11 @@ export function initUI(game, opts = {}) {
     // statistics
     btnStats: $("btnStats"), statsOverlay: $("statsOverlay"),
     statsBody: $("statsBody"), btnStatsClose: $("btnStatsClose"),
+    codeInput: $("codeInput"), btnCodeApply: $("btnCodeApply"), adminStatus: $("adminStatus"),
+    adminOverlay: $("adminOverlay"), btnAdminClose: $("btnAdminClose"), btnAdminItem: $("btnAdminItem"),
+    btnAdminStats: $("btnAdminStats"), btnAdminHeal: $("btnAdminHeal"), btnAdminUnlock: $("btnAdminUnlock"),
+    adminItem: $("adminItem"), adminQty: $("adminQty"), adminMoney: $("adminMoney"),
+    adminStr: $("adminStr"), adminTou: $("adminTou"), adminSpd: $("adminSpd"), adminInt: $("adminInt"), adminCha: $("adminCha"),
     // tasklist quick
     taskQueueQuick: $("taskQueueQuick"),
     btnTaskRepeatQuick: $("btnTaskRepeatQuick"), btnTaskAdvanceQuick: $("btnTaskAdvanceQuick"),
@@ -269,7 +275,8 @@ export function initUI(game, opts = {}) {
       return;
     }
     if (state.MovingTo) {
-      game.logMsg("Already traveling — wait to arrive.");
+      // Clicking another destination while traveling reroutes immediately.
+      game.beginMove(key);
       render();
       return;
     }
@@ -323,10 +330,7 @@ export function initUI(game, opts = {}) {
     d.setAttribute("data-tip", `${r.name} — roaming ${styleName(r.style)}. Click to fight.`);
     d.addEventListener("click", () => {
       if (game.roamerStatus(r.key) !== "ready") return;
-      pauseAutoRun();
-      const view = game.beginRoamerFight(r.key);
-      if (view) openCombat(view);
-      else render();
+      openRoamerRoster(r.key);
     });
     roamerEls[r.key] = d;
     mapLayer.appendChild(d);
@@ -364,6 +368,11 @@ export function initUI(game, opts = {}) {
   const fmtStats = (stats) => {
     if (!stats) return "";
     return `Str ${stats.Str} · Tou ${stats.Tou} · Spd ${stats.Spd} · Int ${stats.Int} · Cha ${stats.Cha}`;
+  };
+  const fmtTP = (stats) => {
+    if (!stats) return "TP 0.00";
+    const total = ["Str", "Tou", "Spd", "Int", "Cha"].reduce((sum, k) => sum + (Number(stats[k]) || 0), 0);
+    return `TP ${(total / 30).toFixed(2)}`;
   };
 
   const clampRivalIdx = () => Math.min(Math.max(Number(state.RivalIdx) || 1, 1), MAX_TOTAL);
@@ -414,9 +423,17 @@ export function initUI(game, opts = {}) {
         <span class="nm">${a.name}</span>
         <span class="val">${val.toFixed(2)}</span>
         <span class="apt">×${apt.toFixed(2)}</span>
+        <button class="btn tiny-btn apt-buy" data-attr="${a.id}" title="Spend $25 to multiply this Aptitude by 1.5">+1.5×</button>
       </div>`;
     }
     el.attrsBody.innerHTML = html;
+    el.attrsBody.querySelectorAll(".apt-buy").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        game.buyAptitude(btn.dataset.attr);
+        render();
+      });
+    });
   }
 
   function renderStyles() {
@@ -502,11 +519,13 @@ export function initUI(game, opts = {}) {
       // ETA: remaining distance / speed
       const spd = Math.max(1, num(state.Spd));
       const speed = MOVE_BASE_SPEED * (1 + spd * 0.12);
-      let rem = 0;
-      for (let i = 0; i < pts.length - 1; i++) {
-        rem += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+      let rem = Math.max(0, Number(state.routeRemainingDistance) || 0);
+      if (!rem) {
+        for (let i = 0; i < pts.length - 1; i++) {
+          rem += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+        }
+        rem *= (1 - Math.max(0, Math.min(1, num(state.MoveProgress))));
       }
-      rem *= (1 - Math.max(0, Math.min(1, num(state.MoveProgress))));
       const etaSec = Math.max(0, Math.round(rem / Math.max(0.01, speed)));
       etaBox.textContent = `~${etaSec}s`;
       etaBox.style.display = "block";
@@ -521,9 +540,44 @@ export function initUI(game, opts = {}) {
     renderRoamers();
   }
 
+  function openRoamerRoster(key) {
+    const r = ROAMERS.find((x) => x.key === key);
+    if (!r) return;
+    const challengers = game.roamerChallengers(key);
+    game.noteRoamerSeen(key);
+    openLocKey = null;
+    el.locName.textContent = `${r.name} — Challengers`;
+    el.locFlavor.textContent = "Walkable encounter point. Choose one fighter to challenge.";
+    el.locFightersTitle.textContent = `Street fighters (${challengers.length})`;
+    el.locFightersList.innerHTML = "";
+    challengers.forEach((c, index) => {
+      const row = document.createElement("div");
+      row.className = "ghostrow";
+      const tp = fmtTP(c.stats);
+      row.innerHTML = `<div class="gmain"><div class="gnm">${c.name}</div><div class="gsub">${styleName(c.style)} · ${tp} · reward ${fmtCash(c.reward || 0)}</div></div>`;
+      const btn = document.createElement("button");
+      btn.className = "btn small-btn";
+      btn.textContent = "FIGHT";
+      btn.addEventListener("click", () => {
+        el.locOverlay.classList.remove("show");
+        const view = game.beginRoamerFight(key, index + 1, index);
+        if (view) openCombat(view);
+        else render();
+      });
+      row.appendChild(btn);
+      el.locFightersList.appendChild(row);
+    });
+    el.locOverlay.classList.add("show");
+  }
+
   function renderRoamers() {
+    game.refreshRoamerRespawns();
     for (const key of Object.keys(roamerEls)) {
       const elR = roamerEls[key];
+      const r = ROAMERS.find((x) => x.key === key);
+      const zone = state.RoamerZones?.[key] || (r && r.zone);
+      const spot = zone ? ROAMER_SPOTS[zone] : null;
+      if (spot) { elR.style.left = pct(spot[0], MAP_W); elR.style.top = pct(spot[1], MAP_H); }
       const status = game.roamerStatus(key);
       elR.classList.toggle("ready", status === "ready");
       elR.classList.toggle("defeated", status === "defeated");
@@ -557,7 +611,7 @@ export function initUI(game, opts = {}) {
         name: r.name,
         style: `Style: ${styleName(r.style)}`,
         line: r.line,
-        stats: `${fmtStats(r.stats)} · Reward ${fmtCash(r.rewardMoney)}`,
+        stats: `${fmtTP(r.stats)} · Reward ${fmtCash(r.rewardMoney)}`,
         fightLabel: "FIGHT",
         mode: "ladder",
         learnStyleId: r.style,
@@ -568,7 +622,7 @@ export function initUI(game, opts = {}) {
       name: f.name,
       style: `Style: ${styleName(f.style)}`,
       line: f.line,
-      stats: `${fmtStats(f.stats)} · Bet ${f.bet} · Pay ${f.pay}`,
+      stats: `${fmtTP(f.stats)} · Bet ${f.bet} · Pay ${f.pay}`,
       fightLabel: "ENTER THE INSIDE",
       mode: "inside",
       learnStyleId: f.style,
@@ -622,6 +676,10 @@ export function initUI(game, opts = {}) {
       el.logList.appendChild(d);
     }
     el.logList.scrollTop = el.logList.scrollHeight;
+    if (el.btnNews) {
+      const unread = entries.length > Number(state.NewsSeen || 0) && !el.newsFloater.classList.contains("show");
+      el.btnNews.classList.toggle("news-unread", unread);
+    }
     const msg = String(state.LastMsg ?? "");
     if (msg.includes("POTENTIAL UP") && msg !== lastRankMsg) {
       lastRankMsg = msg;
@@ -868,7 +926,7 @@ export function initUI(game, opts = {}) {
       row.innerHTML = `
         <div class="gmain">
           <div class="gnm">${r.name} ${r.beaten ? "✓" : ""}</div>
-          <div class="gsub">${st ? st.name : styleId} · reward ${fmtCash(r.rewardMoney)} · ${r.rewardXp} XP${!r.unlocked ? " (locked)" : ""}</div>
+          <div class="gsub">${st ? st.name : styleId} · ${fmtTP(r.stats)} · reward ${fmtCash(r.rewardMoney)} · ${r.rewardXp} XP${!r.unlocked ? " (locked)" : ""}</div>
         </div>`;
       if (!r.beaten && r.unlocked) {
         const btn = document.createElement("button");
@@ -876,7 +934,11 @@ export function initUI(game, opts = {}) {
         btn.textContent = "FIGHT";
         btn.addEventListener("click", () => {
           const view = game.beginLocationFight(key, r.n);
-          if (view) renderCombat(view);
+          if (view) {
+            el.locOverlay.classList.remove("show");
+            openCombat(view);
+          }
+          else render();
         });
         row.appendChild(btn);
       }
@@ -1078,15 +1140,23 @@ export function initUI(game, opts = {}) {
       const ratePct = Math.round(rate * 100);
       const stam = Math.max(0, Math.round(num(state.Stamina)));
       const stamCost = game.jobActionStaminaCost(job.key);
-      let hudHtml = `<div class="mg-hud">Action ${round} · Combo ${combo} · Rate ${ratePct}% · Cash +${fmtCash(totalCash)} · XP +${totalXp.toFixed(1)} · Stam ${stam} (−${stamCost}/act) · Fails ${fails}/3</div><button class="btn small-btn mg-quit" id="mgQuit">QUIT</button>`;
-      const existing = el.jobGameArea.querySelector('.mg-hud');
-      if (existing) {
-        existing.outerHTML = hudHtml;
-      } else {
-        el.jobGameArea.insertAdjacentHTML('afterbegin', hudHtml);
+      const hudText = `Action ${round} · Combo ${combo} · Rate ${ratePct}% · Cash +${fmtCash(totalCash)} · XP +${totalXp.toFixed(1)} · Stam ${stam} (−${stamCost}/act) · Fails ${fails}/3`;
+      let hud = el.jobGameArea.querySelector('.mg-hud');
+      if (!hud) {
+        hud = document.createElement("div");
+        hud.className = "mg-hud";
+        el.jobGameArea.prepend(hud);
       }
-      const quitBtn = el.jobGameArea.querySelector('#mgQuit');
-      if (quitBtn) quitBtn.addEventListener('click', finish);
+      hud.textContent = hudText;
+      let quitBtn = el.jobGameArea.querySelector('#mgQuit');
+      if (!quitBtn) {
+        quitBtn = document.createElement("button");
+        quitBtn.className = "btn small-btn mg-quit";
+        quitBtn.id = "mgQuit";
+        quitBtn.textContent = "QUIT";
+        quitBtn.addEventListener("click", finish);
+        el.jobGameArea.appendChild(quitBtn);
+      }
     }
 
     function finish() {
@@ -1718,6 +1788,7 @@ export function initUI(game, opts = {}) {
   }
   if (el.btnTaskAdvanceQuick) {
     el.btnTaskAdvanceQuick.addEventListener("click", () => {
+      if (el.jobsOverlay.classList.contains("show") && el.jobGameArea.style.display !== "none") return;
       game.advanceDay();
       renderTasklistQuick();
       render();
@@ -1725,6 +1796,7 @@ export function initUI(game, opts = {}) {
   }
   if (el.btnTaskPlayQuick) {
     el.btnTaskPlayQuick.addEventListener("click", () => {
+      if (el.jobsOverlay.classList.contains("show") && el.jobGameArea.style.display !== "none") return;
       game.doDay();
       renderTasklistQuick();
       render();
@@ -1732,6 +1804,7 @@ export function initUI(game, opts = {}) {
   }
   if (el.btnTaskAutoQuick) {
     el.btnTaskAutoQuick.addEventListener("click", () => {
+      if (el.jobsOverlay.classList.contains("show") && el.jobGameArea.style.display !== "none") return;
       if (taskAutoInterval) {
         clearInterval(taskAutoInterval);
         taskAutoInterval = null;
@@ -1994,11 +2067,11 @@ export function initUI(game, opts = {}) {
       triggerClass(el.roundLbl, "pop");
     }
     el.modeLbl.textContent = (view.mode || (combatMeta && combatMeta.mode) || "fight").toUpperCase();
-    el.youStyle.textContent = view.playerStyleName || (combatMeta && combatMeta.playerStyleName) || state.ActiveStyle;
+    el.youStyle.textContent = `${view.playerStyleName || (combatMeta && combatMeta.playerStyleName) || state.ActiveStyle} · TP ${Number(view.playerTotalPower || 0).toFixed(2)}`;
     el.youName.textContent = view.playerName || state.Name || "You";
     el.youHitbox.querySelector(".fhb").textContent = String(el.youName.textContent || "Y").charAt(0).toUpperCase();
     el.foeName.textContent = view.foeName || (combatMeta && combatMeta.foeName) || "Rival";
-    el.foeStyle.textContent = view.foeStyleName || (combatMeta && combatMeta.foeStyleName) || "—";
+    el.foeStyle.textContent = `${view.foeStyleName || (combatMeta && combatMeta.foeStyleName) || "—"} · TP ${Number(view.foeTotalPower || 0).toFixed(2)}`;
     el.foeHitbox.querySelector(".fhb").textContent = String(el.foeName.textContent || "R").charAt(0).toUpperCase();
 
     renderCombatHpBar(el.youHpBar, el.youHpTail, el.youHpTxt, view.playerHp, view.playerMaxHp, prevYouHp);
@@ -2114,6 +2187,9 @@ export function initUI(game, opts = {}) {
     // Show escape button only for escapable fights
     const escapable = view.mode === "encounter" || view.mode === "roamer";
     el.btnEscape.style.display = escapable ? "" : "none";
+    el.btnEscape.disabled = !escapable || view.escapeUsed;
+    const escChance = escapable ? Math.max(5, Math.min(95, Math.round((Number(view.playerSpeed || 1) / (Number(view.playerSpeed || 1) + Number(view.foeSpeed || 1))) * 100))) : 0;
+    el.btnEscape.textContent = escapable ? (view.escapeUsed ? "ESCAPE USED" : `ESCAPE ${escChance}%`) : "ESCAPE";
     renderCombat(view);
     maybeAuto();
   }
@@ -2297,6 +2373,9 @@ export function initUI(game, opts = {}) {
       el.combatOverlay.classList.remove("show");
       render();
     } else {
+      activeView.escapeUsed = true;
+      el.btnEscape.disabled = true;
+      el.btnEscape.textContent = "ESCAPE USED";
       renderCombat(activeView);
     }
   });
@@ -2367,6 +2446,10 @@ export function initUI(game, opts = {}) {
   if (el.btnNews) {
     el.btnNews.addEventListener("click", () => {
       el.newsFloater.classList.toggle("show");
+      if (el.newsFloater.classList.contains("show")) {
+        state.NewsSeen = Array.isArray(state.Log) ? state.Log.length : 0;
+        el.btnNews.classList.remove("news-unread");
+      }
     });
   }
   if (el.btnNewsClose) {
@@ -2402,12 +2485,44 @@ export function initUI(game, opts = {}) {
       openSaveOverlay();
     });
   }
+  if (el.btnCodeApply) {
+    el.btnCodeApply.addEventListener("click", () => {
+      const code = String(el.codeInput.value || "").trim().toUpperCase();
+      if (code === "ADMIN") {
+        adminUnlocked = true;
+        el.adminStatus.textContent = "ADMIN enabled.";
+        el.optionsOverlay.classList.remove("show");
+        ["Str","Tou","Spd","Int","Cha"].forEach((id) => { el[`admin${id}`].value = state[id]; });
+        el.adminMoney.value = state.Money;
+        el.adminOverlay.classList.add("show");
+      } else {
+        el.adminStatus.textContent = "Unknown code.";
+      }
+    });
+  }
   el.btnOptionsClose.addEventListener("click", () => el.optionsOverlay.classList.remove("show"));
   el.optionsOverlay.addEventListener("click", (e) => {
     if (e.target === el.optionsOverlay) el.optionsOverlay.classList.remove("show");
   });
   el.btnThemeDark.addEventListener("click", () => applyTheme("dark"));
   el.btnThemeLight.addEventListener("click", () => applyTheme("light"));
+
+  el.btnAdminClose.addEventListener("click", () => el.adminOverlay.classList.remove("show"));
+  el.adminOverlay.addEventListener("click", (e) => { if (e.target === el.adminOverlay) el.adminOverlay.classList.remove("show"); });
+  el.btnAdminStats.addEventListener("click", () => {
+    if (!adminUnlocked) return;
+    ["Str","Tou","Spd","Int","Cha"].forEach((id) => game.adminSetStat(id, el[`admin${id}`].value));
+    game.adminSetMoney(el.adminMoney.value);
+    render();
+  });
+  el.btnAdminItem.addEventListener("click", () => {
+    if (!adminUnlocked) return;
+    game.adminAddItem(el.adminItem.value.trim(), el.adminQty.value);
+    el.adminItem.value = "";
+    render();
+  });
+  el.btnAdminHeal.addEventListener("click", () => { if (adminUnlocked) { game.adminHeal(); render(); } });
+  el.btnAdminUnlock.addEventListener("click", () => { if (adminUnlocked) { game.adminUnlockAll(); render(); } });
 
   // options: name
   el.btnOptNameSave.addEventListener("click", () => {
@@ -2455,6 +2570,10 @@ export function initUI(game, opts = {}) {
   // ------------------------------------------------------------ initial paint --
   applyTheme(currentTheme());
   render();
+  if (el.newsFloater) {
+    el.newsFloater.classList.add("show");
+    state.NewsSeen = Array.isArray(state.Log) ? state.Log.length : 0;
+  }
   syncSoundBtn();
   syncAutoRunBtn();
   el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";

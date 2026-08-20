@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.2;
+export const GAME_VERSION = 2.3;
 export const UPDATE_LOG = [
+  { v: 2.3, text: "v2.3: route timing now uses the full route with instant rerouting and no same-location detours; movement grants more Speed; map fighters open challenger rosters; gym fighter clicks open combat correctly; arena moved to the river's right-middle square; opponent readouts use Total Power (all stats ÷ 30); escape is a one-use Speed-vs-Speed chance; News opens by default and glows on unread entries; Aptitude purchases multiply current Aptitude by 1.5; ADMIN code opens a testing console." },
   { v: 2.2, text: "v2.2: fast map travel (20-30s baseline, ~1s at high Speed), dashed route line + ETA box while traveling, no random fights while walking (use the Searching-for-Trouble toggle), randomized NPC stats by tier (tier 1 low / 2 mid / 3 high), central locations (gym, store, clinic, job board) moved near home, and news is now a floating box in the top-left opened from the NEWS button." },
   { v: 2.1, text: "v2.1: jobs manual play is indefinite (no round cap, stamina cost scales 5→1 by level, ends on 3 fails or quit), stats display 0 but work as 1, slower style mastery, no fight round cap (win by KO or stamina drain), map movement follows streets with reliable arrival, tasks persist on the tab until removed, auto button shows true state, Statistics menu, mobile layout fixes." },
   { v: 2.0, text: "v2: decimal cash, auto-work jobs, City Gym store, tasklist UI, traversable city map, job rework, stat-gain rework, gyms fight-only (training via purchased programs), removed 60s auto-work button, mobile zoom fix." },
@@ -829,7 +830,7 @@ export const MAP_POS = {
   home: [75, 60], gym: [150, 60], spar: [225, 60], wat: [375, 60],
   clinic: [75, 135], cstore: [225, 135], tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
   jobboard: [150, 210], raishin: [225, 390], oldhouse: [375, 390],
-  arena: [375, 60], foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
+  arena: [700, 300], foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
   sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
   kaiwan: [600, 210], silat: [700, 210], hunt: [820, 210], sword: [930, 210],
   xiyi: [600, 360], kyoku: [700, 360], shotokan: [820, 360], taekwon: [930, 360],

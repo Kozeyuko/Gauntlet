@@ -193,13 +193,13 @@ export const PERSISTENT_KEYS = [
   "InFight", "AutoBattle",
   "AutoJobKey",
   "StoreBuffs", "TempBoosts",
-  "Log", "Roamers", "Name",
+  "Log", "Roamers", "Name", "NewsSeen",
   "Inventory", "TaskList", "TaskRepeat", "TaskIndex",
   "SeenVersion",
   "TrainTiers", "TrainProgress",
   "PurchasedTraining",
   "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
-  "LocationFights", "UnlockedTiers",
+  "LocationFights", "LocationFighterCache", "RoamerChallengerCache", "RoamerSeenAt", "RoamerZones", "UnlockedTiers",
   "PlayerX", "PlayerY", "MovingTo", "MoveProgress", "RunCooldown",
 ];
 
@@ -216,6 +216,7 @@ export function freshState() {
     StyleKnowledge: "", KnownSkills: "", Build: "",
     JobXp: "", JobLevel: "", JobCooldowns: {},
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
+    NewsSeen: 0,
     AutoRun: false,
     AutoJobKey: "",
     Roamers: {},
@@ -234,6 +235,10 @@ export function freshState() {
     OwnedEquipment: [],
     OwnedItems: [],
     LocationFights: {},
+    LocationFighterCache: {},
+    RoamerChallengerCache: {},
+    RoamerSeenAt: {},
+    RoamerZones: {},
     UnlockedTiers: {},
     PlayerX: MAP_POS.home[0],
     PlayerY: MAP_POS.home[1],
@@ -244,6 +249,7 @@ export function freshState() {
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
     routePath: null, routeIndex: 0, moveSegmentStartX: 0, moveSegmentStartY: 0,
+    routeTotalDistance: 0, routeRemainingDistance: 0,
   };
   const starter = STYLES.Brawling;
   st.StyleSkills = starter.skills.map((s) => s.name).join(",");
@@ -731,6 +737,20 @@ export function createGame(state, opts = {}) {
     }
   }
 
+  function buyAptitude(id) {
+    const attr = ATTRIBUTES.find((a) => a.id === id);
+    if (!attr) return false;
+    const cost = 25;
+    if (num(state.Money) < cost) {
+      logMsg(`Not enough Cash. Aptitude purchase costs ${cost}.`);
+      return false;
+    }
+    state.Money = num(state.Money) - cost;
+    state[id + "Ap"] = attrApt(id) * 1.5;
+    logMsg(`${attr.name} Aptitude increased to ×${state[id + "Ap"].toFixed(2)}.`);
+    return true;
+  }
+
   // ---- base64 helpers ----
   function b64encode(str) {
     if (typeof btoa !== "undefined") return btoa(unescape(encodeURIComponent(str)));
@@ -871,6 +891,8 @@ export function createGame(state, opts = {}) {
     const stam = COMBAT_STAM_BASE + stats.Tou;
     const drain = 6 * (1 + stats.Str / STR_DRAIN_DIV) * Math.pow(0.75, stats.Tou / TOU_EFF_DIV);
     return {
+      rawStats: { ...stats },
+      totalPower: (num(stats.Str) + num(stats.Tou) + num(stats.Spd) + num(stats.Int) + num(stats.Cha)) / 30,
       hp, maxHp: hp, dmg, crit, dodge, spd: stats.Spd, stam, maxStam: stam, drain, int: stats.Int,
       skills, skillName: null, ultCharge: 0, modeRounds: 0,
       ultMult: style.ult && style.ult.mult ? style.ult.mult : 1.35,
@@ -1395,14 +1417,49 @@ export function createGame(state, opts = {}) {
     return { result, mode: "roamer" };
   }
 
-  function beginRoamerFight(key, step = 1) {
+  function noteRoamerSeen(key) {
+    if (!state.RoamerSeenAt) state.RoamerSeenAt = {};
+    state.RoamerSeenAt[key] = Date.now();
+  }
+  function refreshRoamerRespawns() {
+    if (!state.RoamerSeenAt) state.RoamerSeenAt = {};
+    if (!state.RoamerZones) state.RoamerZones = {};
+    const zones = ROAMERS.map((r) => r.zone);
+    for (const r of ROAMERS) {
+      const seen = Number(state.RoamerSeenAt[r.key] || 0);
+      if (!seen || Date.now() - seen < 5 * 60 * 1000) continue;
+      const choices = zones.filter((z) => z !== (state.RoamerZones[r.key] || r.zone));
+      state.RoamerZones[r.key] = choices[Math.floor(R() * choices.length)] || r.zone;
+      delete state.RoamerSeenAt[r.key];
+      delete state.RoamerChallengerCache?.[r.key];
+      logMsg(`${r.name} moved to a new part of the city.`);
+    }
+  }
+
+  function roamerChallengers(key) {
+    const roamer = getRoamer(key);
+    if (!roamer) return [];
+    if (!state.RoamerChallengerCache) state.RoamerChallengerCache = {};
+    if (!Array.isArray(state.RoamerChallengerCache[key])) {
+      const count = 3 + Math.floor(R() * 3);
+      state.RoamerChallengerCache[key] = [];
+      for (let i = 1; i <= count; i++) {
+        const built = buildChainedRoamer(roamer, i);
+        state.RoamerChallengerCache[key].push({ ...built, challengerIndex: i - 1, name: `${roamer.name} Challenger ${i}` });
+      }
+    }
+    return state.RoamerChallengerCache[key];
+  }
+
+  function beginRoamerFight(key, step = 1, challengerIndex = 0) {
     if (num(state.Health) <= 0) return null;
     if (battle) return null;
     if (typeof key !== "string") return null;
     const roamer = getRoamer(key);
     if (!roamer) return null;
     if (roamerStatus(key) !== "ready") return null;
-    const built = buildChainedRoamer(roamer, step);
+    const challengers = roamerChallengers(key);
+    const built = challengers[Math.max(0, Math.min(challengers.length - 1, Number(challengerIndex) || 0))] || buildChainedRoamer(roamer, step);
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(built.stats, built.style);
     battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0, foeStats: built.stats };
@@ -1502,6 +1559,11 @@ export function createGame(state, opts = {}) {
   function combatantToView(me, foe) {
     return {
       playerName: String(state.Name || "You"),
+      playerTotalPower: Number(me.totalPower || 0),
+      foeTotalPower: Number(foe.totalPower || 0),
+      playerSpeed: Number(me.spd || 0),
+      foeSpeed: Number(foe.spd || 0),
+      escapeUsed: !!(battle && battle.escapeUsed),
       playerHp: Math.max(0, Math.floor(me.hp)),
       playerMaxHp: Math.floor(me.maxHp),
       playerStam: Math.max(0, Math.floor(me.stam)),
@@ -1712,6 +1774,14 @@ export function createGame(state, opts = {}) {
     }
     const target = MAP_POS[locKey];
     if (!target) return false;
+    if (!state.MovingTo && state.Location === locKey) {
+      state.PlayerX = target[0];
+      state.PlayerY = target[1];
+      state.routePath = null;
+      state.routeRemainingDistance = 0;
+      logMsg(`You are already at ${loc.name}.`);
+      return false;
+    }
     state.MovingTo = locKey;
     state.MoveProgress = 0;
     const sx = num(state.PlayerX), sy = num(state.PlayerY);
@@ -1721,6 +1791,11 @@ export function createGame(state, opts = {}) {
     state.routeIndex = 0;
     state.moveSegmentStartX = sx;
     state.moveSegmentStartY = sy;
+    state.routeTotalDistance = 0;
+    for (let i = 0; i < state.routePath.length - 1; i++) {
+      state.routeTotalDistance += Math.hypot(state.routePath[i + 1][0] - state.routePath[i][0], state.routePath[i + 1][1] - state.routePath[i][1]);
+    }
+    state.routeRemainingDistance = state.routeTotalDistance;
     return true;
   }
 
@@ -1757,8 +1832,11 @@ export function createGame(state, opts = {}) {
     const spd = attrValue("Spd");
     const travelTime = segLen / (MOVE_BASE_SPEED * (1 + spd * 0.12));
     const step = dt / Math.max(0.01, travelTime);
+    const movedDistance = Math.min(segLen, Math.max(0, segLen * step));
     state.MoveProgress = num(state.MoveProgress) + step;
-    state.Spd = num(state.Spd) + 0.002 * attrApt("Spd");
+    state.routeRemainingDistance = Math.max(0, num(state.routeRemainingDistance) - movedDistance);
+    // Movement is an actual progression source: Speed grows visibly while traveling.
+    state.Spd = num(state.Spd) + 0.02 * attrApt("Spd");
     // Encounter ONLY if "searching for trouble" is ON; otherwise walking is safe.
     if (state.Looking === true && R() < MOVE_ENC_CHANCE && !state.InFight) {
       state.Encounter = 1;
@@ -1788,6 +1866,9 @@ export function createGame(state, opts = {}) {
     state.Location = locKey;
     state.MovingTo = null;
     state.MoveProgress = 0;
+    state.routePath = null;
+    state.routeIndex = 0;
+    state.routeRemainingDistance = 0;
     const target = MAP_POS[locKey];
     if (target) {
       state.PlayerX = target[0];
@@ -1802,19 +1883,25 @@ export function createGame(state, opts = {}) {
     const mode = battle.mode;
     if (mode !== "encounter" && mode !== "roamer") {
       logMsg("Can't escape from this fight!");
-      return { escaped: false };
+      return { escaped: false, chance: 0, used: false };
     }
-    const spd = attrValue("Spd");
-    const escapeChance = Math.min(0.85, 0.5 + spd * 0.005);
+    if (battle.escapeUsed) {
+      logMsg("You've already tried to escape this battle.");
+      return { escaped: false, chance: 0, used: true };
+    }
+    battle.escapeUsed = true;
+    const playerSpd = Math.max(1, Number(battle.me.spd) || 1);
+    const foeSpd = Math.max(1, Number(battle.foe.spd) || 1);
+    const escapeChance = Math.max(0.05, Math.min(0.95, playerSpd / (playerSpd + foeSpd)));
     if (R() < escapeChance) {
       state.Cha = num(state.Cha) + 0.03 * attrApt("Cha");
       battle = null;
       state.InFight = false;
       logMsg("You escaped!", "fight");
-      return { escaped: true };
+      return { escaped: true, chance: escapeChance, used: true };
     }
-    logMsg("Couldn't escape!", "fight");
-    return { escaped: false };
+    logMsg(`Couldn't escape! (${Math.round(escapeChance * 100)}% chance)`, "fight");
+    return { escaped: false, chance: escapeChance, used: true };
   }
 
   function setLooking(on) {
@@ -1839,6 +1926,26 @@ export function createGame(state, opts = {}) {
       logMsg(`You adopt ${st.name}${bonusText}. Ultimate: ${st.ult && st.ult.name ? st.ult.name : "Berserk"}.`);
     }
   }
+
+  function adminSetStat(id, value) {
+    if (!(ATTRIBUTES || []).some((a) => a.id === id)) return false;
+    state[id] = Math.max(0, Number(value) || 0);
+    clampVitals();
+    updatePotential();
+    return true;
+  }
+  function adminAddItem(key, qty = 1) {
+    if (!key) return false;
+    if (!Array.isArray(state.Inventory)) state.Inventory = [];
+    const n = Math.max(1, Math.floor(Number(qty) || 1));
+    const item = state.Inventory.find((x) => x.key === key);
+    if (item) item.qty = Number(item.qty || 0) + n;
+    else state.Inventory.push({ key: String(key), qty: n });
+    return true;
+  }
+  function adminSetMoney(value) { state.Money = Math.max(0, Number(value) || 0); return true; }
+  function adminHeal() { state.Health = maxHealth(); state.Stamina = maxStamina(); state.Nutrition = maxNutrition(); return true; }
+  function adminUnlockAll() { state.RivalIdx = MAX_TOTAL; for (const k of Object.keys(LOCATIONS)) state.LocationFights[k] = [1,2,3,4,5]; return true; }
 
   // ---- store ----
   function hasBuff(name) {
@@ -2432,7 +2539,11 @@ export function createGame(state, opts = {}) {
   function locationFightList(locKey) {
     const loc = LOCATIONS[locKey];
     if (!loc) return [];
-    const rivals = locationRivals(locKey);
+    if (!state.LocationFighterCache) state.LocationFighterCache = {};
+    if (!Array.isArray(state.LocationFighterCache[locKey])) {
+      state.LocationFighterCache[locKey] = locationRivals(locKey);
+    }
+    const rivals = state.LocationFighterCache[locKey];
     const beaten = state.LocationFights?.[locKey] || [];
     return rivals.map((r) => ({
       ...r,
@@ -2445,7 +2556,7 @@ export function createGame(state, opts = {}) {
     if (num(state.Health) <= 0) return null;
     if (battle) return null;
     if (!canFightLocation(locKey, n)) return null;
-    const rivals = locationRivals(locKey);
+    const rivals = locationFightList(locKey);
     const foe = rivals[n - 1];
     if (!foe) return null;
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
@@ -2480,7 +2591,7 @@ export function createGame(state, opts = {}) {
     maxHealth, maxStamina, maxNutrition, clampVitals,
     // actions
     setActivity, setLocation, setLooking, setStyle, reincarnate, rebirthCost,
-    setName, hardReset,
+    setName, hardReset, buyAptitude, adminSetStat, adminAddItem, adminSetMoney, adminHeal, adminUnlockAll,
     setAutoBattle, buyItem, useItem, autoEatFood, inventory, cookItem,
     trainingAt, setTaskList, addTask, removeTask,
     trainTier, trainTierName, trainTierProgress,
@@ -2498,7 +2609,7 @@ export function createGame(state, opts = {}) {
     // ghosts
     listGhosts, fightGhost,
     // roamers
-    spawnRoamers, roamerStatus, roamerRemaining, fightRoamer, beginRoamerFight,
+    spawnRoamers, roamerStatus, roamerRemaining, noteRoamerSeen, refreshRoamerRespawns, roamerChallengers, fightRoamer, beginRoamerFight,
     // day
     doDay, advanceDay, advanceNDays,
     // gym training

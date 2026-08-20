@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.2">
+<link rel="stylesheet" href="css/style.css?v=2.3">
 </head>
 <body>
 
@@ -352,15 +352,42 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.2</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.3</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
       <button class="btn small-btn" id="btnOptSaveLoad">EXPORT / IMPORT</button>
     </div>
+    <div class="optrow">
+      <span>Codes</span>
+      <div class="optgroup">
+        <input type="text" id="codeInput" placeholder="Enter code">
+        <button class="btn small-btn" id="btnCodeApply">Apply</button>
+      </div>
+    </div>
+    <div class="optrow" id="adminStatus"></div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ ADMIN TEST CONSOLE ============ -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal">
+    <h2>Admin Console</h2>
+    <div class="sub">Testing tools only. Changes affect this save.</div>
+    <div class="admin-grid">
+      <label>Strength <input id="adminStr" type="number" step="0.1"></label>
+      <label>Toughness <input id="adminTou" type="number" step="0.1"></label>
+      <label>Speed <input id="adminSpd" type="number" step="0.1"></label>
+      <label>Intelligence <input id="adminInt" type="number" step="0.1"></label>
+      <label>Charisma <input id="adminCha" type="number" step="0.1"></label>
+      <label>Cash <input id="adminMoney" type="number" step="0.01"></label>
+    </div>
+    <div class="optgroup"><input id="adminItem" placeholder="item key"><input id="adminQty" type="number" value="1" min="1"><button class="btn small-btn" id="btnAdminItem">ADD ITEM</button></div>
+    <div class="btnrow"><button class="btn" id="btnAdminStats">APPLY STATS/CASH</button><button class="btn" id="btnAdminHeal">HEAL + REFILL</button><button class="btn" id="btnAdminUnlock">UNLOCK ALL</button></div>
+    <div class="acts"><button class="btn" id="btnAdminClose">Close</button></div>
   </div>
 </div>
 
@@ -461,6 +488,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.2"></script>
+<script type="module" src="js/main.js?v=2.3"></script>
 </body>
 </html>

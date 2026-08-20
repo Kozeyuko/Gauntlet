@@ -1191,4 +1191,10 @@ header {
 .news-floater.show { display: block; }
 .news-floater-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .news-floater-head h3 { margin: 0; color: var(--gold); font-size: 15px; }
+.btn.news-unread { animation: news-pulse 1.2s ease-in-out infinite; border-color: var(--gold); box-shadow: 0 0 10px rgba(228, 190, 92, .65); }
+.tiny-btn { padding: 2px 5px; font-size: 10px; margin-left: 4px; }
+.admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+.admin-grid label { display: grid; gap: 3px; color: var(--muted); font-size: 12px; }
+.admin-grid input { width: 100%; box-sizing: border-box; }
+@keyframes news-pulse { 0%,100% { box-shadow: 0 0 4px rgba(228,190,92,.35); } 50% { box-shadow: 0 0 14px rgba(228,190,92,.9); } }
 
