@@ -1199,7 +1199,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.0, "GAME_VERSION === 2.0");
+  assert(GAME_VERSION === 2.1, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1230,7 +1230,7 @@ console.log("== Part A: shouldShowUpdateLog uses versionCompare ==");
 console.log("== Part A: shouldShowUpdateLog false when current ==");
 {
   const state = freshState();
-  state.SeenVersion = 2.0;
+  state.SeenVersion = GAME_VERSION;
   const g = createGame(state, { rng: makeRng(1) });
   assert(g.shouldShowUpdateLog() === false, "should not show when seenVersion=2.0");
 }
