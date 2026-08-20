@@ -46,7 +46,7 @@ function persist() {
   } catch (e) { /* ignore */ }
 }
 
-// Welcome message mirrors BitCore onJoin, then refresh rank display.
+// Welcome message, then refresh rank display.
 game.logMsg(cameBack ? "Welcome back. Your training continues." : "You leave home at 18. Train, fight, and learn.");
 game.updatePotential();
 
