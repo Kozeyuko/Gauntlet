@@ -23,7 +23,7 @@ export const ENC_CHANCE = 0.3;
 export const ENC_MIN = 0.8;
 export const ENC_MAX = 1.1;
 export const HOME_MULT = 0.5;
-export const STYLEXP_TRAIN = 2;
+export const STYLEXP_TRAIN = 0.2;
 export const STYLEXP_LOSS = 2;
 export const MASTERY_TIERS = [25, 75, 150];
 
@@ -95,7 +95,7 @@ export function jobPay(job, level) {
   return Math.round(job.basePay * (1 + 0.18 * (level - 1)));
 }
 export function jobStaminaCost(job, level) {
-  return 5;
+  return Math.max(1, 5 - Math.floor(level / 4));
 }
 export const JOB_BASE_RATE = 0.25;
 export const JOB_MAX_RATE = 1.0;

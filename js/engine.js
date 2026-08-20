@@ -315,7 +315,7 @@ export function createGame(state, opts = {}) {
   }
 
   // ---- attribute helpers ----
-  const attrValue = (id) => Math.max(0, num(state[id]) + num(state.TempBoosts && state.TempBoosts[id]));
+  const attrValue = (id) => Math.max(1, num(state[id]) + num(state.TempBoosts && state.TempBoosts[id]));
   const attrApt = (id) => Math.max(1, num(state[id + "Ap"]));
   function num(v) {
     const n = Number(v);
@@ -448,7 +448,7 @@ export function createGame(state, opts = {}) {
   function onPlayerHit(styleId, skill, dmg) {
     if (!styleId) return 0;
     if (skill && skill.name) learnSkill(styleId, skill.name);
-    const gain = Math.min(30, 2 + dmg * 0.5);
+    const gain = 0.01 + R() * 0.19;
     addKnowledge(styleId, gain);
     return gain;
   }
@@ -457,7 +457,7 @@ export function createGame(state, opts = {}) {
   function selfTrainTick(styleId) {
     const k = styleKnowledge(styleId);
     if (k >= KNOWLEDGE_UNMASTERED && k < KNOWLEDGE_LEARNED) {
-      addKnowledge(styleId, 4 * SELF_TRAIN_MULT); // 6% per round
+      addKnowledge(styleId, 0.1 + R() * 0.2);
     }
   }
 
@@ -538,6 +538,12 @@ export function createGame(state, opts = {}) {
     if (!job) return { success: false };
     const level = jobLevel(jobKey);
     const rate = jobActionRate(combo);
+    const staminaCost = jobStaminaCost(job, level);
+    if (num(state.Stamina) < staminaCost) {
+      logMsg("Too tired to keep working.", "job");
+      return { success: false, staminaDepleted: true };
+    }
+    state.Stamina = num(state.Stamina) - staminaCost;
     let pay = 0;
     let xp = 0;
     if (success) {
@@ -551,7 +557,13 @@ export function createGame(state, opts = {}) {
     }
     updatePotential();
     const newLevel = jobLevel(jobKey);
-    return { success, pay, xp, combo, rate, level: newLevel };
+    return { success, pay, xp, combo, rate, level: newLevel, staminaCost };
+  }
+
+  function jobActionStaminaCost(jobKey) {
+    const job = JOBS.find((j) => j.key === jobKey);
+    if (!job) return 5;
+    return jobStaminaCost(job, jobLevel(jobKey));
   }
 
   function doAutoJob(jobKey) {
@@ -883,13 +895,13 @@ export function createGame(state, opts = {}) {
     const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
     const foe = makeCombatant(foeStats, foeStyle);
     let round = 0;
-    const MAX_ROUNDS = 15;
+    const MAX_ROUNDS = 10000;
     const events = [];
     let attacksLanded = 0;
     let dodges = 0;
     let dmgDealt = 0;
     let dmgTaken = 0;
-    while (round < MAX_ROUNDS && me.hp > 0 && foe.hp > 0) {
+    while (me.hp > 0 && foe.hp > 0 && me.stam > 0 && foe.stam > 0 && round < MAX_ROUNDS) {
       round += 1;
       me.stam -= me.drain;
       foe.stam -= foe.drain;
@@ -933,7 +945,8 @@ export function createGame(state, opts = {}) {
       selfTrainTick(activeStyle());
       stampEvents(events, roundStart, round, me, foe);
     }
-    return { win: me.hp > 0 && foe.hp <= 0, rounds: round, playerHpLeft: me.hp, playerSkill: me.skillName, foeSkill: foe.skillName, events, attacksLanded, dodges, dmgDealt, dmgTaken, foeStats };
+    const win = (me.hp > 0 && foe.hp <= 0) || (me.hp > 0 && foe.stam <= 0 && me.stam > 0);
+    return { win, rounds: round, playerHpLeft: Math.max(0, me.hp), playerSkill: me.skillName, foeSkill: foe.skillName, events, attacksLanded, dodges, dmgDealt, dmgTaken, foeStats };
   }
 
   function meHpLost(result) {
@@ -1023,7 +1036,7 @@ export function createGame(state, opts = {}) {
         state.Wins = num(state.Wins) + 1;
         const learned = styleKnowledge(extra.style) >= KNOWLEDGE_LEARNED;
         if (idx < MAX_RIVAL) state.RivalIdx = idx + 1;
-        addStyleXp(activeStyle(), 6 + idx * 2);
+        addStyleXp(activeStyle(), 0.5 + idx * 0.2);
         applyFightGains(true, result.foeStats, result);
         captureGhost();
         if (learned) {
@@ -1036,7 +1049,7 @@ export function createGame(state, opts = {}) {
       } else if (mode === "inside") {
         state.Money = num(state.Money) + extra.pay;
         state.Wins = num(state.Wins) + 1;
-        addStyleXp(activeStyle(), 20 + (idx - MAX_RIVAL) * 8);
+        addStyleXp(activeStyle(), 1.5 + (idx - MAX_RIVAL) * 0.5);
         applyFightGains(true, result.foeStats, result);
         if (idx < MAX_TOTAL) {
           state.RivalIdx = idx + 1;
@@ -1048,20 +1061,20 @@ export function createGame(state, opts = {}) {
         const moneyGain = 10 + Math.floor((extra.potential || pot) / 50);
         state.Money = num(state.Money) + moneyGain;
         state.Wins = num(state.Wins) + 1;
-        addStyleXp(activeStyle(), 4 + Math.floor((extra.potential || 0) / 100));
+        addStyleXp(activeStyle(), 0.5 + Math.floor((extra.potential || 0) / 500));
         applyFightGains(true, result.foeStats, result);
         logMsg(`You defeated the ghost of ${extra.name || "a fighter"} in ${result.rounds} rounds. +${moneyGain} Cash. Their record is yours to claim.`, "fight");
       } else if (mode === "roamer") {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
-        addStyleXp(activeStyle(), num(extra.styleXp) || 4);
+        addStyleXp(activeStyle(), num(extra.styleXp) || 0.5);
         applyFightGains(true, result.foeStats, result);
         logMsg(`You won Bout ${extra.chainStep || 1} of ${extra.name}. +${reward} Cash.`, "fight");
       } else if (mode === "location") {
         const reward = num(extra.rewardMoney);
         state.Money = num(state.Money) + reward;
         state.Wins = num(state.Wins) + 1;
-        addStyleXp(activeStyle(), 6 + (extra.n || 1) * 2);
+        addStyleXp(activeStyle(), 0.5 + (extra.n || 1) * 0.2);
         applyFightGains(true, result.foeStats, result);
         const locKey = extra.locKey;
         if (locKey && !state.LocationFights) state.LocationFights = {};
@@ -1085,12 +1098,12 @@ export function createGame(state, opts = {}) {
       } else if (mode === "tourney") {
         const reward = num(extra.reward);
         state.Money = num(state.Money) + reward;
-        addStyleXp(activeStyle(), 10);
+        addStyleXp(activeStyle(), 1.0);
         applyFightGains(true, result.foeStats, result);
         logMsg(`TOURNAMENT ROUND ${extra.round} VICTORY! +${reward} Cash.`, "fight");
       } else if (mode === "gu") {
         const wave = extra.wave || 1;
-        addStyleXp(activeStyle(), 15);
+        addStyleXp(activeStyle(), 1.5);
         applyFightGains(true, result.foeStats, result);
         if (wave >= 5) {
           state.Money = num(state.Money) + 500;
@@ -1103,7 +1116,7 @@ export function createGame(state, opts = {}) {
       } else { // encounter
         const moneyGain = 5 + Math.floor(pot / 20);
         state.Money = num(state.Money) + moneyGain;
-        addStyleXp(activeStyle(), 3 + Math.floor(pot / 50));
+        addStyleXp(activeStyle(), 0.3 + Math.floor(pot / 500));
         applyFightGains(true, result.foeStats, result);
         logMsg(`You beat the challenger in ${result.rounds} rounds. The crowd nods. +${moneyGain} Cash.`, "fight");
       }
@@ -1619,13 +1632,13 @@ export function createGame(state, opts = {}) {
 
     selfTrainTick(activeStyle());
 
-    const MAX_COMBAT_ROUNDS = 15;
+    const MAX_COMBAT_ROUNDS = 10000;
     const roundNum = battle.round;
     stampEvents(events, 0, roundNum, me, foe);
-    const finished = me.hp <= 0 || foe.hp <= 0 || roundNum >= MAX_COMBAT_ROUNDS;
+    const finished = me.hp <= 0 || foe.hp <= 0 || me.stam <= 0 || foe.stam <= 0 || roundNum >= MAX_COMBAT_ROUNDS;
     if (finished) {
       if (me.hp <= 0 && foe.hp <= 0) me.hp = 0;
-      const won = me.hp > foe.hp;
+      const won = (me.hp > 0 && foe.hp <= 0) || (me.hp > 0 && foe.stam <= 0 && me.stam > 0);
       const result = {
         win: won, rounds: roundNum, playerHpLeft: Math.max(0, me.hp),
         playerSkill: chosen.name, foeSkill: foeSkill.name,
@@ -2435,7 +2448,7 @@ export function createGame(state, opts = {}) {
     beginMove, moveStep, arriveAt, tryEscape,
     // jobs
     jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, jobCanWork,
-    setAutoJob, clearAutoJob, autoJobActive,
+    setAutoJob, clearAutoJob, autoJobActive, jobActionStaminaCost,
     // arena modes
     beginTourneyFight, beginGuFight,
     // combat

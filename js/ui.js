@@ -1007,10 +1007,10 @@ export function initUI(game, opts = {}) {
     const lvl = game.jobLevel(job.key);
     let round = 0;
     let combo = 0;
+    let fails = 0;
     let totalCash = 0;
     let totalXp = 0;
     const cfg = job.minigameConfig;
-    const totalRounds = cfg.rounds || 5;
 
     game.doJobShift(job.key, 0);
 
@@ -1022,13 +1022,16 @@ export function initUI(game, opts = {}) {
       const rate = jobActionRate(combo);
       const ratePct = Math.round(rate * 100);
       const stam = Math.max(0, Math.round(num(state.Stamina)));
-      let hudHtml = `<div class="mg-hud">Round ${round}/${totalRounds} · Combo ${combo} · Rate ${ratePct}% · Cash +${fmtCash(totalCash)} · XP +${totalXp.toFixed(1)} · Stamina ${stam}</div>`;
+      const stamCost = game.jobActionStaminaCost(job.key);
+      let hudHtml = `<div class="mg-hud">Action ${round} · Combo ${combo} · Rate ${ratePct}% · Cash +${fmtCash(totalCash)} · XP +${totalXp.toFixed(1)} · Stam ${stam} (−${stamCost}/act) · Fails ${fails}/3</div><button class="btn small-btn mg-quit" id="mgQuit">QUIT</button>`;
       const existing = el.jobGameArea.querySelector('.mg-hud');
       if (existing) {
         existing.outerHTML = hudHtml;
       } else {
         el.jobGameArea.insertAdjacentHTML('afterbegin', hudHtml);
       }
+      const quitBtn = el.jobGameArea.querySelector('#mgQuit');
+      if (quitBtn) quitBtn.addEventListener('click', finish);
     }
 
     function finish() {
@@ -1038,20 +1041,24 @@ export function initUI(game, opts = {}) {
       render();
     }
 
+    function checkEnd() {
+      if (fails >= 3) { finish(); return true; }
+      if (!game.jobCanWork(job.key)) { finish(); return true; }
+      return false;
+    }
+
     function nextRound() {
       cleanup();
-      if (round >= totalRounds) {
-        finish();
-        return;
-      }
+      if (checkEnd()) return;
       round += 1;
 
       function onResult(success) {
-        if (success) combo += 1;
-        else combo = 0;
+        if (success) { combo += 1; fails = 0; }
+        else { combo = 0; fails += 1; }
         const res = game.doJobAction(job.key, combo, success);
         totalCash += res.pay;
         totalXp += res.xp;
+        if (res.staminaDepleted || fails >= 3) { finish(); return; }
         updateHud(success);
         minigameTimer = setTimeout(nextRound, 400);
       }
@@ -1059,7 +1066,7 @@ export function initUI(game, opts = {}) {
       if (job.minigame === "matchtap") {
         const targetDoor = Math.floor(Math.random() * 3) + 1;
         el.jobGameArea.innerHTML = `
-          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-header">${job.name} · Action ${round}</div>
           <div class="mg-prompt">Deliver to Door <b class="gold">#${targetDoor}</b>!</div>
           <div class="mg-grid doors">
             <button class="mg-target" data-door="1">#1</button>
@@ -1091,7 +1098,7 @@ export function initUI(game, opts = {}) {
       } else if (job.minigame === "whack") {
         const targetPos = Math.floor(Math.random() * 6);
         el.jobGameArea.innerHTML = `
-          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-header">${job.name} · Action ${round}</div>
           <div class="mg-prompt">Quick! Tap the dirty dish!</div>
           <div class="mg-grid whack">
             ${[0, 1, 2, 3, 4, 5].map((i) => `<button class="mg-target ${i === targetPos ? "active-dish" : ""}" data-pos="${i}">${i === targetPos ? "🍽️" : ""}</button>`).join("")}
@@ -1122,7 +1129,7 @@ export function initUI(game, opts = {}) {
         const items = ["A", "B", "C", "D"];
         const target = items[Math.floor(Math.random() * items.length)];
         el.jobGameArea.innerHTML = `
-          <div class="mg-header">${job.name} · Round ${round}/${totalRounds}</div>
+          <div class="mg-header">${job.name} · Action ${round}</div>
           <div class="mg-prompt">Sort Box <b class="gold">[${target}]</b> into Bin:</div>
           <div class="mg-grid bins">
             ${items.map((it) => `<button class="mg-target" data-it="${it}">Bin ${it}</button>`).join("")}
