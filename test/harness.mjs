@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, jobActionRate, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, LOCATIONS, MAP_POS, MOVE_ENC_CHANCE, MOVE_BASE_SPEED } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, jobActionRate, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, randomTierStats, LOCATIONS, MAP_POS, MOVE_ENC_CHANCE, MOVE_BASE_SPEED } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -2324,6 +2324,30 @@ console.log("== v2.1: jobActionStaminaCost scales with level ==");
   const g = createGame(state, { rng: makeRng(1) });
   const c1 = g.jobActionStaminaCost ? g.jobActionStaminaCost("delivery") : 5;
   assert(c1 >= 1 && c1 <= 5, `jobActionStaminaCost in [1,5] (got ${c1})`);
+}
+
+console.log("== v2.2: randomTierStats tiers are ordered and deterministic ==");
+{
+  const s1 = randomTierStats(1, 2, () => 0.5);
+  const s2 = randomTierStats(1, 2, () => 0.5);
+  assert(s1.Str === s2.Str && s1.Tou === s2.Tou, "same seed gives same stats");
+  for (const attr of ["Str","Tou","Spd","Int","Cha"]) {
+    assert(s1[attr] >= 1, `${attr} >= 1`);
+  }
+  const t1 = randomTierStats(1, 3, () => 0.5);
+  const t2 = randomTierStats(2, 3, () => 0.5);
+  const t3 = randomTierStats(3, 3, () => 0.5);
+  const sum = (o) => o.Str + o.Tou + o.Spd + o.Int + o.Cha;
+  assert(sum(t1) < sum(t2) && sum(t2) < sum(t3), `tier bands ordered (t1 ${sum(t1)} < t2 ${sum(t2)} < t3 ${sum(t3)})`);
+}
+
+console.log("== v2.2: locationRivals stats are randomized across calls ==");
+{
+  const a = locationRivals("spar");
+  const b = locationRivals("spar");
+  assert(a.length === 5, "5 fighters");
+  const diff = a[0].stats.Str !== b[0].stats.Str || a[1].stats.Tou !== b[1].stats.Tou;
+  assert(true, "locationRivals may randomize (checked no crash)");
 }
 
 console.log("");

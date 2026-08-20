@@ -594,6 +594,30 @@ export const LOC_RIVAL_TIERS = {
   4: { mult: 4.0, base: 18 },
 };
 
+// Randomized stat bands per tier (tier 1 = lower class, 2 = middle, 3 = highest).
+export const TIER_BASE = {
+  1: { Str: 6, Tou: 5, Spd: 5, Int: 3, Cha: 1 },
+  2: { Str: 22, Tou: 18, Spd: 20, Int: 13, Cha: 6 },
+  3: { Str: 55, Tou: 46, Spd: 50, Int: 35, Cha: 16 },
+};
+export const TIER_SPREAD = { 1: 0.4, 2: 0.35, 3: 0.3 };
+
+// Equation: stats randomize within a tier band, scaled by tier mult and slot.
+export function randomTierStats(tier, slot, rng) {
+  const t = tier >= 4 ? 3 : tier;
+  const base = TIER_BASE[t] || TIER_BASE[1];
+  const spread = TIER_SPREAD[t] || TIER_SPREAD[1];
+  const r = rng || Math.random;
+  const cfg = LOC_RIVAL_TIERS[t] || LOC_RIVAL_TIERS[1];
+  const esc = 0.7 + (slot || 1) * 0.18;
+  const stats = {};
+  for (const attr of ["Str", "Tou", "Spd", "Int", "Cha"]) {
+    const roll = 1 + (r() * 2 - 1) * spread;
+    stats[attr] = Math.max(1, Math.floor(base[attr] * cfg.mult * esc * roll));
+  }
+  return stats;
+}
+
 export function locationRivals(locKey) {
   const loc = LOCATIONS[locKey];
   if (!loc || !loc.styleGym) return [];
@@ -603,10 +627,7 @@ export function locationRivals(locKey) {
   const fighters = [];
   for (let k = 1; k <= 5; k++) {
     const esc = 0.7 + k * 0.18;
-    const stats = {};
-    for (const attr of ["Str", "Tou", "Spd", "Int", "Cha"]) {
-      stats[attr] = Math.max(1, Math.floor(baseRival.stats[attr] * cfg.mult * esc));
-    }
+    const stats = randomTierStats(tier, k);
     const rewardMoney = Math.max(1, Math.round(baseRival.rewardMoney * cfg.mult * (0.8 + k * 0.1)));
     const rewardXp = Math.max(1, Math.round(baseRival.rewardXp * cfg.mult * (0.8 + k * 0.1)));
     fighters.push({
