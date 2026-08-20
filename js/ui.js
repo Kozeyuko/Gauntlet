@@ -30,6 +30,7 @@ import {
   MAIN_GYM,
   EQUIPMENT,
   MAP_POS,
+  STATUS_EFFECT_INFO,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -220,6 +221,9 @@ export function initUI(game, opts = {}) {
     updateOverlay: $("updateOverlay"), btnUpdateLog: $("btnUpdateLog"),
     btnUpdateClose: $("btnUpdateClose"), updateList: $("updateList"),
     updateHeader: $("updateHeader"),
+    // statistics
+    btnStats: $("btnStats"), statsOverlay: $("statsOverlay"),
+    statsBody: $("statsBody"), btnStatsClose: $("btnStatsClose"),
     // tasklist quick
     taskQueueQuick: $("taskQueueQuick"),
     btnTaskRepeatQuick: $("btnTaskRepeatQuick"), btnTaskAdvanceQuick: $("btnTaskAdvanceQuick"),
@@ -1759,6 +1763,71 @@ export function initUI(game, opts = {}) {
   el.btnUpdateClose.addEventListener("click", () => el.updateOverlay.classList.remove("show"));
   el.updateOverlay.addEventListener("click", (e) => {
     if (e.target === el.updateOverlay) el.updateOverlay.classList.remove("show");
+  });
+
+  // ------------------------------------------------------------ statistics overlay --
+  function renderStats(tab) {
+    if (!el.statsBody) return;
+    const t = tab || "effects";
+    let html = "";
+    if (t === "effects") {
+      html = `<h3 class="stat-h">Status Effects</h3>`;
+      for (const k of Object.keys(STATUS_EFFECT_INFO)) {
+        const e = STATUS_EFFECT_INFO[k];
+        html += `<div class="statrow"><b>${e.name}</b><span>${e.desc}</span></div>`;
+      }
+    } else if (t === "styles") {
+      html = `<h3 class="stat-h">Styles by Tier</h3>`;
+      const tiers = { 1: "Tier 1 (Basic)", 2: "Tier 2 (Advanced)", 3: "Tier 3 (Elite)" };
+      for (const tier of [1, 2, 3]) {
+        const list = Object.keys(STYLES).filter((id) => styleTier(id) === tier);
+        if (!list.length) continue;
+        html += `<div class="stat-t"><b>${tiers[tier]}</b></div>`;
+        for (const id of list) {
+          const st = STYLES[id];
+          const mods = [];
+          if (st.dmg > 1) mods.push(`dmg +${Math.round((st.dmg - 1) * 100)}%`);
+          if (st.dodge > 0) mods.push(`dodge +${Math.round(st.dodge * 100)}%`);
+          if (st.crit > 0) mods.push(`crit +${Math.round(st.crit * 100)}%`);
+          html += `<div class="statrow"><b>${st.name}</b><span>${mods.join(", ") || "—"} · Ult: ${st.ult ? st.ult.name : "—"}</span></div>`;
+        }
+      }
+    } else if (t === "attrs") {
+      html = `<h3 class="stat-h">Attributes</h3>`;
+      for (const a of ATTRIBUTES) {
+        html += `<div class="statrow"><b>${a.name}</b><span>${a.desc}</span></div>`;
+      }
+      html += `<div class="statrow"><b>Speed (movement)</b><span>Higher Speed lets you travel the map faster and is gained while moving.</span></div>`;
+    } else if (t === "prog") {
+      html = `<h3 class="stat-h">Progression</h3>`;
+      html += `<div class="statrow"><b>Fights</b><span>Win by KO'ing an opponent's HP or draining their stamina. No round cap.</span></div>`;
+      html += `<div class="statrow"><b>Training</b><span>Buy stat trainings at the City Gym, then queue them in your Task List.</span></div>`;
+      html += `<div class="statrow"><b>Rivals</b><span>Each gym has a roster of fighters — beat all 5 to unlock the next tier of locations.</span></div>`;
+      html += `<div class="statrow"><b>Jobs</b><span>Manual play: build a 25 combo for 100% pay, or set an auto-job that works every 10s.</span></div>`;
+    }
+    el.statsBody.innerHTML = html;
+  }
+
+  function openStats() {
+    const tabs = el.statsOverlay.querySelectorAll(".stats-tabs .store-tab");
+    const active = el.statsOverlay.querySelector(".stats-tabs .store-tab.active");
+    renderStats(active ? active.getAttribute("data-stab") : "effects");
+    if (tabs.length) {
+      tabs.forEach((tb) => {
+        tb.onclick = () => {
+          tabs.forEach((x) => x.classList.remove("active"));
+          tb.classList.add("active");
+          renderStats(tb.getAttribute("data-stab"));
+        };
+      });
+    }
+    el.statsOverlay.classList.add("show");
+  }
+
+  el.btnStats.addEventListener("click", openStats);
+  el.btnStatsClose.addEventListener("click", () => el.statsOverlay.classList.remove("show"));
+  el.statsOverlay.addEventListener("click", (e) => {
+    if (e.target === el.statsOverlay) el.statsOverlay.classList.remove("show");
   });
 
   // ------------------------------------------------------------ result overlay --

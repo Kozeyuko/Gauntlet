@@ -25,6 +25,7 @@
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
     <button class="btn small-btn" id="btnJobs">JOBS</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
+    <button class="btn small-btn" id="btnStats">STATS</button>
     <button class="btn small-btn" id="btnUpdateLog">UPDATES</button>
   </div>
 </header>
@@ -353,6 +354,24 @@
     </div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STATISTICS OVERLAY ============ -->
+<div class="overlay" id="statsOverlay">
+  <div class="modal statsmodal">
+    <h2>Statistics</h2>
+    <div class="sub">Game info: effects, styles, attributes, and progression.</div>
+    <div class="stats-tabs">
+      <button class="store-tab active" data-stab="effects">Effects</button>
+      <button class="store-tab" data-stab="styles">Styles</button>
+      <button class="store-tab" data-stab="attrs">Attributes</button>
+      <button class="store-tab" data-stab="prog">Progression</button>
+    </div>
+    <div class="stats-body" id="statsBody"></div>
+    <div class="acts">
+      <button class="btn" id="btnStatsClose">Close</button>
     </div>
   </div>
 </div>

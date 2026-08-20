@@ -51,6 +51,15 @@ export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 export const COOLDOWN_LOSS_MULT = 0.1;
 
+// Status effect descriptions for the Statistics menu.
+export const STATUS_EFFECT_INFO = {
+  poison: { name: "Poison", desc: "Deals damage over time each round while active." },
+  buff: { name: "Offense Up", desc: "Raises your own damage while active." },
+  debuff: { name: "Defense Down", desc: "Lowers the target's defense, so they take more damage." },
+  limbArm: { name: "Damaged Arm", desc: "Permanently cuts the target's damage for the fight." },
+  limbLeg: { name: "Damaged Leg", desc: "Permanently slows the target, so they act later." },
+};
+
 // ------------------------------------------------------------------ JOBS --
 export const JOBS = [
   {
