@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -922,10 +922,10 @@ console.log("== Tasklist: doDay advances through entries in order ==");
   g.doDay();
   assert(state.Activity !== "Pushups" || state.TaskList.length === 2, "tasklist used Pushups");
   assert(state.TaskList.length === 2, "TaskList has 2 remaining");
-  assert(state.TaskList[0] === "Situps", "next is Situps");
+  assert(state.TaskList[0].act === "Situps", "next is Situps");
   g.doDay();
   assert(state.TaskList.length === 1, "TaskList has 1 remaining");
-  assert(state.TaskList[0] === "Squats", "next is Squats");
+  assert(state.TaskList[0].act === "Squats", "next is Squats");
   g.doDay();
   assert(state.TaskList.length === 0, "TaskList empty after 3 days");
 }
@@ -938,9 +938,9 @@ console.log("== Tasklist: TaskRepeat cycles the sequence ==");
   g.updatePotential();
   g.doDay();
   assert(state.TaskList.length === 2, "repeat: still 2 entries");
-  assert(state.TaskList[0] === "Situps" && state.TaskList[1] === "Pushups", "Pushups rotated to end");
+  assert(state.TaskList[0].act === "Situps" && state.TaskList[1].act === "Pushups", "Pushups rotated to end");
   g.doDay();
-  assert(state.TaskList[0] === "Pushups" && state.TaskList[1] === "Situps", "Situps rotated; cycle complete");
+  assert(state.TaskList[0].act === "Pushups" && state.TaskList[1].act === "Situps", "Situps rotated; cycle complete");
 }
 
 console.log("== Tasklist: empty TaskList falls back to Activity ==");
@@ -960,14 +960,14 @@ console.log("== Tasklist: setTaskList validates against ACTIVITIES ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.setTaskList(["Pushups", "Bogus", "Situps"], false);
   assert(state.TaskList.length === 2, "invalid entries filtered");
-  assert(state.TaskList[0] === "Pushups" && state.TaskList[1] === "Situps", "only valid entries kept");
+  assert(state.TaskList[0].act === "Pushups" && state.TaskList[1].act === "Situps", "only valid entries kept");
 }
 
 console.log("== Tasklist: addTask caps at 20 ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
-  for (let i = 0; i < 22; i++) g.addTask("Pushups");
+  for (let i = 0; i < 22; i++) g.addTask("OddJobs");
   assert(state.TaskList.length === 20, "capped at 20");
 }
 
@@ -978,7 +978,7 @@ console.log("== Tasklist: removeTask works ==");
   g.setTaskList(["Pushups", "Situps", "Squats"], false);
   g.removeTask(1);
   assert(state.TaskList.length === 2, "removed one");
-  assert(state.TaskList[1] === "Squats", "Situps removed, Squats shifted");
+  assert(state.TaskList[1].act === "Squats", "Situps removed, Squats shifted");
 }
 
 console.log("== Tasklist: too tired falls back to Rest ==");
@@ -1153,6 +1153,255 @@ console.log("== Training ladder: snapshot preserves tiers ==");
   restore(state2, snap);
   assert(state2.TrainTiers.Pushups === 1, "restored TrainTiers.Pushups = 1");
   assert(state2.TrainProgress.Pushups === 10, "restored TrainProgress.Pushups = 10");
+}
+
+// ================================================================
+// PART A — Semver-style versions
+// ================================================================
+console.log("== Part A: GAME_VERSION is float ==");
+{
+  assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
+  assert(GAME_VERSION === 1.01, "GAME_VERSION === 1.01");
+}
+
+console.log("== Part A: versionCompare ==");
+{
+  assert(versionCompare(1.01, 1.0) === 1, "1.01 > 1.0");
+  assert(versionCompare(1.0, 1.01) === -1, "1.0 < 1.01");
+  assert(versionCompare(1.01, 1.01) === 0, "1.01 === 1.01");
+  assert(versionCompare(2, 1) === 1, "2 > 1");
+  assert(versionCompare(1, 2) === -1, "1 < 2");
+}
+
+console.log("== Part A: UPDATE_LOG has correct structure ==");
+{
+  assert(Array.isArray(UPDATE_LOG), "UPDATE_LOG is array");
+  assert(UPDATE_LOG.length > 0, "UPDATE_LOG has entries");
+  assert(typeof UPDATE_LOG[0].v === "number", "log entries have numeric v");
+}
+
+console.log("== Part A: shouldShowUpdateLog uses versionCompare ==");
+{
+  const state = freshState();
+  state.SeenVersion = 1.0;
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.shouldShowUpdateLog() === true, "should show when seenVersion=1.0");
+}
+
+console.log("== Part A: shouldShowUpdateLog false when current ==");
+{
+  const state = freshState();
+  state.SeenVersion = 1.01;
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.shouldShowUpdateLog() === false, "should not show when seenVersion=1.01");
+}
+
+// ================================================================
+// PART B — Gym-purchased Pushups/Situps
+// ================================================================
+console.log("== Part B: GYM_TRAINING data ==");
+{
+  assert(Array.isArray(GYM_TRAINING), "GYM_TRAINING is array");
+  assert(GYM_TRAINING.length === 2, "two gym trainings");
+  assert(GYM_TRAINING[0].key === "Pushups", "first is Pushups");
+  assert(GYM_TRAINING[1].key === "Situps", "second is Situps");
+  assert(typeof GYM_TRAINING[0].cost === "number", "has cost");
+}
+
+console.log("== Part B: MAIN_GYM ==");
+{
+  assert(typeof MAIN_GYM === "string", "MAIN_GYM is string");
+  assert(MAIN_GYM.length > 0, "MAIN_GYM not empty");
+}
+
+console.log("== Part B: PurchasedTraining in freshState ==");
+{
+  const s = freshState();
+  assert(Array.isArray(s.PurchasedTraining), "PurchasedTraining is array");
+  assert(s.PurchasedTraining.length === 0, "starts empty");
+}
+
+console.log("== Part B: buyTraining / hasTraining ==");
+{
+  const state = boostedState();
+  state.Location = "spar";
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.hasTraining("Pushups") === false, "no Pushups initially");
+  assert(g.hasTraining("Situps") === false, "no Situps initially");
+  // non-gym training is always available
+  assert(g.hasTraining("Running") === true, "Running always available");
+
+  // buy Pushups
+  state.Money = 100;
+  const bought = g.buyTraining("Pushups");
+  assert(bought === true, "buyTraining returns true");
+  assert(g.hasTraining("Pushups") === true, "has Pushups after purchase");
+  assert(state.Money === 90, "money deducted by 10");
+
+  // can't buy twice
+  const bought2 = g.buyTraining("Pushups");
+  assert(bought2 === false, "can't buy again");
+}
+
+console.log("== Part B: buyTraining fails with no money ==");
+{
+  const state = boostedState();
+  state.Location = "spar";
+  state.Money = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  const bought = g.buyTraining("Pushups");
+  assert(bought === false, "can't buy with no money");
+  assert(g.hasTraining("Pushups") === false, "still no Pushups");
+}
+
+console.log("== Part B: canAddToTask ==");
+{
+  const state = boostedState();
+  state.Location = "spar";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  assert(g.canAddToTask("Running") === true, "Running always addable");
+  assert(g.canAddToTask("Pushups") === false, "Pushups locked before purchase");
+  g.buyTraining("Pushups");
+  assert(g.canAddToTask("Pushups") === true, "Pushups unlocked after purchase");
+}
+
+console.log("== Part B: addTask gates on training purchase ==");
+{
+  const state = boostedState();
+  state.Location = "spar";
+  state.Money = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  const added = g.addTask("Pushups");
+  assert(added === false, "can't add Pushups without purchase");
+  state.Money = 100;
+  g.buyTraining("Pushups");
+  const added2 = g.addTask("Pushups");
+  assert(added2 === true, "can add Pushups after purchase");
+}
+
+// ================================================================
+// PART C — Tasklist v2 {act, n} + advanceDay + advanceNDays
+// ================================================================
+console.log("== Part C: TaskList format is [{act, n}] ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Running", "Pushups"], false);
+  const tl = g.taskList();
+  assert(tl.length === 2, "two items");
+  assert(tl[0].act === "Running", "first act is Running");
+  assert(tl[0].n === 1, "first n is 1");
+  assert(tl[1].act === "Pushups", "second act is Pushups");
+  assert(tl[1].n === 1, "second n is 1");
+}
+
+console.log("== Part C: addTask with count ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("Running", 5);
+  const tl = g.taskList();
+  assert(tl.length === 1, "one item");
+  assert(tl[0].act === "Running", "act is Running");
+  assert(tl[0].n === 5, "n is 5");
+}
+
+console.log("== Part C: addTask clamps count ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("Running", 200);
+  assert(g.taskList()[0].n === 99, "clamped to 99");
+  g.addTask("OddJobs", 0);
+  assert(g.taskList()[1].n === 1, "floored to 1");
+}
+
+console.log("== Part C: advanceDay runs one day ==");
+{
+  const state = boostedState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  const prevAge = state.AgeDays;
+  g.setTaskList(["OddJobs"], false);
+  const result = g.advanceDay();
+  assert(result === true, "advanceDay returned true");
+  assert(state.AgeDays === prevAge + 1, "aged by one day");
+  assert(g.taskList().length === 0, "task consumed (not repeated)");
+}
+
+console.log("== Part C: advanceDay with repeat ==");
+{
+  const state = boostedState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["OddJobs"], true);
+  g.advanceDay();
+  assert(g.taskList().length === 1, "task rotated (repeat on)");
+  assert(g.taskList()[0].act === "OddJobs", "still OddJobs");
+}
+
+console.log("== Part C: advanceDay decrements count ==");
+{
+  const state = boostedState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("OddJobs", 3);
+  g.advanceDay();
+  assert(g.taskList().length === 1, "still one item");
+  assert(g.taskList()[0].n === 2, "n decremented to 2");
+  g.advanceDay();
+  assert(g.taskList()[0].n === 1, "n decremented to 1");
+  g.advanceDay();
+  assert(g.taskList().length === 0, "item consumed at n=0");
+}
+
+console.log("== Part C: advanceNDays ==");
+{
+  const state = boostedState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("OddJobs", 5);
+  const count = g.advanceNDays(3);
+  assert(count === 3, "advanced 3 days");
+  assert(g.taskList()[0].n === 2, "n is 2 after 3 days");
+}
+
+console.log("== Part C: advanceNDays stops on empty ==");
+{
+  const state = boostedState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.addTask("OddJobs", 2);
+  const count = g.advanceNDays(10);
+  assert(count === 2, "stopped after 2 days");
+  assert(g.taskList().length === 0, "task list empty");
+}
+
+console.log("== Part C: advanceDay returns false on empty list ==");
+{
+  const state = boostedState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const result = g.advanceDay();
+  assert(result === false, "returns false on empty");
+}
+
+console.log("== Part C: restore migrates old string TaskList ==");
+{
+  const state = freshState();
+  const oldSnap = { TaskList: ["Running", "OddJobs"], TaskRepeat: true, SeenVersion: 1.0 };
+  restore(state, oldSnap);
+  assert(Array.isArray(state.TaskList), "TaskList is array");
+  assert(state.TaskList.length === 2, "two items");
+  assert(state.TaskList[0].act === "Running", "migrated first");
+  assert(state.TaskList[0].n === 1, "n=1 for migrated");
+  assert(state.TaskList[1].act === "OddJobs", "migrated second");
+  assert(state.TaskRepeat === true, "repeat preserved");
 }
 
 console.log("");

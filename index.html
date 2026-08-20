@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Bit · Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=1.01">
 </head>
 <body>
 
@@ -181,6 +181,10 @@
       <h3>Train Here</h3>
       <div id="locStyles"></div>
     </section>
+    <section class="panel" id="buyTrainingPanel" style="display:none">
+      <h3>Buy Training</h3>
+      <div class="loclist" id="buyTrainingList"></div>
+    </section>
     <div class="acts">
       <button class="btn" id="btnLocClose">Close</button>
     </div>
@@ -322,7 +326,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v3</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v1.01</span>
     </div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
@@ -366,6 +370,14 @@
     <div id="taskQueue"></div>
     <div class="btnrow" style="margin-top:10px">
       <button class="btn small-btn" id="btnTaskRepeat">Repeat: OFF</button>
+      <button class="btn small-btn" id="btnTaskAdvance">ADVANCE DAY</button>
+      <button class="btn small-btn" id="btnTaskPlay">PLAY</button>
+      <button class="btn small-btn" id="btnTaskAuto">AUTO: OFF</button>
+      <select id="taskSpeed" class="small-btn">
+        <option value="100">Fast</option>
+        <option value="500" selected>Normal</option>
+        <option value="1000">Slow</option>
+      </select>
     </div>
     <section class="panel" style="margin-top:10px">
       <h3>Add Activity</h3>
@@ -401,6 +413,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=3"></script>
+<script type="module" src="js/main.js?v=1.01"></script>
 </body>
 </html>

@@ -36,12 +36,16 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 3;
+export const GAME_VERSION = 1.01;
 export const UPDATE_LOG = [
-  { v: 3, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
-  { v: 2, text: "Feat: jobs system, arena modes w/ Gu ritual + Formless style, chained roamers, rebirth & death aptitudes." },
-  { v: 1, text: "Launch: train, fight rivals, learn styles, reincarnate." },
+  { v: 1.01, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
+  { v: 1.0, text: "Launch: train, fight rivals, learn styles, reincarnate." },
 ];
+export function versionCompare(a, b) {
+  if (a > b) return 1;
+  if (a < b) return -1;
+  return 0;
+}
 export const MAX_GHOSTS = 50;
 export const ROAMER_COOLDOWN_MS = 3 * 60 * 1000;
 
@@ -640,6 +644,12 @@ export const IMAGINED_NPCS = [
 
 // ------------------------------------------------------------------ ENCOUNTER NAMES --
 export const ENCOUNTER_NAMES = ["Street Fighter", "Drifter", "Bouncer", "Thug", "Rival in the Crowd"];
+
+export const GYM_TRAINING = [
+  { key: "Pushups", name: "Pushups (Str)", cost: 10 },
+  { key: "Situps",  name: "Situps (Tou)", cost: 10 },
+];
+export const MAIN_GYM = "spar";
 
 // ------------------------------------------------------------------ ROAMERS --
 // Free-roaming encounter nodes on the city map.

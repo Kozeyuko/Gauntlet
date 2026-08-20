@@ -25,6 +25,8 @@ import {
   GAME_VERSION,
   UPDATE_LOG,
   trainChain,
+  GYM_TRAINING,
+  MAIN_GYM,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -227,10 +229,14 @@ export function initUI(game, opts = {}) {
     btnTasklist: $("btnTasklist"), taskOverlay: $("taskOverlay"),
     taskQueue: $("taskQueue"), taskActivityList: $("taskActivityList"),
     btnTaskRepeat: $("btnTaskRepeat"), btnTaskClose: $("btnTaskClose"),
+    btnTaskAdvance: $("btnTaskAdvance"), btnTaskPlay: $("btnTaskPlay"),
+    btnTaskAuto: $("btnTaskAuto"), taskSpeed: $("taskSpeed"),
     // update log
     updateOverlay: $("updateOverlay"), btnUpdateLog: $("btnUpdateLog"),
     btnUpdateClose: $("btnUpdateClose"), updateList: $("updateList"),
     updateHeader: $("updateHeader"),
+    // buy training
+    buyTrainingPanel: $("buyTrainingPanel"), buyTrainingList: $("buyTrainingList"),
   };
 
   // ------------------------------------------------------------ build static grids --
@@ -795,6 +801,43 @@ export function initUI(game, opts = {}) {
     el.locStyles.appendChild(row);
   }
 
+  function renderBuyTraining(key) {
+    if (!GYM_TRAINING || GYM_TRAINING.length === 0) {
+      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
+      return;
+    }
+    if (key !== MAIN_GYM) {
+      if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "none";
+      return;
+    }
+    if (el.buyTrainingPanel) el.buyTrainingPanel.style.display = "";
+    if (!el.buyTrainingList) return;
+    el.buyTrainingList.innerHTML = "";
+    const money = num(state.Money);
+    for (const t of GYM_TRAINING) {
+      const owned = game.hasTraining(t.key);
+      const canBuy = !owned && money >= t.cost;
+      const b = document.createElement("button");
+      b.className = "btn locrow" + (owned ? " owned" : (canBuy ? "" : " cantafford"));
+      b.innerHTML = `
+        <span class="lr-main">
+          <span class="lr-name">${t.name}</span>
+          <span class="lr-stat">${owned ? "Purchased" : "Unlocked"}</span>
+        </span>
+        <span class="lr-meta">
+          <span class="lr-cost${canBuy || owned ? "" : " red"}">${owned ? "Owned" : t.cost + " Cash"}</span>
+        </span>`;
+      if (!owned) {
+        b.addEventListener("click", () => {
+          game.buyTraining(t.key);
+          renderBuyTraining(key);
+          render();
+        });
+      }
+      el.buyTrainingList.appendChild(b);
+    }
+  }
+
   function openLocationOverlay(key) {
     const loc = LOCATIONS[key];
     if (!loc) return;
@@ -804,6 +847,7 @@ export function initUI(game, opts = {}) {
     renderLocTier(key);
     renderLocActivities(key);
     renderLocStyles(key);
+    renderBuyTraining(key);
     el.locOverlay.classList.add("show");
   }
 
@@ -1296,6 +1340,8 @@ export function initUI(game, opts = {}) {
   });
 
   // ------------------------------------------------------------ tasklist overlay --
+  let taskAutoInterval = null;
+
   function renderTasklist() {
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     el.taskQueue.innerHTML = "";
@@ -1306,17 +1352,42 @@ export function initUI(game, opts = {}) {
       el.taskQueue.appendChild(empty);
     } else {
       for (let i = 0; i < tl.length; i++) {
-        const act = ACTIVITIES[tl[i]];
+        const item = tl[i];
+        const act = ACTIVITIES[item.act];
+        const locked = !game.canAddToTask(item.act);
         const row = document.createElement("div");
-        row.className = "taskrow";
+        row.className = "taskrow" + (locked ? " locked" : "");
         const num = document.createElement("span");
         num.className = "tnum";
         num.textContent = `${i + 1}.`;
         const nm = document.createElement("span");
         nm.className = "tname";
-        nm.textContent = act ? act.name : tl[i];
+        nm.textContent = act ? act.name : item.act;
+        const cnt = document.createElement("span");
+        cnt.className = "tcnt";
+        cnt.textContent = `×${item.n}`;
         row.appendChild(num);
         row.appendChild(nm);
+        row.appendChild(cnt);
+        const btnDown = document.createElement("button");
+        btnDown.className = "tcount-btn";
+        btnDown.textContent = "−";
+        btnDown.addEventListener("click", () => {
+          if (item.n > 1) item.n--;
+          else game.removeTask(i);
+          renderTasklist();
+          render();
+        });
+        const btnUp = document.createElement("button");
+        btnUp.className = "tcount-btn";
+        btnUp.textContent = "+";
+        btnUp.addEventListener("click", () => {
+          if (item.n < 99) item.n++;
+          renderTasklist();
+          render();
+        });
+        row.appendChild(btnDown);
+        row.appendChild(btnUp);
         const rm = document.createElement("button");
         rm.className = "tremove";
         rm.textContent = "×";
@@ -1333,16 +1404,20 @@ export function initUI(game, opts = {}) {
     el.btnTaskRepeat.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
     el.btnTaskRepeat.classList.toggle("on", repeatOn);
 
+    // Activity list — grey out locked trainings
     el.taskActivityList.innerHTML = "";
     for (const key of Object.keys(ACTIVITIES)) {
       const act = ACTIVITIES[key];
+      const locked = !game.canAddToTask(key);
       const b = document.createElement("button");
-      b.className = "btn small-btn";
+      b.className = "btn small-btn" + (locked ? " locked" : "");
       b.textContent = act.name;
+      if (locked) b.title = "Buy this training at the gym first";
       b.addEventListener("click", () => {
-        game.addTask(key);
-        renderTasklist();
-        render();
+        if (game.addTask(key)) {
+          renderTasklist();
+          render();
+        }
       });
       el.taskActivityList.appendChild(b);
     }
@@ -1362,6 +1437,47 @@ export function initUI(game, opts = {}) {
     state.TaskRepeat = state.TaskRepeat !== true;
     renderTasklist();
   });
+
+  if (el.btnTaskAdvance) {
+    el.btnTaskAdvance.addEventListener("click", () => {
+      game.advanceDay();
+      renderTasklist();
+      render();
+    });
+  }
+  if (el.btnTaskPlay) {
+    el.btnTaskPlay.addEventListener("click", () => {
+      game.doDay();
+      renderTasklist();
+      render();
+    });
+  }
+  if (el.btnTaskAuto) {
+    el.btnTaskAuto.addEventListener("click", () => {
+      if (taskAutoInterval) {
+        clearInterval(taskAutoInterval);
+        taskAutoInterval = null;
+        el.btnTaskAuto.classList.remove("on");
+        el.btnTaskAuto.textContent = "AUTO: OFF";
+      } else {
+        el.btnTaskAuto.classList.add("on");
+        el.btnTaskAuto.textContent = "AUTO: ON";
+        const ms = el.taskSpeed ? Number(el.taskSpeed.value) || 500 : 500;
+        taskAutoInterval = setInterval(() => {
+          if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
+            clearInterval(taskAutoInterval);
+            taskAutoInterval = null;
+            el.btnTaskAuto.classList.remove("on");
+            el.btnTaskAuto.textContent = "AUTO: OFF";
+            return;
+          }
+          game.doDay();
+          renderTasklist();
+          render();
+        }, ms);
+      }
+    });
+  }
 
   // ------------------------------------------------------------ update log overlay --
   function renderUpdateLog(highlightVersion) {

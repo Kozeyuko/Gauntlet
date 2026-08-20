@@ -1089,3 +1089,14 @@ header {
   overflow-wrap: break-word;
   white-space: normal;
 }
+/* ---------- tasklist v2 ---------- */
+.taskrow .tcnt { font-size: 12px; color: var(--gold); margin-left: 6px; font-weight: 700; }
+.taskrow .tcount-btn {
+  background: none; border: 1px solid var(--line); color: var(--text);
+  border-radius: 4px; width: 22px; height: 22px; font-size: 13px; font-weight: 700;
+  cursor: pointer; line-height: 1; padding: 0; text-align: center;
+}
+.taskrow .tcount-btn:hover { border-color: var(--gold); color: var(--gold); }
+.taskrow.locked, .small-btn.locked { opacity: 0.4; cursor: not-allowed; }
+#btnTaskAdvance.on, #btnTaskAuto.on { border-color: var(--green); color: var(--green); }
+.locrow.owned { opacity: 0.5; cursor: default; }

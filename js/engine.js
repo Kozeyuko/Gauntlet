@@ -61,6 +61,9 @@ import {
   STYLE_TIER_MULT,
   styleTier,
   trainChain,
+  versionCompare,
+  GYM_TRAINING,
+  MAIN_GYM,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -184,6 +187,7 @@ export const PERSISTENT_KEYS = [
   "Inventory", "TaskList", "TaskRepeat",
   "SeenVersion",
   "TrainTiers", "TrainProgress",
+  "PurchasedTraining",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -208,6 +212,7 @@ export function freshState() {
     SeenVersion: 0,
     TrainTiers: {},
     TrainProgress: {},
+    PurchasedTraining: [],
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -233,6 +238,12 @@ export function restore(state, saved) {
     if (saved[k] !== undefined && saved[k] !== null) {
       state[k] = saved[k];
       restored = true;
+    }
+  }
+  // Migrate old TaskList format (array of strings) to [{act, n}]
+  if (Array.isArray(state.TaskList) && state.TaskList.length > 0) {
+    if (typeof state.TaskList[0] === "string") {
+      state.TaskList = state.TaskList.map((s) => ({ act: s, n: 1 }));
     }
   }
   return restored;
@@ -268,7 +279,7 @@ export function createGame(state, opts = {}) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   }
-  function shouldShowUpdateLog() { return num(state.SeenVersion) < GAME_VERSION; }
+  function shouldShowUpdateLog() { return versionCompare(GAME_VERSION, num(state.SeenVersion)) > 0; }
   function maxHealth() { return 100 + Math.max(0, attrValue("Tou") - 1) * 10; }
   function maxStamina() { return 100 + Math.max(0, attrValue("Spd") - 1) * 8; }
   function maxNutrition() { return 100 + Math.max(0, attrValue("Int") - 1) * 5; }
@@ -1596,17 +1607,23 @@ export function createGame(state, opts = {}) {
   function setTaskList(list, repeat) {
     const valid = [];
     for (const k of list) {
-      if (ACTIVITIES[k]) valid.push(k);
+      if (typeof k === "string" && ACTIVITIES[k]) {
+        valid.push({ act: k, n: 1 });
+      } else if (k && typeof k === "object" && ACTIVITIES[k.act]) {
+        valid.push({ act: k.act, n: Math.max(1, Math.floor(num(k.n) || 1)) });
+      }
     }
     state.TaskList = valid.slice(0, 20);
     state.TaskRepeat = repeat === true;
   }
 
-  function addTask(activityKey) {
+  function addTask(activityKey, count) {
     if (!ACTIVITIES[activityKey]) return false;
+    if (!canAddToTask(activityKey)) return false;
     if (!Array.isArray(state.TaskList)) state.TaskList = [];
     if (state.TaskList.length >= 20) return false;
-    state.TaskList.push(activityKey);
+    const n = Math.max(1, Math.min(99, Math.floor(num(count) || 1)));
+    state.TaskList.push({ act: activityKey, n });
     return true;
   }
 
@@ -1614,6 +1631,32 @@ export function createGame(state, opts = {}) {
     if (!Array.isArray(state.TaskList)) return false;
     if (index < 0 || index >= state.TaskList.length) return false;
     state.TaskList.splice(index, 1);
+    return true;
+  }
+
+  // ---- gym training purchase ----
+  function buyTraining(activityKey) {
+    const item = GYM_TRAINING.find((t) => t.key === activityKey);
+    if (!item) return false;
+    if (!Array.isArray(state.PurchasedTraining)) state.PurchasedTraining = [];
+    if (state.PurchasedTraining.includes(activityKey)) return false;
+    if (num(state.Money) < item.cost) {
+      logMsg(`Not enough Cash to buy ${item.name} training (${item.cost} Cash).`);
+      return false;
+    }
+    state.Money = num(state.Money) - item.cost;
+    state.PurchasedTraining.push(activityKey);
+    logMsg(`Bought ${item.name} training for ${item.cost} Cash.`, "store");
+    return true;
+  }
+
+  function hasTraining(activityKey) {
+    if (!GYM_TRAINING.some((t) => t.key === activityKey)) return true;
+    return Array.isArray(state.PurchasedTraining) && state.PurchasedTraining.includes(activityKey);
+  }
+
+  function canAddToTask(activityKey) {
+    if (GYM_TRAINING.some((t) => t.key === activityKey)) return hasTraining(activityKey);
     return true;
   }
 
@@ -1639,6 +1682,28 @@ export function createGame(state, opts = {}) {
     return { tier, progress: state.TrainProgress[activityKey] || 0, req: t.req };
   }
 
+  // ---- tasklist consumption helper ----
+  function consumeTaskItem() {
+    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+    if (tl.length === 0) return;
+    const first = tl[0];
+    if (!first || typeof first !== "object") { tl.shift(); return; }
+    if (first.n > 1) {
+      first.n -= 1;
+    } else {
+      if (state.TaskRepeat) {
+        tl.shift();
+        tl.push(first);
+      } else {
+        tl.shift();
+      }
+    }
+  }
+
+  function taskList() {
+    return Array.isArray(state.TaskList) ? state.TaskList : [];
+  }
+
   // ---- the day ----
   function doDay() {
     if (num(state.Health) <= 0) return;
@@ -1662,11 +1727,11 @@ export function createGame(state, opts = {}) {
     state.Nutrition = clamp(nutrition, 0, maxNutrition());
 
     // 2) Activity
-    const taskList = Array.isArray(state.TaskList) ? state.TaskList : [];
+    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     let usedTask = false;
     let actKey;
-    if (taskList.length > 0) {
-      actKey = String(taskList[0] ?? "Rest");
+    if (tl.length > 0) {
+      actKey = String(tl[0].act ?? "Rest");
       usedTask = true;
     } else {
       actKey = String(state.Activity ?? "Rest");
@@ -1753,14 +1818,7 @@ export function createGame(state, opts = {}) {
     state.AgeDays = num(state.AgeDays) + 1;
 
     // Advance tasklist
-    if (usedTask && taskList.length > 0) {
-      if (state.TaskRepeat) {
-        const used = taskList.shift();
-        if (used) taskList.push(used);
-      } else {
-        taskList.shift();
-      }
-    }
+    if (usedTask) consumeTaskItem();
 
     // 4) Lifespan
     state.Lifespan = Math.min(60, BASE_LIFESPAN + attrValue("Tou") / 2);
@@ -1791,7 +1849,107 @@ export function createGame(state, opts = {}) {
     updatePotential();
   }
 
-  // Auto-resolve (legacy quick FIGHT).
+  // ---- manual / speed advance (tasklist only) ----
+  function advanceDay() {
+    if (num(state.Health) <= 0) return false;
+    if (state.InFight) return false;
+    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+    if (tl.length === 0) return false;
+
+    const actKey = tl[0].act;
+    let act = ACTIVITIES[actKey] || ACTIVITIES.Rest;
+    const stamina = num(state.Stamina);
+    if (actKey !== "Rest" && actKey !== "OddJobs" && stamina < act.cost) {
+      act = ACTIVITIES.Rest;
+      logMsg("Too tired — you rest instead.");
+    }
+
+    const locKey = String(state.Location ?? "home");
+    const loc = LOCATIONS[locKey] || LOCATIONS.home;
+
+    if (actKey === "Rest") {
+      state.Stamina = Math.min(maxStamina(), stamina + 35);
+      state.Health = Math.min(maxHealth(), num(state.Health) + 2);
+    } else if (actKey === "OddJobs") {
+      const money = act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha);
+      state.Money = num(state.Money) + money;
+      state.Stamina = stamina - act.cost;
+      logMsg(`Odd jobs: +${money} Cash.`, "money");
+    } else if (act.attr) {
+      const entry = trainingAt(locKey)[actKey];
+      if (!entry) {
+        state.Stamina = Math.min(maxStamina(), stamina + 35);
+        logMsg("Can't train that here — resting.");
+      } else if (num(state.Money) < entry.cost) {
+        state.Stamina = Math.min(maxStamina(), stamina + 35);
+        logMsg("Not enough Cash — resting.");
+      } else {
+        const chain = trainChain(actKey);
+        const tierIdx = chain ? trainTier(actKey) : 0;
+        const tier = chain ? chain.tiers[tierIdx] : null;
+        const gainMult = tier ? tier.gainMult : 1.0;
+        const costMult = tier ? tier.costMult : 1.0;
+        state.Money = num(state.Money) - Math.ceil(entry.cost * costMult);
+        const double = hasBuff("weights") ? 2 : 1;
+        const gain = act.gain * entry.gain * gainMult * attrApt(act.attr) * double;
+        state[act.attr] = num(state[act.attr]) + gain;
+        let cost = act.cost;
+        if (actKey === "Running") cost = Math.floor(cost * 1.5);
+        cost = Math.ceil(cost * costMult);
+        state.Stamina = stamina - cost;
+        if (act.staminaBonus) state.Stamina = Math.min(maxStamina(), num(state.Stamina) + act.staminaBonus);
+        const attrName = ATTRIBUTES.find((a) => a.id === act.attr).name;
+        logMsg(`Training: +${gain.toFixed(2)} ${attrName} (advance day).`, "train");
+
+        if (chain && tierIdx + 1 < chain.tiers.length) {
+          state.TrainProgress[actKey] = (state.TrainProgress[actKey] || 0) + 1;
+          const nextTier = chain.tiers[tierIdx + 1];
+          if (state.TrainProgress[actKey] >= nextTier.req) {
+            state.TrainTiers[actKey] = tierIdx + 1;
+            state.TrainProgress[actKey] = 0;
+            logMsg(`Tier up! ${tier.name} → ${nextTier.name}.`, "train");
+          }
+        }
+      }
+    }
+
+    state.AgeDays = num(state.AgeDays) + 1;
+    consumeTaskItem();
+
+    state.Lifespan = Math.min(60, BASE_LIFESPAN + attrValue("Tou") / 2);
+
+    if (Array.isArray(state.StoreBuffs) && state.StoreBuffs.length > 0) {
+      const kept = [];
+      for (const b of state.StoreBuffs) {
+        const d = num(b.daysLeft) - 1;
+        if (d <= 0) { logMsg(`${BUFF_LABELS[b.name] || b.name} wore off.`); }
+        else { kept.push({ name: b.name, daysLeft: d }); }
+      }
+      state.StoreBuffs = kept;
+    }
+
+    const health = num(state.Health);
+    const ageYears = num(state.AgeDays) / 365;
+    if (health <= 0) { reincarnate("you succumbed to your wounds"); }
+    else if (ageYears >= state.Lifespan) { reincarnate("you died of old age"); }
+
+    updatePotential();
+    return true;
+  }
+
+  function advanceNDays(n) {
+    const days = Math.max(1, Math.min(999, Math.floor(num(n) || 1)));
+    let count = 0;
+    for (let i = 0; i < days; i++) {
+      if (num(state.Health) <= 0) break;
+      if (state.InFight) break;
+      const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+      if (tl.length === 0) break;
+      if (!advanceDay()) break;
+      count++;
+    }
+    return count;
+  }
   function fight() {
     if (num(state.Health) <= 0) return null;
     const setup = setupFoe();
@@ -1837,6 +1995,10 @@ export function createGame(state, opts = {}) {
     // roamers
     spawnRoamers, roamerStatus, roamerRemaining, fightRoamer, beginRoamerFight,
     // day
-    doDay,
+    doDay, advanceDay, advanceNDays,
+    // gym training
+    buyTraining, hasTraining, canAddToTask,
+    // tasklist
+    taskList,
   };
 }
