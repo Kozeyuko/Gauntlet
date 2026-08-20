@@ -637,11 +637,45 @@ export function createGame(state, opts = {}) {
     }
   }
 
+  // ---- base64 helpers ----
+  function b64encode(str) {
+    if (typeof btoa !== "undefined") return btoa(unescape(encodeURIComponent(str)));
+    return Buffer.from(str, "utf8").toString("base64");
+  }
+  function b64decode(str) {
+    if (typeof atob !== "undefined") return decodeURIComponent(escape(atob(str)));
+    return Buffer.from(str, "base64").toString("utf8");
+  }
+
+  // ---- export / import save codes ----
+  function exportSave() {
+    return "GAUNTLET:" + b64encode(JSON.stringify(snapshot(state)));
+  }
+
+  function importSave(code) {
+    if (typeof code !== "string") return false;
+    const prefix = "GAUNTLET:";
+    if (!code.startsWith(prefix)) return false;
+    try {
+      const json = b64decode(code.slice(prefix.length));
+      const parsed = JSON.parse(json);
+      if (!parsed || typeof parsed !== "object") return false;
+      restore(state, parsed);
+      clampVitals();
+      updatePotential();
+      logMsg("Save restored.");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ---- hard reset ----
   function hardReset() {
     for (const k of PERSISTENT_KEYS) delete state[k];
     for (const k of TRANSIENT_KEYS) delete state[k];
     Object.assign(state, freshState());
+    state.SeenVersion = GAME_VERSION;
     ghostCache = [];
   }
 
@@ -2000,5 +2034,7 @@ export function createGame(state, opts = {}) {
     buyTraining, hasTraining, canAddToTask,
     // tasklist
     taskList,
+    // save codes
+    exportSave, importSave,
   };
 }

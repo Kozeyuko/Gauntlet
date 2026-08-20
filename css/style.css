@@ -328,6 +328,12 @@ header {
   .map-wrap { border-radius: 8px; }
   #footer { padding: 6px 8px; }
   .footbtns .btn { padding: 8px 10px; font-size: 11px; }
+  /* logo spans the full header width on phones */
+  #topbar { display: flex; flex-wrap: wrap; }
+  #topbar .logo { flex: 1 1 100%; width: 100%; text-align: center; justify-content: center; display: flex; flex-wrap: wrap; }
+  #topbar .vitals { order: 2; }
+  #topbar .headerbtns { order: 3; }
+  .codetext { width: 100%; font-family: var(--mono); font-size: 11px; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; resize: vertical; }
 }
 
 /* phones: scale the whole map to fit width instead of panning,

@@ -20,6 +20,7 @@
     <span class="vital next" data-tip="You advance when potential exceeds the next rank."><span class="lbl" id="hNext">next F at 26 (+2)</span></span>
   </div>
   <div class="headerbtns">
+    <button class="btn small-btn" id="btnSave">SAVE</button>
     <button class="btn small-btn sndtoggle" id="btnSound" title="Toggle sound">SND ON</button>
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
     <button class="btn small-btn" id="btnJobs">JOBS</button>
@@ -328,6 +329,10 @@
     <div class="optrow">
       <span class="small" style="margin-right:auto">GAUNTLET v1.01</span>
     </div>
+    <div class="optrow">
+      <span>Save / Load</span>
+      <button class="btn small-btn" id="btnOptSaveLoad">EXPORT / IMPORT</button>
+    </div>
     <div class="acts">
       <button class="btn" id="btnOptionsClose">Close</button>
     </div>
@@ -385,6 +390,33 @@
     </section>
     <div class="acts">
       <button class="btn" id="btnTaskClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SAVE / LOAD OVERLAY ============ -->
+<div class="overlay" id="saveOverlay">
+  <div class="modal">
+    <h2>Save / Load</h2>
+    <div class="sub">Back up your run as a code you can paste back in anytime.</div>
+    <section class="panel">
+      <h3>Export code</h3>
+      <textarea id="saveCodeTextarea" class="codetext" rows="4" readonly placeholder="(generated when you open this)"></textarea>
+      <div class="btnrow">
+        <button class="btn small-btn" id="btnSaveCopy">COPY</button>
+        <button class="btn small-btn" id="btnSaveDownload">DOWNLOAD .TXT</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>Import code</h3>
+      <textarea id="loadCodeTextarea" class="codetext" rows="4" placeholder="Paste a GAUNTLET: code here"></textarea>
+      <div class="btnrow">
+        <button class="btn gold" id="btnSaveImport">IMPORT</button>
+      </div>
+      <div class="small" id="saveImportStatus"></div>
+    </section>
+    <div class="acts">
+      <button class="btn" id="btnSaveClose">Close</button>
     </div>
   </div>
 </div>

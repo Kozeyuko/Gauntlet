@@ -1404,6 +1404,39 @@ console.log("== Part C: restore migrates old string TaskList ==");
   assert(state.TaskRepeat === true, "repeat preserved");
 }
 
+console.log("== Save export/import round-trip ==");
+{
+  const state = freshState();
+  state.Money = 123; state.Str = 9; state.TaskList = [{ act: "Pushups", n: 3 }];
+  const g = createGame(state, { rng: makeRng(1) });
+  const code = g.exportSave();
+  assert(typeof code === "string" && code.startsWith("GAUNTLET:"), "exportSave starts with GAUNTLET:");
+  const fresh = freshState();
+  const g2 = createGame(fresh, { rng: makeRng(1) });
+  const ok = g2.importSave(code);
+  assert(ok === true, "importSave succeeds");
+  assert(fresh.Money >= 123, "Money restored (got " + fresh.Money + ", rank bonus applied)");
+  assert(fresh.Str === 9, "Str restored");
+  assert(Array.isArray(fresh.TaskList) && fresh.TaskList[0].act === "Pushups", "TaskList restored");
+}
+console.log("== Save import rejects garbage ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  state.Money = 55;
+  const ok = g.importSave("not-a-code");
+  assert(ok === false, "garbage import returns false");
+  assert(state.Money === 55, "state unchanged on bad import");
+}
+console.log("== Hard reset suppresses update log ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.hardReset();
+  assert(state.SeenVersion === GAME_VERSION, "SeenVersion = GAME_VERSION after reset");
+  assert(g.shouldShowUpdateLog() === false, "shouldShowUpdateLog false after reset");
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`${failures} test(s) FAILED, ${passes} passed.`);

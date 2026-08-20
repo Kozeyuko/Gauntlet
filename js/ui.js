@@ -237,6 +237,15 @@ export function initUI(game, opts = {}) {
     updateHeader: $("updateHeader"),
     // buy training
     buyTrainingPanel: $("buyTrainingPanel"), buyTrainingList: $("buyTrainingList"),
+    // save / load
+    btnSave: $("btnSave"),
+    saveOverlay: $("saveOverlay"),
+    saveCodeTextarea: $("saveCodeTextarea"),
+    btnSaveCopy: $("btnSaveCopy"), btnSaveDownload: $("btnSaveDownload"),
+    loadCodeTextarea: $("loadCodeTextarea"),
+    btnSaveImport: $("btnSaveImport"), saveImportStatus: $("saveImportStatus"),
+    btnSaveClose: $("btnSaveClose"),
+    btnOptSaveLoad: $("btnOptSaveLoad"),
   };
 
   // ------------------------------------------------------------ build static grids --
@@ -1820,6 +1829,55 @@ export function initUI(game, opts = {}) {
     render();
   });
 
+  // ---- save / load ----
+  function openSaveOverlay() {
+    el.saveCodeTextarea.value = game.exportSave();
+    el.saveImportStatus.textContent = "";
+    el.loadCodeTextarea.value = "";
+    el.saveOverlay.classList.add("show");
+  }
+
+  el.btnSave.addEventListener("click", () => {
+    // SAVE button: force a save now
+    onSave();
+    // brief flash feedback
+    const orig = el.btnSave.textContent;
+    el.btnSave.textContent = "SAVED!";
+    setTimeout(() => { el.btnSave.textContent = orig; }, 900);
+  });
+
+  el.btnSaveClose.addEventListener("click", () => el.saveOverlay.classList.remove("show"));
+  el.saveOverlay.addEventListener("click", (e) => {
+    if (e.target === el.saveOverlay) el.saveOverlay.classList.remove("show");
+  });
+
+  el.btnSaveCopy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(el.saveCodeTextarea.value);
+      el.saveImportStatus.textContent = "Copied to clipboard.";
+    } catch (e) {
+      el.saveImportStatus.textContent = "Copy failed — select and copy manually.";
+    }
+  });
+
+  el.btnSaveDownload.addEventListener("click", () => {
+    const blob = new Blob([el.saveCodeTextarea.value], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gauntlet-save.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  el.btnSaveImport.addEventListener("click", () => {
+    const ok = game.importSave(el.loadCodeTextarea.value);
+    el.saveImportStatus.textContent = ok ? "Save restored!" : "Invalid code — check it starts with GAUNTLET:";
+    if (ok) {
+      el.saveOverlay.classList.remove("show");
+      render();
+    }
+  });
+
   el.btnReset.addEventListener("click", () => {
     if (!confirm("Hard reset? This wipes your save and ghosts.")) return;
     try {
@@ -1938,6 +1996,12 @@ export function initUI(game, opts = {}) {
     if (el.optionsOverlay.classList.contains("show")) el.optionsOverlay.classList.remove("show");
     else openOptions();
   });
+  if (el.btnOptSaveLoad) {
+    el.btnOptSaveLoad.addEventListener("click", () => {
+      el.optionsOverlay.classList.remove("show");
+      openSaveOverlay();
+    });
+  }
   el.btnOptionsClose.addEventListener("click", () => el.optionsOverlay.classList.remove("show"));
   el.optionsOverlay.addEventListener("click", (e) => {
     if (e.target === el.optionsOverlay) el.optionsOverlay.classList.remove("show");
