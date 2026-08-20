@@ -150,33 +150,34 @@ export const ACTIVITY_LIST = [
 // ------------------------------------------------------------------ STORE --
 // Convenience store: food, drinks, and gear (the old general store inventory).
 export const CSTORE_ITEMS = [
-  { key: "rice", name: "Rice bowl", desc: "Restores 20 Nutrition", price: 5, nutrition: 20 },
-  { key: "protein", name: "Protein shake", desc: "+5 Strength for this life", price: 15, stat: "Str", amount: 5 },
-  { key: "energy", name: "Energy drink", desc: "+5 Speed for this life", price: 15, stat: "Spd", amount: 5 },
-  { key: "focus", name: "Focus tea", desc: "+5 Intelligence for this life", price: 15, stat: "Int", amount: 5 },
-  { key: "heart", name: "Heart tonic", desc: "+5 Toughness for this life", price: 20, stat: "Tou", amount: 5 },
-  { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5 },
-  { key: "rawmeat", name: "Raw Meat", desc: "Cook at home for Grilled Meat", price: 4, raw: true, cookTo: "grilledmeat" },
-  { key: "rawchicken", name: "Raw Chicken", desc: "Cook at home for Fried Chicken", price: 5, raw: true, cookTo: "chicken" },
-  { key: "hotdog", name: "Hot Dog", desc: "Restores 25 Nutrition", price: 6, nutrition: 25 },
-  { key: "pizza", name: "Pizza Slice", desc: "Restores 40 Nutrition", price: 8, nutrition: 40 },
-  { key: "chicken", name: "Fried Chicken", desc: "Restores 35 Nutrition", price: 7, nutrition: 35 },
-  { key: "tacos", name: "Tacos", desc: "Restores 45 Nutrition", price: 9, nutrition: 45 },
-  { key: "grilledmeat", name: "Grilled Meat", desc: "Restores 50 Nutrition", price: 0, nutrition: 50, notSold: true },
-  { key: "mat", name: "Old Training Mat", desc: "Required for Shadow Boxing training", price: 15, permanent: true },
+  { key: "rice", name: "Rice bowl", desc: "Restores 20 Nutrition", price: 5, nutrition: 20, cat: "food" },
+  { key: "protein", name: "Protein shake", desc: "+5 Strength for this life", price: 15, stat: "Str", amount: 5, cat: "drinks" },
+  { key: "energy", name: "Energy drink", desc: "+5 Speed for this life", price: 15, stat: "Spd", amount: 5, cat: "drinks" },
+  { key: "focus", name: "Focus tea", desc: "+5 Intelligence for this life", price: 15, stat: "Int", amount: 5, cat: "drinks" },
+  { key: "heart", name: "Heart tonic", desc: "+5 Toughness for this life", price: 20, stat: "Tou", amount: 5, cat: "drinks" },
+  { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5, cat: "drinks" },
+  { key: "rawmeat", name: "Raw Meat", desc: "Cook at home for Grilled Meat", price: 4, raw: true, cookTo: "grilledmeat", cat: "rawfood" },
+  { key: "rawchicken", name: "Raw Chicken", desc: "Cook at home for Fried Chicken", price: 5, raw: true, cookTo: "chicken", cat: "rawfood" },
+  { key: "hotdog", name: "Hot Dog", desc: "Restores 25 Nutrition", price: 6, nutrition: 25, cat: "food" },
+  { key: "pizza", name: "Pizza Slice", desc: "Restores 40 Nutrition", price: 8, nutrition: 40, cat: "food" },
+  { key: "chicken", name: "Fried Chicken", desc: "Restores 35 Nutrition", price: 7, nutrition: 35, cat: "food" },
+  { key: "tacos", name: "Tacos", desc: "Restores 45 Nutrition", price: 9, nutrition: 45, cat: "food" },
+  { key: "grilledmeat", name: "Grilled Meat", desc: "Restores 50 Nutrition", price: 0, nutrition: 50, notSold: true, cat: "food" },
+  { key: "mat", name: "Old Training Mat", desc: "Required for Shadow Boxing training", price: 15, permanent: true, cat: "gear" },
 ];
 
 // Clinic: cheap medical/healing items.
 export const CLINIC_ITEMS = [
-  { key: "bandages", name: "Bandages", desc: "Restore 25 Health", price: 8, health: 25 },
-  { key: "medkit", name: "Medkit", desc: "Restore 60 Health", price: 20, health: 60 },
-  { key: "fullrecovery", name: "Full recovery", desc: "Restore 100 Health + 50 Stamina", price: 40, health: 100, stamina: 50 },
-  { key: "checkup", name: "Checkup", desc: "+2 Toughness for this life", price: 25, stat: "Tou", amount: 2 },
+  { key: "bandages", name: "Bandages", desc: "Restore 25 Health", price: 8, health: 25, cat: "clinic" },
+  { key: "medkit", name: "Medkit", desc: "Restore 60 Health", price: 20, health: 60, cat: "clinic" },
+  { key: "fullrecovery", name: "Full recovery", desc: "Restore 100 Health + 50 Stamina", price: 40, health: 100, stamina: 50, cat: "clinic" },
+  { key: "checkup", name: "Checkup", desc: "+2 Toughness for this life", price: 25, stat: "Tou", amount: 2, cat: "clinic" },
 ];
 
 // ------------------------------------------------------------------ LOCATIONS --
 export const LOCATIONS = {
   home: { name: "Home", unlock: 0, tier: 0, styleGym: null },
+  gym: { name: "City Gym", unlock: 0, tier: 1, styleGym: null },
   spar: { name: "Iron Spar Gym", unlock: 0, tier: 1, styleGym: "Boxer" },
   wat: { name: "Wat Chai Gym", unlock: 0, tier: 1, styleGym: "MuayThai" },
   tatami: { name: "Tatami Hall", unlock: 0, tier: 1, styleGym: "Judo" },
@@ -221,6 +222,7 @@ export const LOCATIONS = {
 // Display order for the locations grid.
 export const LOCATION_LIST = [
   { key: "home", label: "Home", desc: "Your starting point. Safe, quiet, and close to the fridge." },
+  { key: "gym", label: "City Gym", desc: "A clean gym with weights and training gear." },
   { key: "spar", label: "Iron Spar", desc: "A gritty gym with heavy bags and sparse lighting." },
   { key: "wat", label: "Wat Chai", desc: "Temple-styled ringside. Watches every clinch." },
   { key: "tatami", label: "Tatami", desc: "Clean mats, quiet atmosphere, crisp footwork." },
@@ -267,6 +269,8 @@ export const LOCATION_LIST = [
 export const TRAINING = {
   // tier 0 — home: free basics + always-available actions
   home: { Pushups: { cost: 0, gain: 0.6 }, Situps: { cost: 0, gain: 0.6 } },
+  // tier 1 — gym: basic trainings (cheaper than style gyms)
+  gym:   { Pushups: { cost: 2, gain: 1.0 }, Situps: { cost: 2, gain: 1.0 }, Squats: { cost: 3, gain: 1.0 }, ShadowBoxing: { cost: 3, gain: 1.0 }, Roadworks: { cost: 2, gain: 1.0 } },
   // tier 1 — unlock 0, cheap (cost 2-3), gain ×1.0-1.1
   spar:   { Pushups: { cost: 2, gain: 1.0 }, HeavyBag: { cost: 3, gain: 1.1 }, Sparring: { cost: 3, gain: 1.0 } },
   wat:    { Situps: { cost: 2, gain: 1.0 }, Sparring: { cost: 3, gain: 1.0 }, HeavyBag: { cost: 3, gain: 1.0 } },
@@ -702,15 +706,15 @@ export const GYM_TRAINING = [
 
 export const EQUIPMENT = [
   { key: "training_weights", name: "Training Weights", slot: "body",
-    desc: "+50% to all training gains.", cost: 30, buffMult: 1.5 },
+    desc: "+50% to all training gains.", cost: 30, buffMult: 1.5, cat: "gear" },
   { key: "weighted_vest", name: "Weighted Vest", slot: "body",
-    desc: "+30% training gains.", cost: 40, buffMult: 1.3 },
+    desc: "+30% training gains.", cost: 40, buffMult: 1.3, cat: "gear" },
   { key: "ankle_weights", name: "Ankle Weights", slot: "legs",
-    desc: "+40% Speed training gains.", cost: 25, buffMult: 1.4, attrs: ["Spd"] },
+    desc: "+40% Speed training gains.", cost: 25, buffMult: 1.4, attrs: ["Spd"], cat: "gear" },
   { key: "breathing_mask", name: "Breathing Mask", slot: "head",
-    desc: "+20% all training gains.", cost: 35, buffMult: 1.2 },
+    desc: "+20% all training gains.", cost: 35, buffMult: 1.2, cat: "gear" },
 ];
-export const MAIN_GYM = "spar";
+export const MAIN_GYM = "gym";
 
 // ------------------------------------------------------------------ ROAMERS --
 // Free-roaming encounter nodes on the city map.

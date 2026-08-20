@@ -1121,3 +1121,7 @@ header {
 }
 .store-tab.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
 .store-tab:hover:not(.active) { border-color: var(--gold-dim); color: var(--text); }
+/* ---------- tasklist quick panel ---------- */
+.tasklist-panel .taskqueue { max-height: 180px; overflow-y: auto; }
+.tasklist-panel .taskqueue .small { padding: 2px 0; }
+#btnTaskAdvanceQuick.on, #btnTaskAutoQuick.on { border-color: var(--green); color: var(--green); }

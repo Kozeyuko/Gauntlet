@@ -78,11 +78,22 @@
       <h3>News</h3>
       <div class="loglist" id="logList"></div>
     </section>
-    <section class="panel rivalcard">
-      <h3>Rival</h3>
-      <div class="rivalname" id="rivalQuickName">—</div>
-      <div class="small rivalquicklearn" id="rivalQuickLearn"></div>
-      <button class="btn red" id="btnQuickFight">FIGHT</button>
+    <section class="panel tasklist-panel">
+      <h3>Tasks</h3>
+      <div id="taskQueueQuick" class="taskqueue"></div>
+      <div class="btnrow" style="margin-top:8px">
+        <button class="btn small-btn" id="btnTaskRepeatQuick">Repeat: OFF</button>
+        <button class="btn small-btn" id="btnTaskAdvanceQuick">ADVANCE DAY</button>
+      </div>
+      <div class="btnrow" style="margin-top:4px">
+        <button class="btn small-btn" id="btnTaskPlayQuick">PLAY</button>
+        <button class="btn small-btn" id="btnTaskAutoQuick">AUTO: OFF</button>
+        <select id="taskSpeedQuick" class="small-btn">
+          <option value="100">Fast</option>
+          <option value="500" selected>Normal</option>
+          <option value="1000">Slow</option>
+        </select>
+      </div>
     </section>
     <div class="footbtns">
       <button class="btn orange" id="btnReincarnate">REBIRTH</button>
@@ -187,6 +198,10 @@
     <section class="panel" id="buyTrainingPanel" style="display:none">
       <h3>Buy Training</h3>
       <div class="loclist" id="buyTrainingList"></div>
+    </section>
+    <section class="panel" id="gymEquipPanel" style="display:none">
+      <h3>Equipment</h3>
+      <div class="loclist" id="gymEquipList"></div>
     </section>
     <section class="panel" id="cookPanel" style="display:none">
       <h3>Cook</h3>

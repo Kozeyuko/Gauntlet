@@ -189,7 +189,7 @@ export const PERSISTENT_KEYS = [
   "AutoJobKey",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name",
-  "Inventory", "TaskList", "TaskRepeat",
+  "Inventory", "TaskList", "TaskRepeat", "TaskIndex",
   "SeenVersion",
   "TrainTiers", "TrainProgress",
   "PurchasedTraining",
@@ -217,6 +217,7 @@ export function freshState() {
     Inventory: [],
     TaskList: [],
     TaskRepeat: false,
+    TaskIndex: 0,
     SeenVersion: 0,
     TrainTiers: {},
     TrainProgress: {},
@@ -258,7 +259,11 @@ export function restore(state, saved) {
   // Migrate old TaskList format (array of strings) to [{act, n}]
   if (Array.isArray(state.TaskList) && state.TaskList.length > 0) {
     if (typeof state.TaskList[0] === "string") {
-      state.TaskList = state.TaskList.map((s) => ({ act: s, n: 1 }));
+      state.TaskList = state.TaskList.map((s) => ({ act: s, n: 1, origN: 1 }));
+    } else {
+      for (const item of state.TaskList) {
+        if (item && typeof item === "object" && item.origN === undefined) item.origN = item.n;
+      }
     }
   }
   // Migrate old PurchasedTraining → OwnedTraining
@@ -1758,13 +1763,15 @@ export function createGame(state, opts = {}) {
     const valid = [];
     for (const k of list) {
       if (typeof k === "string" && ACTIVITIES[k]) {
-        valid.push({ act: k, n: 1 });
+        valid.push({ act: k, n: 1, origN: 1 });
       } else if (k && typeof k === "object" && ACTIVITIES[k.act]) {
-        valid.push({ act: k.act, n: Math.max(1, Math.floor(num(k.n) || 1)) });
+        const n = Math.max(1, Math.floor(num(k.n) || 1));
+        valid.push({ act: k.act, n, origN: n });
       }
     }
     state.TaskList = valid.slice(0, 20);
     state.TaskRepeat = repeat === true;
+    state.TaskIndex = 0;
   }
 
   function addTask(activityKey, count) {
@@ -1773,7 +1780,7 @@ export function createGame(state, opts = {}) {
     if (!Array.isArray(state.TaskList)) state.TaskList = [];
     if (state.TaskList.length >= 20) return false;
     const n = Math.max(1, Math.min(99, Math.floor(num(count) || 1)));
-    state.TaskList.push({ act: activityKey, n });
+    state.TaskList.push({ act: activityKey, n, origN: n });
     return true;
   }
 
@@ -1910,23 +1917,32 @@ export function createGame(state, opts = {}) {
   function consumeTaskItem() {
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     if (tl.length === 0) return;
-    const first = tl[0];
-    if (!first || typeof first !== "object") { tl.shift(); return; }
+    const idx = Math.min(state.TaskIndex || 0, tl.length - 1);
+    const item = tl[idx];
+    if (!item || typeof item !== "object") {
+      if (state.TaskRepeat) { state.TaskIndex = 0; }
+      else { tl.splice(idx, 1); state.TaskIndex = 0; }
+      return;
+    }
     // Decrement consumable training stock if applicable
-    const gymEntry = GYM_TRAINING.find((t) => t.key === first.act);
+    const gymEntry = GYM_TRAINING.find((t) => t.key === item.act);
     if (gymEntry && gymEntry.unlock === "consumable" && state.Consumables) {
-      if ((state.Consumables[first.act] || 0) > 0) {
-        state.Consumables[first.act] -= 1;
+      if ((state.Consumables[item.act] || 0) > 0) {
+        state.Consumables[item.act] -= 1;
       }
     }
-    if (first.n > 1) {
-      first.n -= 1;
+    if (item.n > 1) {
+      item.n -= 1;
     } else {
       if (state.TaskRepeat) {
-        tl.shift();
-        tl.push(first);
+        state.TaskIndex = idx + 1;
+        if (state.TaskIndex >= tl.length) {
+          state.TaskIndex = 0;
+          for (const t of tl) { if (t && typeof t === "object") t.n = t.origN !== undefined ? t.origN : 1; }
+        }
       } else {
-        tl.shift();
+        tl.splice(idx, 1);
+        if (idx >= tl.length) state.TaskIndex = 0;
       }
     }
   }
@@ -1961,8 +1977,9 @@ export function createGame(state, opts = {}) {
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     let usedTask = false;
     let actKey;
-    if (tl.length > 0) {
-      actKey = String(tl[0].act ?? "Rest");
+    const tIdx = state.TaskIndex || 0;
+    if (tl.length > 0 && tIdx < tl.length) {
+      actKey = String(tl[tIdx].act ?? "Rest");
       usedTask = true;
     } else {
       actKey = String(state.Activity ?? "Rest");
@@ -2087,7 +2104,8 @@ export function createGame(state, opts = {}) {
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     if (tl.length === 0) return false;
 
-    const actKey = tl[0].act;
+    const tIdx = Math.min(state.TaskIndex || 0, tl.length - 1);
+    const actKey = tl[tIdx].act;
     let act = ACTIVITIES[actKey] || ACTIVITIES.Rest;
     const stamina = num(state.Stamina);
     if (actKey !== "Rest" && actKey !== "OddJobs" && stamina < act.cost) {

@@ -981,9 +981,11 @@ console.log("== Tasklist: TaskRepeat cycles the sequence ==");
   g.updatePotential();
   g.doDay();
   assert(state.TaskList.length === 2, "repeat: still 2 entries");
-  assert(state.TaskList[0].act === "Situps" && state.TaskList[1].act === "Pushups", "Pushups rotated to end");
+  assert(state.TaskList[0].act === "Pushups" && state.TaskList[1].act === "Situps", "order unchanged (stable)");
+  assert(state.TaskIndex === 1, "TaskIndex advanced to 1");
   g.doDay();
-  assert(state.TaskList[0].act === "Pushups" && state.TaskList[1].act === "Situps", "Situps rotated; cycle complete");
+  assert(state.TaskList[0].act === "Pushups" && state.TaskList[1].act === "Situps", "order still stable");
+  assert(state.TaskIndex === 0, "TaskIndex reset to 0 (cycle complete)");
 }
 
 console.log("== Tasklist: empty TaskList falls back to Activity ==");
@@ -1757,6 +1759,83 @@ console.log("== M2Cross removal: STYLES no longer contains M2Cross ==");
 console.log("== M2Cross removal: IronBoxing exists in STYLES ==");
 {
   assert("IronBoxing" in STYLES, "IronBoxing exists in STYLES");
+}
+
+console.log("== Part A: MAIN_GYM === 'gym' ==");
+{
+  assert(MAIN_GYM === "gym", "MAIN_GYM is 'gym'");
+}
+
+console.log("== Part A: gym location exists in LOCATIONS ==");
+{
+  assert("gym" in LOCATIONS, "gym exists in LOCATIONS");
+  assert(LOCATIONS.gym.name === "City Gym", "gym name is City Gym");
+  assert(LOCATIONS.gym.styleGym === null, "gym has no styleGym");
+}
+
+console.log("== Part A: TRAINING has gym entry ==");
+{
+  assert("gym" in TRAINING, "TRAINING has gym entry");
+  const gt = TRAINING.gym;
+  assert(gt.Pushups && gt.Situps && gt.Squats && gt.ShadowBoxing && gt.Roadworks, "gym has all basic trainings");
+}
+
+console.log("== Part B: every CSTORE_ITEM has a cat field ==");
+{
+  for (const item of CSTORE_ITEMS) {
+    assert(typeof item.cat === "string" && item.cat.length > 0, `CSTORE ${item.key} has cat`);
+  }
+}
+
+console.log("== Part B: every CLINIC_ITEM has a cat field ==");
+{
+  for (const item of CLINIC_ITEMS) {
+    assert(typeof item.cat === "string" && item.cat.length > 0, `CLINIC ${item.key} has cat`);
+  }
+}
+
+console.log("== Part B: every EQUIPMENT item has a cat field ==");
+{
+  for (const item of EQUIPMENT) {
+    assert(typeof item.cat === "string" && item.cat.length > 0, `EQUIPMENT ${item.key} has cat`);
+  }
+}
+
+console.log("== Part D: TaskIndex persists in freshState ==");
+{
+  const s = freshState();
+  assert(typeof s.TaskIndex === "number", "TaskIndex is number");
+  assert(s.TaskIndex === 0, "TaskIndex starts at 0");
+}
+
+console.log("== Part D: TaskIndex advances through setTaskList ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["Pushups", "Situps", "Squats"], false);
+  assert(state.TaskIndex === 0, "TaskIndex starts at 0");
+  g.updatePotential();
+  g.doDay();
+  assert(state.TaskIndex === 0, "TaskIndex stays at 0 in non-repeat (splice)");
+  assert(state.TaskList[0].act === "Situps", "first item removed, Situps now first");
+  g.doDay();
+  assert(state.TaskList[0].act === "Squats", "Squats now first");
+  g.doDay();
+  assert(state.TaskList.length === 0, "tasklist empty after 3 days");
+}
+
+console.log("== Part D: stable task order across advanceDay with repeat ==");
+{
+  const state = freshState();
+  state.Location = "home";
+  state.Money = 100;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.setTaskList(["OddJobs", "Pushups"], true);
+  g.advanceDay();
+  assert(g.taskList().length === 2, "repeat: still 2 entries after advanceDay");
+  assert(g.taskList()[0].act === "OddJobs" && g.taskList()[1].act === "Pushups", "order unchanged");
+  g.advanceDay();
+  assert(g.taskList()[0].act === "OddJobs" && g.taskList()[1].act === "Pushups", "order still stable after cycle");
 }
 
 console.log("== M2Cross removal: no location/rival/roamer/imagined NPC references M2Cross ==");

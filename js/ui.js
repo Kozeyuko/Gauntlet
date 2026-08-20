@@ -58,7 +58,7 @@ const MAP_H = 850;
 // Building centers (in the 1000×850 map space).
 const MAP_POS = {
   // West district
-  home: [75, 60], spar: [225, 60], wat: [375, 60],
+  home: [75, 60], gym: [150, 135], spar: [225, 60], wat: [375, 60],
   tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
   clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
   jobboard: [75, 540], arena: [225, 540], cstore: [375, 540],
@@ -177,7 +177,7 @@ export function initUI(game, opts = {}) {
     btnReset: $("btnReset"),
     btnAutoRun: $("btnAutoRun"),
     storeOverlay: $("storeOverlay"), storeName: $("storeName"), storeNotice: $("storeNotice"),
-    storeCash: $("storeCash"), storeList: $("storeList"),
+    storeCash: $("storeCash"), storeList: $("storeList"), storeTabs: $("storeTabs"),
     btnStoreClose: $("btnStoreClose"),
     btnOptions: $("btnOptions"), optionsOverlay: $("optionsOverlay"),
     btnOptSound: $("btnOptSound"), btnThemeDark: $("btnThemeDark"), btnThemeLight: $("btnThemeLight"),
@@ -242,6 +242,13 @@ export function initUI(game, opts = {}) {
     updateHeader: $("updateHeader"),
     // buy training
     buyTrainingPanel: $("buyTrainingPanel"), buyTrainingList: $("buyTrainingList"),
+    // gym equip
+    gymEquipPanel: $("gymEquipPanel"), gymEquipList: $("gymEquipList"),
+    // tasklist quick
+    taskQueueQuick: $("taskQueueQuick"),
+    btnTaskRepeatQuick: $("btnTaskRepeatQuick"), btnTaskAdvanceQuick: $("btnTaskAdvanceQuick"),
+    btnTaskPlayQuick: $("btnTaskPlayQuick"), btnTaskAutoQuick: $("btnTaskAutoQuick"),
+    taskSpeedQuick: $("taskSpeedQuick"),
     // save / load
     btnSave: $("btnSave"),
     saveOverlay: $("saveOverlay"),
@@ -522,6 +529,7 @@ export function initUI(game, opts = {}) {
   }
 
   function renderQuickRival() {
+    if (!el.rivalQuickName) return;
     const info = rivalInfo();
     el.rivalQuickName.textContent = info.name;
     el.rivalQuickLearn.textContent = learnLine(info);
@@ -621,6 +629,7 @@ export function initUI(game, opts = {}) {
     renderRival();
     renderQuickRival();
     renderEquipmentPanel();
+    renderTasklistQuick();
     renderLog();
     renderLooking();
     maybeOpenRivalForEncounter();
@@ -887,6 +896,44 @@ export function initUI(game, opts = {}) {
     }
   }
 
+  function renderGymEquip(key) {
+    if (!el.gymEquipPanel || !el.gymEquipList) return;
+    if (key !== MAIN_GYM) { el.gymEquipPanel.style.display = "none"; return; }
+    el.gymEquipPanel.style.display = "";
+    el.gymEquipList.innerHTML = "";
+    const money = num(state.Money);
+    const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
+    const equipped = state.Equipment || {};
+    for (const eq of EQUIPMENT) {
+      const isOwned = owned.includes(eq.key);
+      const isEquipped = equipped[eq.slot] === eq.key;
+      const canBuy = money >= eq.cost;
+      const b = document.createElement("button");
+      b.className = "btn locrow" + (isOwned ? " owned" : (canBuy ? "" : " cantafford"));
+      const label = isOwned ? (isEquipped ? "UNEQUIP" : "EQUIP") : "Buy";
+      b.innerHTML = `
+        <span class="lr-main">
+          <span class="lr-name">${eq.name}</span>
+          <span class="lr-stat">${label}</span>
+        </span>
+        <span class="lr-meta">
+          ${isOwned ? "" : `<span class="lr-cost${canBuy ? "" : " red"}">${fmtCash(eq.cost)}</span>`}
+        </span>`;
+      b.addEventListener("click", () => {
+        if (isOwned) {
+          if (isEquipped) game.unequipItem(eq.key);
+          else game.equipItem(eq.key);
+        } else {
+          game.buyItem(eq.key);
+        }
+        renderGymEquip(key);
+        renderEquipmentPanel();
+        render();
+      });
+      el.gymEquipList.appendChild(b);
+    }
+  }
+
   function openLocationOverlay(key) {
     const loc = LOCATIONS[key];
     if (!loc) return;
@@ -897,6 +944,7 @@ export function initUI(game, opts = {}) {
     renderLocActivities(key);
     renderLocFighters(key);
     renderBuyTraining(key);
+    renderGymEquip(key);
     // Cook panel at Home
     const isHome = key === "home";
     if (isHome && el.cookPanel) {
@@ -1251,18 +1299,19 @@ export function initUI(game, opts = {}) {
   // ------------------------------------------------------------ store overlay --
   let storeType = "cstore";
   let storeTab = "food";
-  const STORE_TABS = ["food", "drinks", "gear", "clinic"];
+  const STORE_TABS = ["food", "rawfood", "drinks", "clinic", "gear"];
+  const STORE_TYPE_TABS = { cstore: ["food", "rawfood", "drinks"], clinic: ["clinic"] };
 
   function renderStoreTabs() {
     if (!el.storeTabs) return;
     el.storeTabs.innerHTML = "";
-    for (const tab of STORE_TABS) {
+    const tabs = STORE_TYPE_TABS[storeType] || STORE_TABS;
+    for (const tab of tabs) {
       const btn = document.createElement("button");
       btn.className = "store-tab" + (storeTab === tab ? " active" : "");
       btn.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
       btn.addEventListener("click", () => {
         storeTab = tab;
-        storeType = tab === "clinic" ? "clinic" : "cstore";
         renderStore();
       });
       el.storeTabs.appendChild(btn);
@@ -1270,12 +1319,14 @@ export function initUI(game, opts = {}) {
   }
 
   function getStoreItems() {
-    if (storeType === "clinic") return CLINIC_ITEMS;
+    if (storeType === "clinic") {
+      return CLINIC_ITEMS.filter((i) => i.cat === storeTab || storeTab === "clinic");
+    }
     if (storeTab === "gear") {
       const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
       const equipped = state.Equipment || {};
       const gearItems = EQUIPMENT.map((e) => ({
-        key: e.key, name: e.name, desc: e.desc, price: e.cost,
+        key: e.key, name: e.name, desc: e.desc, price: e.cost, cat: e.cat,
         _isEquip: true, _owned: owned.includes(e.key),
         _equipped: equipped[e.slot] === e.key, _slot: e.slot,
       }));
@@ -1285,9 +1336,7 @@ export function initUI(game, opts = {}) {
     return CSTORE_ITEMS.filter((i) => {
       if (i.notSold) return false;
       if (i.permanent) return false;
-      if (storeTab === "food") return i.nutrition || i.raw || i.key === "rice";
-      if (storeTab === "drinks") return i.stat;
-      return true;
+      return i.cat === storeTab;
     });
   }
 
@@ -1702,6 +1751,118 @@ export function initUI(game, opts = {}) {
     });
   }
 
+  function renderTasklistQuick() {
+    const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
+    if (!el.taskQueueQuick) return;
+    el.taskQueueQuick.innerHTML = "";
+    if (tl.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No tasks queued.";
+      el.taskQueueQuick.appendChild(empty);
+    } else {
+      const maxShow = Math.min(tl.length, 8);
+      for (let i = 0; i < maxShow; i++) {
+        const item = tl[i];
+        const act = ACTIVITIES[item.act];
+        const div = document.createElement("div");
+        div.className = "small";
+        div.textContent = `${i + 1}. ${act ? act.name : item.act} x${item.n}`;
+        el.taskQueueQuick.appendChild(div);
+      }
+      if (tl.length > maxShow) {
+        const more = document.createElement("div");
+        more.className = "small";
+        more.textContent = `... +${tl.length - maxShow} more`;
+        el.taskQueueQuick.appendChild(more);
+      }
+    }
+    const repeatOn = state.TaskRepeat === true;
+    if (el.btnTaskRepeatQuick) {
+      el.btnTaskRepeatQuick.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
+      el.btnTaskRepeatQuick.classList.toggle("on", repeatOn);
+    }
+    if (el.btnTaskAutoQuick) {
+      const autoOn = !!taskAutoInterval;
+      el.btnTaskAutoQuick.textContent = autoOn ? "AUTO: ON" : "AUTO: OFF";
+      el.btnTaskAutoQuick.classList.toggle("on", autoOn);
+    }
+  }
+
+  if (el.btnTaskRepeatQuick) {
+    el.btnTaskRepeatQuick.addEventListener("click", () => {
+      state.TaskRepeat = state.TaskRepeat !== true;
+      renderTasklistQuick();
+    });
+  }
+  if (el.btnTaskAdvanceQuick) {
+    el.btnTaskAdvanceQuick.addEventListener("click", () => {
+      game.advanceDay();
+      renderTasklistQuick();
+      renderTasklist();
+      render();
+    });
+  }
+  if (el.btnTaskPlayQuick) {
+    el.btnTaskPlayQuick.addEventListener("click", () => {
+      game.doDay();
+      renderTasklistQuick();
+      renderTasklist();
+      render();
+    });
+  }
+  if (el.btnTaskAutoQuick) {
+    el.btnTaskAutoQuick.addEventListener("click", () => {
+      if (taskAutoInterval) {
+        clearInterval(taskAutoInterval);
+        taskAutoInterval = null;
+        renderTasklistQuick();
+      } else {
+        const ms = el.taskSpeedQuick ? Number(el.taskSpeedQuick.value) || 500 : 500;
+        taskAutoInterval = setInterval(() => {
+          if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
+            clearInterval(taskAutoInterval);
+            taskAutoInterval = null;
+            renderTasklistQuick();
+            render();
+            return;
+          }
+          game.doDay();
+          renderTasklistQuick();
+          renderTasklist();
+          render();
+        }, ms);
+        renderTasklistQuick();
+      }
+    });
+  }
+  // D2: speed dropdown restarts interval immediately when AUTO is running
+  function restartAutoIfRunning(speedEl) {
+    if (!taskAutoInterval || !speedEl) return;
+    clearInterval(taskAutoInterval);
+    taskAutoInterval = null;
+    const ms = Number(speedEl.value) || 500;
+    taskAutoInterval = setInterval(() => {
+      if (state.Health <= 0 || state.InFight || (Array.isArray(state.TaskList) && state.TaskList.length === 0)) {
+        clearInterval(taskAutoInterval);
+        taskAutoInterval = null;
+        renderTasklistQuick();
+        render();
+        return;
+      }
+      game.doDay();
+      renderTasklistQuick();
+      renderTasklist();
+      render();
+    }, ms);
+  }
+  if (el.taskSpeed) {
+    el.taskSpeed.addEventListener("change", () => restartAutoIfRunning(el.taskSpeed));
+  }
+  if (el.taskSpeedQuick) {
+    el.taskSpeedQuick.addEventListener("change", () => restartAutoIfRunning(el.taskSpeedQuick));
+  }
+
   // ------------------------------------------------------------ update log overlay --
   function renderUpdateLog(highlightVersion) {
     el.updateList.innerHTML = "";
@@ -2012,12 +2173,14 @@ export function initUI(game, opts = {}) {
     else render();
   });
 
-  el.btnQuickFight.addEventListener("click", () => {
-    pauseAutoRun();
-    const view = game.beginFight();
-    if (view) openCombat(view);
-    else render();
-  });
+  if (el.btnQuickFight) {
+    el.btnQuickFight.addEventListener("click", () => {
+      pauseAutoRun();
+      const view = game.beginFight();
+      if (view) openCombat(view);
+      else render();
+    });
+  }
 
   el.btnAutoFight.addEventListener("click", () => {
     pauseAutoRun();
