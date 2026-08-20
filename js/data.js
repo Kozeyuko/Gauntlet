@@ -724,6 +724,26 @@ export const EQUIPMENT = [
 ];
 export const MAIN_GYM = "gym";
 
+// ------------------------------------------------------------------ MOVEMENT --
+export const MOVE_ENC_CHANCE = 0.15;
+export const MOVE_BASE_SPEED = 1.0;
+
+// Building centers (in the 1000×850 map space).
+export const MAP_POS = {
+  home: [75, 60], gym: [150, 135], spar: [225, 60], wat: [375, 60],
+  tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
+  clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
+  jobboard: [75, 540], arena: [225, 540], cstore: [375, 540],
+  foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
+  sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
+  kaiwan: [600, 210], silat: [700, 210], hunt: [820, 210], sword: [930, 210],
+  xiyi: [600, 360], kyoku: [700, 360], shotokan: [820, 360], taekwon: [930, 360],
+  wrestling: [600, 450], kickbox: [700, 450], kungfu: [820, 450], aikido: [930, 450],
+  kali: [600, 540], ironbox: [700, 540], boran: [820, 540], guihun: [930, 540],
+  ultra: [700, 630],
+  inside: [500, 790],
+};
+
 // ------------------------------------------------------------------ ROAMERS --
 // Free-roaming encounter nodes on the city map.
 // Each node triggers a chained street fight sequence.

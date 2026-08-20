@@ -56,6 +56,23 @@ const ui = initUI(game, {
   onSave: persist,
 });
 
+// Movement loop: ticks every 250ms, advances position when traveling.
+let lastMoveLoc = state.Location;
+setInterval(() => {
+  if (state.MovingTo && !state.InFight) {
+    const result = game.moveStep(0.25);
+    ui.render();
+    if (result && result.arrived) {
+      ui.signalArrival(state.Location);
+      ui.render();
+    }
+  }
+  // Detect arrival after fight ends (encounter interrupted movement)
+  if (!state.MovingTo && lastMoveLoc !== state.Location) {
+    lastMoveLoc = state.Location;
+  }
+}, 250);
+
 // Debug handle (dev console access; harmless in production).
 window.__game = game;
 

@@ -1135,3 +1135,29 @@ header {
   .tasklist-panel .taskqueue { max-height: 160px; }
   .tasklist-panel .taskactivity .btn { font-size: 10px; padding: 5px 6px; }
 }
+/* ---------- player marker ---------- */
+.player-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  pointer-events: none;
+  transition: left 0.25s linear, top 0.25s linear;
+}
+.player-marker .pm-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(232, 184, 75, 0.7);
+}
+.player-marker.moving .pm-dot {
+  background: var(--blue);
+  box-shadow: 0 0 8px rgba(106, 168, 232, 0.8);
+  animation: pm-pulse 0.8s ease-in-out infinite;
+}
+@keyframes pm-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}

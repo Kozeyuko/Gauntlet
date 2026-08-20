@@ -2,7 +2,7 @@
 // Drives js/engine.js + js/data.js headlessly with a deterministic seeded RNG.
 
 import { freshState, snapshot, restore, createGame, eventToString } from "../js/engine.js";
-import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, jobActionRate, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, LOCATIONS } from "../js/data.js";
+import { RIVALS, INSIDE, TRAINING, CSTORE_ITEMS, CLINIC_ITEMS, JOBS, jobPay, jobStaminaCost, jobXpForLevel, jobActionRate, STYLES, KNOWLEDGE_UNMASTERED, KNOWLEDGE_LEARNED, CUSTOM_SKILL_PENALTY, CUSTOM_MAX_SKILLS, SELF_TRAIN_MULT, UNMASTERED_DMG, UNMASTERED_SKILL, STYLE_TIER_MULT, styleTier, ROAMERS, GAME_VERSION, UPDATE_LOG, TRAIN_CHAINS, trainChain, versionCompare, GYM_TRAINING, MAIN_GYM, EQUIPMENT, LOC_RIVAL_TIERS, locationRivals, LOCATIONS, MAP_POS, MOVE_ENC_CHANCE, MOVE_BASE_SPEED } from "../js/data.js";
 
 let failures = 0;
 let passes = 0;
@@ -1987,6 +1987,167 @@ console.log("== v2 B3: tasklist add/remove/advance still works ==");
   g.advanceDay();
   assert(g.taskList().length === 1, "one task consumed");
   assert(g.taskList()[0].act === "Rest", "next task is Rest");
+}
+
+console.log("== v2 B4: beginMove sets MovingTo ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const ok = g.beginMove("gym");
+  assert(ok === true, "beginMove to gym succeeds");
+  assert(state.MovingTo === "gym", "MovingTo is gym");
+  assert(state.MoveProgress === 0, "MoveProgress starts at 0");
+}
+
+console.log("== v2 B4: beginMove rejects locked location ==");
+{
+  const state = freshState();
+  state.RivalIdx = 1;
+  const g = createGame(state, { rng: makeRng(1) });
+  // Locations with unlock >= 1 should be locked when RivalIdx <= unlock
+  const loc = LOCATIONS["inside"];
+  if (loc && loc.unlock >= 1) {
+    const ok = g.beginMove("inside");
+    assert(ok === false, "beginMove to locked location fails");
+    assert(state.MovingTo === null, "MovingTo stays null");
+  }
+}
+
+console.log("== v2 B4: moveStep advances progress ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  g.beginMove("gym");
+  const result = g.moveStep(0.5);
+  assert(result && result.moving === true, "moveStep returns moving");
+  assert(state.MoveProgress > 0, "MoveProgress advanced");
+  assert(state.MoveProgress < 1, "MoveProgress not yet 1");
+}
+
+console.log("== v2 B4: moveStep arrives at destination ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: seqRng([0.5]) });
+  g.beginMove("gym");
+  let arrived = false;
+  for (let i = 0; i < 200; i++) {
+    const r = g.moveStep(1.0);
+    if (r && r.arrived) { arrived = true; break; }
+  }
+  assert(arrived, "eventually arrived");
+  assert(state.MovingTo === null, "MovingTo cleared after arrival");
+  assert(state.Location === "gym", "Location set to gym");
+  const target = MAP_POS["gym"];
+  assertClose(state.PlayerX, target[0], "PlayerX at gym position");
+  assertClose(state.PlayerY, target[1], "PlayerY at gym position");
+}
+
+console.log("== v2 B4: higher Speed means fewer steps to arrive ==");
+{
+  const fast = freshState();
+  fast.Spd = 50;
+  const gf = createGame(fast, { rng: seqRng([0.5]) });
+  gf.beginMove("gym");
+  let fastSteps = 0;
+  for (let i = 0; i < 500; i++) {
+    const r = gf.moveStep(0.25);
+    fastSteps++;
+    if (r && r.arrived) break;
+  }
+
+  const slow = freshState();
+  slow.Spd = 0;
+  const gs = createGame(slow, { rng: seqRng([0.5]) });
+  gs.beginMove("gym");
+  let slowSteps = 0;
+  for (let i = 0; i < 500; i++) {
+    const r = gs.moveStep(0.25);
+    slowSteps++;
+    if (r && r.arrived) break;
+  }
+  assert(fastSteps < slowSteps, `fast (${fastSteps} steps) < slow (${slowSteps} steps)`);
+}
+
+console.log("== v2 B4: movement grants Speed ==");
+{
+  const state = freshState();
+  state.Spd = 0;
+  const g = createGame(state, { rng: makeRng(1) });
+  g.beginMove("gym");
+  g.moveStep(0.5);
+  assert(state.Spd > 0, `Speed increased from 0 to ${state.Spd}`);
+}
+
+console.log("== v2 B4: MOVE_ENC_CHANCE is 0.15 ==");
+{
+  assertClose(MOVE_ENC_CHANCE, 0.15, "MOVE_ENC_CHANCE is 0.15");
+}
+
+console.log("== v2 B4: MOVE_BASE_SPEED is 1.0 ==");
+{
+  assertClose(MOVE_BASE_SPEED, 1.0, "MOVE_BASE_SPEED is 1.0");
+}
+
+console.log("== v2 B4: tryEscape fails when not in fight ==");
+{
+  const state = freshState();
+  const g = createGame(state, { rng: makeRng(1) });
+  const res = g.tryEscape();
+  assert(res.escaped === false, "tryEscape outside fight returns false");
+}
+
+console.log("== v2 B4: tryEscape succeeds with high Speed (deterministic) ==");
+{
+  const state = freshState();
+  state.Spd = 200;
+  state.Int = 10;
+  // Use rng that always returns 0 (below any escape threshold)
+  const g = createGame(state, { rng: seqRng([0]) });
+  // Start an encounter fight
+  state.Encounter = 1;
+  const view = g.beginFight();
+  assert(view !== null, "fight started");
+  assert(state.InFight === true, "InFight is true");
+  const res = g.tryEscape();
+  assert(res.escaped === true, "escape succeeded with high Spd");
+  assert(state.InFight === false, "InFight cleared after escape");
+  assert(state.Cha > 0, `Cha increased to ${state.Cha}`);
+}
+
+console.log("== v2 B4: tryEscape fails with low Speed (deterministic) ==");
+{
+  const state = freshState();
+  state.Spd = 0;
+  state.Int = 10;
+  // Use rng that returns 0.99 (above escape threshold of ~0.5)
+  const g = createGame(state, { rng: seqRng([0.99]) });
+  state.Encounter = 1;
+  const view = g.beginFight();
+  assert(view !== null, "fight started");
+  const chaBefore = state.Cha;
+  const res = g.tryEscape();
+  assert(res.escaped === false, "escape failed with low Spd");
+  assert(state.InFight === true, "InFight still true after failed escape");
+  assertClose(state.Cha, chaBefore, "Cha unchanged after failed escape");
+}
+
+console.log("== v2 B4: MAP_POS exported from data.js ==");
+{
+  assert(typeof MAP_POS === "object", "MAP_POS is an object");
+  assert(MAP_POS.home !== undefined, "MAP_POS has home");
+  assert(MAP_POS.gym !== undefined, "MAP_POS has gym");
+  assert(Array.isArray(MAP_POS.home), "MAP_POS.home is array");
+  assert(MAP_POS.home.length === 2, "MAP_POS.home has 2 coords");
+}
+
+console.log("== v2 B4: freshState has movement fields ==");
+{
+  const s = freshState();
+  assert(typeof s.PlayerX === "number", "PlayerX is number");
+  assert(typeof s.PlayerY === "number", "PlayerY is number");
+  assert(s.MovingTo === null, "MovingTo starts null");
+  assert(s.MoveProgress === 0, "MoveProgress starts 0");
+  assert(s.RunCooldown === 0, "RunCooldown starts 0");
 }
 
 console.log("");

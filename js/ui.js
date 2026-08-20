@@ -29,6 +29,7 @@ import {
   GYM_TRAINING,
   MAIN_GYM,
   EQUIPMENT,
+  MAP_POS,
 } from "./data.js";
 import { eventToString } from "./engine.js";
 import { audio } from "./audio.js";
@@ -55,25 +56,6 @@ const reducedMotion =
 // ---------------------------------------------------------------- map layout --
 const MAP_W = 1000;
 const MAP_H = 850;
-
-// Building centers (in the 1000×850 map space).
-const MAP_POS = {
-  // West district
-  home: [75, 60], gym: [150, 135], spar: [225, 60], wat: [375, 60],
-  tatami: [75, 210], roda: [225, 210], dohyo: [375, 210],
-  clinic: [75, 390], raishin: [225, 390], oldhouse: [375, 390],
-  jobboard: [75, 540], arena: [225, 540], cstore: [375, 540],
-  // East district
-  foundry: [600, 50], mikazuki: [700, 50], stormpg: [820, 50], lightning: [930, 50],
-  sanctum: [600, 140], estate: [700, 140], niko: [820, 140], spirit: [930, 140],
-  kaiwan: [600, 210], silat: [700, 210], hunt: [820, 210], sword: [930, 210],
-  xiyi: [600, 360], kyoku: [700, 360], shotokan: [820, 360], taekwon: [930, 360],
-  wrestling: [600, 450], kickbox: [700, 450], kungfu: [820, 450], aikido: [930, 450],
-  kali: [600, 540], ironbox: [700, 540], boran: [820, 540], guihun: [930, 540],
-  ultra: [700, 630],
-  // The Inside (special locked zone)
-  inside: [500, 790],
-};
 
 // Roamer dots sit on road segments.
 const ROAMER_SPOTS = {
@@ -218,6 +200,7 @@ export function initUI(game, opts = {}) {
     foeFighter: $("foeFighter"), foeHitbox: $("foeHitbox"),
     moveList: $("moveList"), combatLog: $("combatLog"),
     btnUlt: $("btnUlt"), btnAuto: $("btnAuto"), btnForfeit: $("btnForfeit"),
+    btnEscape: $("btnEscape"),
     // ghosts
     ghostOverlay: $("ghostOverlay"), ghostList: $("ghostList"), ghostEmpty: $("ghostEmpty"),
     btnGhostClose: $("btnGhostClose"),
@@ -278,13 +261,26 @@ export function initUI(game, opts = {}) {
       render();
       return;
     }
-    game.setLocation(key);
+    if (state.MovingTo) {
+      game.logMsg("Already traveling — wait to arrive.");
+      render();
+      return;
+    }
+    game.beginMove(key);
+    render();
+  }
+
+  function openArrivalOverlay(key) {
     if (key === "cstore") { openStore("cstore"); return; }
     if (key === "clinic") { openStore("clinic"); return; }
     if (key === MAIN_GYM) { openStore("gym"); return; }
     if (key === "jobboard") { openJobs(); return; }
     if (key === "arena") { openArena(); return; }
     openLocationOverlay(key);
+  }
+
+  function signalArrival(locKey) {
+    pendingArrival = locKey;
   }
 
   el.citymap.innerHTML = `
@@ -328,6 +324,14 @@ export function initUI(game, opts = {}) {
     roamerEls[r.key] = d;
     mapLayer.appendChild(d);
   });
+
+  // Player marker
+  const playerMarker = document.createElement("div");
+  playerMarker.className = "player-marker";
+  playerMarker.innerHTML = `<span class="pm-dot"></span>`;
+  mapLayer.appendChild(playerMarker);
+
+  let pendingArrival = null;
 
   // ------------------------------------------------------------ render helpers --
   const fmtAge = (days) => {
@@ -435,7 +439,7 @@ export function initUI(game, opts = {}) {
       if (key === "inside") hidden = rivalIdx <= MAX_RIVAL;
       b.classList.toggle("locked", hidden);
       b.classList.toggle("hidden", hidden);
-      b.classList.toggle("here", key === state.Location);
+      b.classList.toggle("here", key === state.Location && !state.MovingTo);
       if (!hidden) {
         b.setAttribute("data-tip", buildingBaseTip(key));
       }
@@ -449,6 +453,20 @@ export function initUI(game, opts = {}) {
     if (insideLabel) insideLabel.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
     const insideBox = document.querySelector(".m-inside");
     if (insideBox) insideBox.style.display = rivalIdx > MAX_RIVAL ? "" : "none";
+    // Player marker position
+    const px = num(state.PlayerX);
+    const py = num(state.PlayerY);
+    playerMarker.style.left = pct(px, MAP_W);
+    playerMarker.style.top = pct(py, MAP_H);
+    playerMarker.classList.toggle("moving", !!state.MovingTo);
+    if (state.MovingTo) {
+      const dest = LOCATIONS[state.MovingTo];
+      const pctDone = Math.round((num(state.MoveProgress) || 0) * 100);
+      playerMarker.setAttribute("data-tip", `Traveling to ${dest ? dest.name : state.MovingTo}… ${pctDone}%`);
+    } else {
+      const here = LOCATIONS[state.Location];
+      playerMarker.setAttribute("data-tip", here ? `At ${here.name}` : "");
+    }
     renderRoamers();
   }
 
@@ -633,6 +651,12 @@ export function initUI(game, opts = {}) {
     if (el.logOverlay.classList.contains("show")) renderLogger();
     if (el.jobsOverlay.classList.contains("show") && el.jobList.style.display !== "none") renderJobs();
     if (el.locOverlay.classList.contains("show") && openLocKey) renderLocActivities(openLocKey);
+    // Handle arrival after movement completes
+    if (pendingArrival) {
+      const key = pendingArrival;
+      pendingArrival = null;
+      openArrivalOverlay(key);
+    }
   }
 
   function maybeOpenRivalForEncounter() {
@@ -1950,6 +1974,9 @@ export function initUI(game, opts = {}) {
     el.combatOverlay.classList.add("show");
     el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
     el.btnAuto.classList.toggle("gold", state.AutoBattle === true);
+    // Show escape button only for escapable fights
+    const escapable = view.mode === "encounter" || view.mode === "roamer";
+    el.btnEscape.style.display = escapable ? "" : "none";
     renderCombat(view);
     maybeAuto();
   }
@@ -2117,6 +2144,20 @@ export function initUI(game, opts = {}) {
     showResult(false, String(state.LastMsg ?? "You forfeited the bout."));
   });
 
+  el.btnEscape.addEventListener("click", () => {
+    if (!activeView) return;
+    stopAuto();
+    const res = game.tryEscape();
+    if (res.escaped) {
+      activeView = null;
+      combatMeta = null;
+      el.combatOverlay.classList.remove("show");
+      render();
+    } else {
+      renderCombat(activeView);
+    }
+  });
+
   el.btnAuto.addEventListener("click", () => {
     game.setAutoBattle(state.AutoBattle !== true);
     el.btnAuto.textContent = state.AutoBattle ? "AUTO: ON" : "AUTO: OFF";
@@ -2268,5 +2309,5 @@ export function initUI(game, opts = {}) {
   // roamer countdown refresh while the map is up
   setInterval(renderRoamers, 1000);
 
-  return { render };
+  return { render, signalArrival };
 }

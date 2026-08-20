@@ -69,6 +69,9 @@ import {
   EQUIPMENT,
   LOC_RIVAL_TIERS,
   locationRivals,
+  MAP_POS,
+  MOVE_ENC_CHANCE,
+  MOVE_BASE_SPEED,
 } from "./data.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -196,6 +199,7 @@ export const PERSISTENT_KEYS = [
   "PurchasedTraining",
   "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
   "LocationFights", "UnlockedTiers",
+  "PlayerX", "PlayerY", "MovingTo", "MoveProgress", "RunCooldown",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -230,6 +234,11 @@ export function freshState() {
     OwnedItems: [],
     LocationFights: {},
     UnlockedTiers: {},
+    PlayerX: MAP_POS.home[0],
+    PlayerY: MAP_POS.home[1],
+    MovingTo: null,
+    MoveProgress: 0,
+    RunCooldown: 0,
     // transient
     LastMsg: "", Log: [], Lifespan: BASE_LIFESPAN, Encounter: 0,
     PotRankName: "F-", PotNext: "", StyleSkills: "", StyleUltName: "",
@@ -1632,6 +1641,96 @@ export function createGame(state, opts = {}) {
     logMsg(`You arrive at ${loc.name}.`);
   }
 
+  // ---- movement ----
+  let moveStartX = MAP_POS.home[0];
+  let moveStartY = MAP_POS.home[1];
+
+  function beginMove(locKey) {
+    const loc = LOCATIONS[locKey];
+    if (!loc) return false;
+    if (num(state.RivalIdx) <= loc.unlock) {
+      logMsg(`${loc.name} isn't open to you yet.`);
+      return false;
+    }
+    const target = MAP_POS[locKey];
+    if (!target) return false;
+    state.MovingTo = locKey;
+    state.MoveProgress = 0;
+    moveStartX = num(state.PlayerX);
+    moveStartY = num(state.PlayerY);
+    return true;
+  }
+
+  function moveStep(dt) {
+    if (!state.MovingTo || state.InFight) return null;
+    const target = MAP_POS[state.MovingTo];
+    if (!target) {
+      arriveAt(state.MovingTo);
+      return { arrived: true };
+    }
+    const sx = moveStartX, sy = moveStartY;
+    const tx = target[0], ty = target[1];
+    const dx = tx - sx, dy = ty - sy;
+    const baseDistance = Math.sqrt(dx * dx + dy * dy);
+    if (baseDistance < 1) {
+      arriveAt(state.MovingTo);
+      return { arrived: true };
+    }
+    const spd = attrValue("Spd");
+    const travelTime = baseDistance / (MOVE_BASE_SPEED * (1 + spd * 0.05));
+    const step = dt / Math.max(0.01, travelTime);
+    state.MoveProgress = num(state.MoveProgress) + step;
+    state.Spd = num(state.Spd) + 0.002 * attrApt("Spd");
+    if (R() < MOVE_ENC_CHANCE && !state.InFight) {
+      state.Encounter = 1;
+      state.MovingTo = null;
+      state.MoveProgress = 0;
+      return { encounter: true };
+    }
+    if (state.MoveProgress >= 1) {
+      arriveAt(state.MovingTo);
+      return { arrived: true };
+    }
+    const t = Math.min(1, state.MoveProgress);
+    state.PlayerX = sx + dx * t;
+    state.PlayerY = sy + dy * t;
+    return { moving: true, progress: state.MoveProgress };
+  }
+
+  function arriveAt(locKey) {
+    const loc = LOCATIONS[locKey];
+    state.Location = locKey;
+    state.MovingTo = null;
+    state.MoveProgress = 0;
+    const target = MAP_POS[locKey];
+    if (target) {
+      state.PlayerX = target[0];
+      state.PlayerY = target[1];
+    }
+    if (loc) logMsg(`You arrive at ${loc.name}.`);
+  }
+
+  // ---- escape ----
+  function tryEscape() {
+    if (!battle) return { escaped: false };
+    const mode = battle.mode;
+    if (mode !== "encounter" && mode !== "roamer") {
+      logMsg("Can't escape from this fight!");
+      return { escaped: false };
+    }
+    const spd = attrValue("Spd");
+    const escapeChance = Math.min(0.85, 0.5 + spd * 0.005);
+    if (R() < escapeChance) {
+      state.Cha = num(state.Cha) + 0.03 * attrApt("Cha");
+      battle = null;
+      state.InFight = false;
+      logMsg("You escaped!", "fight");
+      return { escaped: true };
+    }
+    logMsg("Couldn't escape!", "fight");
+    return { escaped: false };
+  }
+
   function setLooking(on) {
     state.Looking = on === true;
     logMsg(on === true ? "You're looking for fights. Careful out there." : "You stop looking for fights. Back to training.");
@@ -2286,6 +2385,8 @@ export function createGame(state, opts = {}) {
     setAutoBattle, buyItem, useItem, autoEatFood, inventory, cookItem,
     trainingAt, setTaskList, addTask, removeTask,
     trainTier, trainTierName, trainTierProgress,
+    // movement
+    beginMove, moveStep, arriveAt, tryEscape,
     // jobs
     jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, jobCanWork,
     setAutoJob, clearAutoJob, autoJobActive,
