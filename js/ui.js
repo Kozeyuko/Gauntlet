@@ -158,6 +158,7 @@ export function initUI(game, opts = {}) {
     btnFight: $("btnFight"), btnAutoFight: $("btnAutoFight"),
     btnLooking: $("btnLooking"), btnGhosts: $("btnGhosts"),
     btnLookingQuick: $("btnLookingQuick"),
+    btnNews: $("btnNews"), newsFloater: $("newsFloater"), btnNewsClose: $("btnNewsClose"),
     logList: $("logList"),
     btnReincarnate: $("btnReincarnate"),
     btnReset: $("btnReset"),
@@ -2362,6 +2363,23 @@ export function initUI(game, opts = {}) {
     if (el.logOverlay.classList.contains("show")) el.logOverlay.classList.remove("show");
     else openLogger();
   });
+  // floating news box (top-left)
+  if (el.btnNews) {
+    el.btnNews.addEventListener("click", () => {
+      el.newsFloater.classList.toggle("show");
+    });
+  }
+  if (el.btnNewsClose) {
+    el.btnNewsClose.addEventListener("click", () => el.newsFloater.classList.remove("show"));
+  }
+  if (el.newsFloater) {
+    el.newsFloater.addEventListener("click", (e) => { e.stopPropagation(); });
+    document.addEventListener("click", (e) => {
+      if (el.newsFloater.classList.contains("show") && !el.newsFloater.contains(e.target) && e.target !== el.btnNews) {
+        el.newsFloater.classList.remove("show");
+      }
+    });
+  }
   el.btnLogClose.addEventListener("click", () => el.logOverlay.classList.remove("show"));
   el.logOverlay.addEventListener("click", (e) => {
     if (e.target === el.logOverlay) el.logOverlay.classList.remove("show");

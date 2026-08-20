@@ -25,10 +25,17 @@
     <button class="btn small-btn" id="btnOptions">OPTIONS</button>
     <button class="btn small-btn" id="btnJobs">JOBS</button>
     <button class="btn small-btn" id="btnLog">LOG</button>
+    <button class="btn small-btn" id="btnNews">NEWS</button>
     <button class="btn small-btn" id="btnStats">STATS</button>
     <button class="btn small-btn" id="btnUpdateLog">UPDATES</button>
   </div>
 </header>
+
+<!-- ============ FLOATING NEWS BOX (top-left, opens from NEWS button) ============ -->
+<div class="news-floater" id="newsFloater">
+  <div class="news-floater-head"><h3>News</h3><button id="btnNewsClose" class="btn small-btn">×</button></div>
+  <div class="loglist" id="logList"></div>
+</div>
 
 <!-- ============ THREE-COLUMN GAME SCREEN ============ -->
 <div class="gamecols">
@@ -72,12 +79,8 @@
   </aside>
   <section id="citymap" aria-label="City map"></section>
 
-  <!-- RIGHT: news + rival quick card + life/save -->
+  <!-- RIGHT: tasklist + life/save -->
   <aside class="col-right">
-    <section class="panel">
-      <h3>News</h3>
-      <div class="loglist" id="logList"></div>
-    </section>
     <section class="panel tasklist-panel">
       <h3>Tasks</h3>
       <div id="taskQueueQuick" class="taskqueue"></div>
