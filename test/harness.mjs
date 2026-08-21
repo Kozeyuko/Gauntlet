@@ -942,7 +942,7 @@ console.log("== Inventory: autoEatFood fires at start of doDay ==");
 }
 
 // ---- PART B: Tasklist tests ----
-console.log("== Tasklist: Home queue is one-shot and removes completed tasks ==");
+console.log("== Tasklist: Home queue persists and rotates after completion ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
@@ -950,13 +950,14 @@ console.log("== Tasklist: Home queue is one-shot and removes completed tasks =="
   g.setTaskList(["Pushups", "Situps", "Squats"], false);
   g.updatePotential();
   g.doDay();
-  assert(state.TaskList.length === 2, "first completed task removed");
+  assert(state.TaskList.length === 3, "completed task remains in queue");
+  assert(state.TaskIndex === 1, "queue rotates to next task");
   g.doDay();
   g.doDay();
-  assert(state.TaskList.length === 0, "one-shot queue is empty after completion");
+  assert(state.TaskList.length === 3, "tasks remain after repeated farming");
 }
 
-console.log("== Tasklist: repeat flag is ignored and sequence does not cycle ==");
+console.log("== Tasklist: repeat flag no longer controls persistence ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
@@ -965,7 +966,7 @@ console.log("== Tasklist: repeat flag is ignored and sequence does not cycle =="
   g.updatePotential();
   g.doDay();
   g.doDay();
-  assert(state.TaskList.length === 0, "repeat removed: queue does not cycle");
+  assert(state.TaskList.length === 2, "tasks persist without Repeat control");
 }
 
 console.log("== Tasklist: empty TaskList falls back to Activity ==");
@@ -1016,7 +1017,7 @@ console.log("== Tasklist: too tired falls back to Rest ==");
   g.doDay();
   const logText = state.Log.map((e) => e.t).join(" ");
   assert(logText.includes("Too tired") || logText.toLowerCase().includes("rest"), "fell back to Rest when too tired");
-  assert(state.TaskList.length === 0, "task is consumed even when training falls back to rest");
+  assert(state.TaskList.length === 1, "task remains after fallback");
 }
 
 console.log("== Version: GAME_VERSION is positive ==");
@@ -1192,7 +1193,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.11, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.12, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1241,7 +1242,7 @@ console.log("== Part A: training via tasklist works regardless of location ==");
   g.setTaskList(["Pushups"], false);
   const tlBefore = state.Stamina;
   g.advanceDay();
-  assert(state.TaskList.length === 0, "task removed after advance");
+  assert(state.TaskList.length === 1, "task remains after advance");
   assert(state.Stamina < tlBefore, "Pushups trained (stamina spent) even at clinic");
 }
 
@@ -1438,7 +1439,7 @@ console.log("== Part C: advanceDay runs one day ==");
   const result = g.advanceDay();
   assert(result === true, "advanceDay returned true");
   assert(state.AgeDays === prevAge + 1, "aged by one day");
-  assert(g.taskList().length === 0, "one-shot task removed after advance");
+  assert(g.taskList().length === 1, "task remains after advance");
 }
 
 console.log("== Part C: advanceDay with repeat ==");
@@ -1449,7 +1450,7 @@ console.log("== Part C: advanceDay with repeat ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.setTaskList(["OddJobs"], true);
   g.advanceDay();
-  assert(g.taskList().length === 0, "repeat removed: task does not cycle");
+  assert(g.taskList().length === 1, "repeat removed: persistent task remains");
 }
 
 console.log("== Part C: advanceDay decrements count ==");
@@ -1465,7 +1466,7 @@ console.log("== Part C: advanceDay decrements count ==");
   g.advanceDay();
   assert(g.taskList()[0].n === 1, "n decremented to 1");
   g.advanceDay();
-  assert(state.TaskList.length === 0, "item removed after final use");
+  assert(state.TaskList.length === 1, "item remains after final use");
 }
 
 console.log("== Part C: advanceNDays ==");
@@ -1488,8 +1489,8 @@ console.log("== Part C: advanceNDays stops on empty ==");
   const g = createGame(state, { rng: makeRng(1) });
   g.addTask("OddJobs", 2);
   const count = g.advanceNDays(10);
-  assert(count === 2, "stops after one-shot tasks are empty");
-  assert(g.taskList().length === 0, "task removed after completion");
+  assert(count === 10, "continues farming persistent tasks");
+  assert(g.taskList().length === 1, "task remains available after completion");
 }
 
 console.log("== Part C: advanceDay returns false on empty list ==");
@@ -1811,7 +1812,7 @@ console.log("== Part D: TaskIndex persists in freshState ==");
   assert(s.TaskIndex === 0, "TaskIndex starts at 0");
 }
 
-console.log("== Part D: Home tasks are one-shot in stable order ==");
+console.log("== Part D: Home tasks persist in stable order ==");
 {
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
@@ -1820,14 +1821,14 @@ console.log("== Part D: Home tasks are one-shot in stable order ==");
   assert(state.TaskIndex === 0, "TaskIndex starts at 0");
   g.updatePotential();
   g.doDay();
-  assert(state.TaskList.length === 2, "first task removed after doDay");
-  assert(state.TaskList[0].act === "Situps", "order preserved after removal");
+  assert(state.TaskList.length === 3, "first task remains");
+  assert(state.TaskList[0].act === "Pushups", "order remains stable");
   g.doDay();
   g.doDay();
-  assert(state.TaskList.length === 0, "tasklist empty after one-shot queue");
+  assert(state.TaskList.length === 3, "tasklist remains after farming");
 }
 
-console.log("== Part D: repeat no longer cycles tasks ==");
+console.log("== Part D: persistent task rotation ignores repeat flag ==");
 {
   const state = freshState();
   state.Location = "home";
@@ -1836,7 +1837,7 @@ console.log("== Part D: repeat no longer cycles tasks ==");
   g.setTaskList(["OddJobs", "Pushups"], true);
   g.advanceDay();
   g.advanceDay();
-  assert(g.taskList().length === 0, "repeat removed: no cycle after advanceDay");
+  assert(g.taskList().length === 2, "tasks remain after repeated advanceDay");
 }
 
 console.log("== M2Cross removal: no location/rival/roamer/imagined NPC references M2Cross ==");
@@ -1978,7 +1979,7 @@ console.log("== v2 B3: tasklist add/remove/advance still works ==");
   assert(g.taskList().length === 0, "task removed");
   g.setTaskList(["OddJobs", "Rest"], false);
   g.advanceDay();
-  assert(g.taskList().length === 1 && g.taskList()[0].act === "Rest", "one-shot queue advances to the next task");
+  assert(g.taskList().length === 2 && g.taskList()[0].act === "OddJobs" && g.taskList()[1].act === "Rest", "persistent queue advances without disappearing");
 }
 
 console.log("== v2 B4: beginMove sets MovingTo ==");

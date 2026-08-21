@@ -1214,7 +1214,10 @@ header {
 .admin-grid input { width: 100%; box-sizing: border-box; }
 @keyframes news-pulse { 0%,100% { box-shadow: 0 0 4px rgba(228,190,92,.35); } 50% { box-shadow: 0 0 14px rgba(228,190,92,.9); } }
 
-/* ---------- tactical dense command-console skin ---------- */
+.loc-tabs { display: flex; gap: 4px; margin: 10px 0; flex-wrap: nowrap; overflow-x: auto; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.loc-tabs .store-tab { flex: 1 0 auto; min-width: 100px; text-align: center; }
+.loc-panel { min-height: 0; }
+
 :root {
   --bg: #090c11;
   --panel: #101720;

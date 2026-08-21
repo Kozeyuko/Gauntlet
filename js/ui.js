@@ -186,7 +186,7 @@ export function initUI(game, opts = {}) {
     // rival overlay
     btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
     // location overlay
-    locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"),
+    locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"), locTabs: $("locTabs"), activitiesPanel: $("activitiesPanel"), trainersPanel: $("trainersPanel"),
     locFightersTitle: $("locFightersTitle"), locFightersList: $("locFightersList"), btnLocClose: $("btnLocClose"), btnReturnHome: $("btnReturnHome"),
     cookPanel: $("cookPanel"), cookList: $("cookList"), homeTaskPanel: $("homeTaskPanel"),
     // logger
@@ -526,7 +526,8 @@ export function initUI(game, opts = {}) {
       const pts = [];
       if (Array.isArray(path) && path.length) {
         pts.push([px, py]);
-        for (const wp of path) pts.push(wp);
+        const activeIndex = Math.max(0, Number(state.routeIndex) || 0);
+        for (let i = Math.max(1, activeIndex + 1); i < path.length; i++) pts.push(path[i]);
       } else if (dest && MAP_POS[state.MovingTo]) {
         pts.push([px, py], MAP_POS[state.MovingTo]);
       }
@@ -568,6 +569,9 @@ export function initUI(game, opts = {}) {
     if (!r) return;
     if (el.cookPanel) el.cookPanel.style.display = "none";
     if (el.homeTaskPanel) el.homeTaskPanel.style.display = "none";
+    if (el.locTabs) el.locTabs.innerHTML = "";
+    if (el.activitiesPanel) el.activitiesPanel.style.display = "none";
+    if (el.trainersPanel) el.trainersPanel.style.display = "";
     const challengers = game.roamerChallengers(key);
     game.noteRoamerSeen(key);
     openLocKey = null;
@@ -931,8 +935,61 @@ export function initUI(game, opts = {}) {
     }
   }
 
+  function renderGymTrainers(key) {
+    const loc = LOCATIONS[key];
+    const programs = game.trainingAt(key) || {};
+    el.locFightersTitle.textContent = "Trainers & Modes";
+    el.locFightersList.innerHTML = "";
+    for (const [activityKey, program] of Object.entries(programs)) {
+      const row = document.createElement("div"); row.className = "ghostrow";
+      row.innerHTML = `<div class="gmain"><div class="gnm">${ACTIVITIES[activityKey]?.name || activityKey}</div><div class="gsub">Gain ×${Number(program.gain || 1).toFixed(2)} · ${fmtCash(program.cost || 0)} per session</div></div>`;
+      const btn = document.createElement("button"); btn.className = "btn small-btn"; btn.textContent = "TRAIN";
+      btn.addEventListener("click", () => { game.setActivity(activityKey); game.doDay(); render(); });
+      row.appendChild(btn); el.locFightersList.appendChild(row);
+    }
+    if (loc.styleGym && STYLES[loc.styleGym]) {
+      const style = STYLES[loc.styleGym];
+      const learned = !!game.learnedStyles()[loc.styleGym];
+      const row = document.createElement("div"); row.className = "ghostrow";
+      row.innerHTML = `<div class="gmain"><div class="gnm">${style.ult?.name || "Special Mode"}</div><div class="gsub">${learned ? "Requirement met — style learned" : "Requires learning " + style.name + " first"}</div></div>`;
+      const btn = document.createElement("button"); btn.className = "btn small-btn"; btn.textContent = learned ? "ACTIVATE" : "LOCKED"; btn.disabled = !learned;
+      btn.addEventListener("click", () => { game.setStyle(loc.styleGym); render(); });
+      row.appendChild(btn); el.locFightersList.appendChild(row);
+    }
+    if (!el.locFightersList.children.length) el.locFightersList.innerHTML = `<div class="small">No trainer programs available here yet.</div>`;
+  }
+
+  function renderLocTabs(key) {
+    const loc = LOCATIONS[key];
+    const tabs = key === "home"
+      ? [{ id: "tasks", label: "TASKS" }, { id: "cook", label: "COOK" }]
+      : (loc && loc.tier > 0)
+        ? [{ id: "trainers", label: "TRAINERS" }, { id: "gear", label: "TRAINING GEAR" }]
+        : [{ id: "activities", label: "ACTIVITIES" }];
+    el.locTabs.innerHTML = "";
+    const select = (id) => {
+      el.activitiesPanel.style.display = id === "activities" ? "" : "none";
+      el.trainersPanel.style.display = id === "trainers" ? "" : "none";
+      el.cookPanel.style.display = id === "cook" ? "" : "none";
+      el.homeTaskPanel.style.display = id === "tasks" ? "" : "none";
+      el.locTabs.querySelectorAll(".store-tab").forEach((b) => b.classList.toggle("active", b.dataset.locTab === id));
+      if (id === "tasks") renderTasklistQuick();
+      if (id === "cook") renderCookPanel();
+    };
+    tabs.forEach((tab) => {
+      const b = document.createElement("button"); b.className = "store-tab"; b.dataset.locTab = tab.id; b.textContent = tab.label;
+      b.addEventListener("click", () => {
+        if (tab.id === "gear") { closeAllTransientUIs(); openStore("gym"); return; }
+        select(tab.id);
+      });
+      el.locTabs.appendChild(b);
+    });
+    select(tabs[0].id);
+  }
+
   function renderLocFighters(key) {
     const loc = LOCATIONS[key];
+    if (loc && loc.tier > 0) { renderGymTrainers(key); return; }
     if (!el.locFightersList || !el.locFightersTitle) return;
     el.locFightersList.innerHTML = "";
     if (!loc.styleGym && loc.tier === 0) {
@@ -988,15 +1045,7 @@ export function initUI(game, opts = {}) {
     renderLocTier(key);
     renderLocActivities(key);
     renderLocFighters(key);
-    // Cook panel at Home
-    const isHome = key === "home";
-    if (isHome && el.cookPanel) {
-      renderCookPanel();
-      el.cookPanel.style.display = "";
-    } else if (el.cookPanel) {
-      el.cookPanel.style.display = "none";
-    }
-    if (el.homeTaskPanel) el.homeTaskPanel.style.display = isHome ? "" : "none";
+    renderLocTabs(key);
     el.locOverlay.classList.add("show");
   }
 

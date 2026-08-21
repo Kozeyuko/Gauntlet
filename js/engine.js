@@ -2295,8 +2295,7 @@ export function createGame(state, opts = {}) {
     const idx = Math.min(state.TaskIndex || 0, tl.length - 1);
     const item = tl[idx];
     if (!item || typeof item !== "object") {
-      state.TaskList.splice(idx, 1);
-      state.TaskIndex = Math.min(idx, Math.max(0, state.TaskList.length - 1));
+      state.TaskIndex = tl.length ? (idx + 1) % tl.length : 0;
       return;
     }
     // Decrement consumable training stock if applicable
@@ -2309,9 +2308,9 @@ export function createGame(state, opts = {}) {
     if (item.n > 1) {
       item.n -= 1;
     } else {
-      // Completed tasks are removed from the one-shot Home queue.
-      state.TaskList.splice(idx, 1);
-      state.TaskIndex = Math.min(idx, Math.max(0, state.TaskList.length - 1));
+      // Tasks are permanent queue entries. Completion resets the count and rotates to the next task.
+      item.n = item.origN !== undefined ? item.origN : 1;
+      state.TaskIndex = tl.length ? (idx + 1) % tl.length : 0;
     }
   }
 

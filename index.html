@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.11">
+<link rel="stylesheet" href="css/style.css?v=2.12">
 </head>
 <body>
 
@@ -186,15 +186,13 @@
       <span id="locTier" class="tierbadge"></span>
     </div>
     <p id="locFlavor"></p>
-    <section class="panel">
-      <div class="panelhead">
-        <h3>Activities</h3>
-        <button class="btn small-btn" id="btnAutoRun">AUTO: OFF</button>
-      </div>
+    <div class="loc-tabs" id="locTabs"></div>
+    <section class="panel loc-panel" id="activitiesPanel">
+      <div class="panelhead"><h3>Activities</h3><button class="btn small-btn" id="btnAutoRun">AUTO: OFF</button></div>
       <div class="loclist" id="activitiesGrid"></div>
     </section>
-    <section class="panel">
-      <h3 id="locFightersTitle">Fighters</h3>
+    <section class="panel loc-panel" id="trainersPanel">
+      <h3 id="locFightersTitle">Trainers</h3>
       <div class="loclist" id="locFightersList"></div>
     </section>
     <section class="panel" id="cookPanel" style="display:none">
@@ -352,7 +350,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.11</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.12</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
@@ -492,6 +490,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.11"></script>
+<script type="module" src="js/main.js?v=2.12"></script>
 </body>
 </html>
