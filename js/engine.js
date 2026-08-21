@@ -609,8 +609,9 @@ export function createGame(state, opts = {}) {
     }
     const cost = jobStaminaCost(job, level);
     if (num(state.Stamina) < cost) {
-      logMsg("Too tired to work. Rest first.", "job");
-      return { success: false };
+      logMsg("Auto-job stopped: you are out of Stamina.", "job");
+      clearAutoJob();
+      return { success: false, exhausted: true };
     }
     const cooldowns = state.JobCooldowns || {};
     const last = Number(cooldowns[jobKey]) || 0;
@@ -1842,6 +1843,15 @@ export function createGame(state, opts = {}) {
     logMsg(`You arrive at ${loc.name}.`);
   }
 
+  function regenStamina(dt = 0.05) {
+    if (state.MovingTo || state.InFight || !state.Location) return false;
+    const amount = maxStamina() * 0.10 * Math.max(0, Number(dt) || 0);
+    if (amount <= 0) return false;
+    const before = num(state.Stamina);
+    state.Stamina = Math.min(maxStamina(), before + amount);
+    return state.Stamina > before;
+  }
+
   // ---- movement ----
   let moveStartX = MAP_POS.home[0];
   let moveStartY = MAP_POS.home[1];
@@ -2688,7 +2698,7 @@ export function createGame(state, opts = {}) {
     trainingAt, setTaskList, addTask, removeTask,
     trainTier, trainTierName, trainTierProgress,
     // movement
-    beginMove, moveStep, arriveAt, tryEscape,
+    beginMove, moveStep, arriveAt, regenStamina, tryEscape,
     // jobs
     jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, autoJobRemaining, jobCanWork,
     setAutoJob, clearAutoJob, autoJobActive, jobActionStaminaCost,

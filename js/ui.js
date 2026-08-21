@@ -787,8 +787,8 @@ export function initUI(game, opts = {}) {
     const cost = game.rebirthCost ? game.rebirthCost() : 0;
     el.btnReincarnate.textContent = `REBIRTH (${fmtCash(cost)})`;
     if (el.logOverlay.classList.contains("show")) renderLogger();
-    if (el.jobsOverlay.classList.contains("show") && el.jobList.style.display !== "none") renderJobs();
-    if (el.locOverlay.classList.contains("show") && openLocKey) renderLocActivities(openLocKey);
+    if (el.jobsOverlay.classList.contains("show") && el.jobList.style.display !== "none") refreshJobLiveState();
+    // Open location panels keep their DOM stable during the real-time pulse.
     // Handle arrival after movement completes
     if (pendingArrival) {
       const key = pendingArrival;
@@ -1158,6 +1158,25 @@ export function initUI(game, opts = {}) {
   // ------------------------------------------------------------ Jobs UI & Minigames --
   let minigameTimer = null;
 
+  function refreshJobLiveState() {
+    if (!el.jobsOverlay.classList.contains("show") || el.jobList.style.display === "none") return;
+    const activeAuto = game.autoJobActive();
+    el.jobList.querySelectorAll(".jobcard").forEach((card) => {
+      const key = card.dataset.jobKey;
+      const job = JOBS.find((j) => j.key === key);
+      if (!job) return;
+      const lvl = game.jobLevel(key);
+      const cost = jobStaminaCost(job, lvl);
+      const turnsLeft = Math.floor(num(state.Stamina) / Math.max(1, cost));
+      const active = activeAuto === key;
+      const remain = active && game.autoJobRemaining ? game.autoJobRemaining(key) : 0;
+      const tip = active ? `Auto-job grace remaining: ${Math.ceil(remain / 1000)}s · ${turnsLeft} turns from current Stamina. It stops automatically at 0 Stamina.` : `Start auto-work; ${turnsLeft} turns available from current Stamina. It stops automatically at 0 Stamina.`;
+      const btn = card.querySelector(".auto-toggle-btn");
+      if (btn) { btn.textContent = active ? "AUTO: ON" : "AUTO: OFF"; btn.classList.toggle("on", active); btn.title = tip; btn.setAttribute("data-tip", tip); }
+      card.classList.toggle("auto-active", active);
+    });
+  }
+
   function renderJobs() {
     el.jobList.innerHTML = "";
     const activeAuto = game.autoJobActive();
@@ -1170,9 +1189,11 @@ export function initUI(game, opts = {}) {
       const canAfford = num(state.Stamina) >= cost;
       const isAutoActive = activeAuto === j.key;
       const autoRemaining = isAutoActive && game.autoJobRemaining ? game.autoJobRemaining(j.key) : 0;
-      const autoTip = isAutoActive ? `Auto-job grace remaining: ${Math.ceil(autoRemaining / 1000)}s. Returning to the Job Board restarts the timer.` : "Start auto-work; it runs every 2 seconds and continues briefly after leaving the Job Board.";
+      const turnsLeft = Math.floor(num(state.Stamina) / Math.max(1, cost));
+      const autoTip = isAutoActive ? `Auto-job grace remaining: ${Math.ceil(autoRemaining / 1000)}s · ${turnsLeft} turns from current Stamina. It stops automatically at 0 Stamina.` : `Start auto-work; ${turnsLeft} turns available from current Stamina. It stops automatically at 0 Stamina.`;
       const card = document.createElement("div");
       card.className = "jobcard" + (isAutoActive ? " auto-active" : "");
+      card.dataset.jobKey = j.key;
       card.innerHTML = `
         <div class="jhead">
           <span>${j.name}</span>
@@ -2003,12 +2024,21 @@ export function initUI(game, opts = {}) {
   const setMobileDrawer = (open) => {
     if (!mobileDrawer) return;
     mobileDrawer.classList.toggle("mobile-open", open);
+    mobileDrawer.classList.toggle("panel-hidden", !open && window.matchMedia && window.matchMedia("(min-width: 901px)").matches);
+    document.body.classList.toggle("drawer-open", open);
     el.mobileDrawerBackdrop.classList.toggle("show", open);
     el.btnMobilePanel.classList.toggle("gold", open);
     el.btnMobilePanel.textContent = open ? "CLOSE PANEL" : "PANEL";
   };
   el.btnMobilePanel.addEventListener("click", () => setMobileDrawer(!mobileDrawer.classList.contains("mobile-open")));
   el.mobileDrawerBackdrop.addEventListener("click", () => setMobileDrawer(false));
+  document.addEventListener("pointerdown", (event) => {
+    if (el.newsFloater?.classList.contains("show") && !el.newsFloater.contains(event.target) && event.target !== el.btnNews) el.newsFloater.classList.remove("show");
+    if (mobileDrawer?.classList.contains("mobile-open") && !mobileDrawer.contains(event.target) && event.target !== el.btnMobilePanel && !el.mobileDrawerBackdrop.contains(event.target)) setMobileDrawer(false);
+  });
+  document.querySelectorAll(".overlay").forEach((overlay) => overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.classList.remove("show");
+  }));
   el.updateOverlay.addEventListener("click", (e) => {
     if (e.target === el.updateOverlay) el.updateOverlay.classList.remove("show");
   });

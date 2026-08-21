@@ -95,15 +95,16 @@ body {
   #topbar .vital.next { display: none; }
   #topbar .headerbtns { order: 3; width: 100%; justify-content: center; gap: 3px; }
   #topbar .headerbtns .btn { padding: 3px 5px; font-size: 9px; }
-  .gamecols { grid-template-columns: 1fr; flex: none; min-height: auto; overflow: visible; }
-  #citymap { order: 1; overflow-x: auto; overflow-y: hidden; justify-content: flex-start; padding: 8px 6px; }
+  .gamecols { display: flex; flex-direction: column; flex: none; min-height: auto; overflow: visible; }
+  #citymap { order: 1; width: 100%; overflow-x: auto; overflow-y: hidden; justify-content: flex-start; padding: 8px 6px; }
   #citymap .map-wrap { width: 1000px; max-width: none; min-width: 1000px; aspect-ratio: 1000 / 850; }
-  .col-left { order: 2; }
-  .col-right { order: 3; }
+  .col-left { order: 2; width: 100%; }
+  .col-right { order: 3; width: 100%; }
   .col-left, .col-right { overflow-y: visible; }
 }
 
-/* ---------- top bar ---------- */
+body.drawer-open { overflow: hidden; }
+
 header {
   display: flex;
   align-items: center;
@@ -1203,7 +1204,7 @@ header {
 /* ---------- floating news box (top-left) ---------- */
 .tutorial-modal { max-width: 420px; text-align: center; }
 .tutorial-modal p { margin: 12px 0 18px; color: var(--muted); line-height: 1.45; }
-.news-floater { position: fixed; top: 8px; left: 8px; width: 300px; max-width: 90vw; max-height: 60vh; overflow-y: auto; background: var(--panel2); border: 1px solid var(--gold-dim); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 90; display: none; padding: 10px; }
+.news-floater { position: fixed; top: 72px; left: 8px; width: 300px; max-width: 90vw; max-height: 60vh; overflow-y: auto; background: var(--panel2); border: 1px solid var(--gold-dim); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 200; display: none; padding: 10px; }
 .news-floater.show { display: block; }
 .news-floater-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .news-floater-head h3 { margin: 0; color: var(--gold); font-size: 15px; }
@@ -1273,7 +1274,8 @@ header { gap: 10px; padding: 8px 12px; border-bottom-color: var(--line); backgro
 .tutorial-modal { border-left: 3px solid var(--green); }
 [data-tip]:hover::after, [data-tip].show::after { border-radius: 2px; font-family: var(--mono); font-size: 10px; }
 @media (max-width: 900px) {
-  .mobile-panel-btn { display: inline-flex !important; }
+  .news-floater { top: 150px; max-height: 55vh; }
+
   .mobile-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 110; }
   .mobile-drawer-backdrop.show { opacity: 1; pointer-events: auto; }
   .col-left { position: fixed; z-index: 120; left: 0; top: 0; bottom: 0; width: min(88vw, 340px); max-width: 340px; padding: 52px 8px 12px; overflow-y: auto; background: #0d141c; border-right: 1px solid var(--line); box-shadow: 12px 0 28px rgba(0,0,0,.45); transform: translateX(-105%); transition: transform .22s ease; }
@@ -1282,5 +1284,6 @@ header { gap: 10px; padding: 8px 12px; border-bottom-color: var(--line); backgro
   #citymap { position: relative; z-index: 1; }
 }
 @media (min-width: 901px) {
-  .mobile-panel-btn, .mobile-drawer-backdrop { display: none !important; }
+  .mobile-drawer-backdrop { display: none !important; }
+  .col-left.panel-hidden { display: none; }
 }

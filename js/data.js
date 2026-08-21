@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.16;
+export const GAME_VERSION = 2.17;
 export const UPDATE_LOG = [
+  { v: 2.17, text: "• Rebuilt map routing as a shortest-path road graph with no diagonal segments or immediate backtracks.\n• Mobile layout now stacks the right column below the map instead of beside it.\n• PANEL is available on PC and mobile; opening it locks page scrolling.\n• Outside clicks dismiss mobile popups and overlays.\n• News now stays below the header.\n• Live Job Board updates preserve DOM nodes to prevent hover flicker.\n• Locations regenerate 10% max Stamina per second.\n• Auto-job stops immediately when Stamina reaches zero and shows turns remaining." },
   { v: 2.16, text: "• Restored trainer purchase requirements for basic techniques.\n• Learned techniques can be queued and used from Home or any task-board location.\n• Advanced training names and multipliers are earned through training XP.\n• Added hover details showing current training tier XP and the next technique requirement." },
   { v: 2.15, text: "• Redirected all legacy gym-store calls into the actual gym overlay.\n• Training Gear now displays the dedicated gym item directly.\n• Purchased one-time gym gear disappears from the shop.\n• Prevented duplicate purchases of dedicated gym gear." },
   { v: 2.14, text: "• Fixed gym Training Gear tabs opening the stale store UI.\n• Added one unique, persistent gear purchase to each combat gym.\n• Removed old gym training/rest panels; gyms now focus on trainers, modes, and gear.\n• Task boards can now be used from any location without returning home.\n• Task-board AUTO now repeats continuously until stopped, depleted, or interrupted by combat/death." },
@@ -825,29 +826,68 @@ function side(x) {
   return x <= RIVER_LEFT ? "west" : x >= RIVER_RIGHT ? "east" : "bridge";
 }
 
-// Compute a list of [x,y] waypoints along the road network from (sx,sy) to (tx,ty).
+// Compute a shortest orthogonal route over the actual road network.
 export function computeRoute(sx, sy, tx, ty) {
   const clean = (points) => points.filter((p, i) => i === 0 || p[0] !== points[i - 1][0] || p[1] !== points[i - 1][1]);
-  const sSide = side(sx), tSide = side(tx);
-  const sVRoad = nearestVRoad(sx);
-  const tVRoad = nearestVRoad(tx);
-  if (sSide === tSide) {
-    const verticals = sSide === "west" ? V_ROADS_WEST : sSide === "east" ? V_ROADS_EAST : [BRIDGE_X];
-    let best = null;
-    for (const roadY of H_ROADS) {
-      for (const fromX of verticals) {
-        for (const toX of verticals) {
-          const distance = Math.abs(sy - roadY) + Math.abs(sx - fromX) + Math.abs(fromX - toX) + Math.abs(tx - toX) + Math.abs(ty - roadY);
-          if (!best || distance < best.distance) best = { roadY, fromX, toX, distance };
-        }
+  const key = (x, y) => `${x},${y}`;
+  const nodes = new Map();
+  const edges = new Map();
+  const addNode = (x, y) => { const k = key(x, y); if (!nodes.has(k)) { nodes.set(k, [x, y]); edges.set(k, []); } return k; };
+  const addEdge = (a, b) => { const ka = addNode(a[0], a[1]), kb = addNode(b[0], b[1]); const d = Math.hypot(a[0] - b[0], a[1] - b[1]); edges.get(ka).push({ to: kb, d }); edges.get(kb).push({ to: ka, d }); };
+  const horizontal = (y, xs) => { for (let i = 0; i < xs.length - 1; i++) addEdge([xs[i], y], [xs[i + 1], y]); };
+  const vertical = (x, ys) => { for (let i = 0; i < ys.length - 1; i++) addEdge([x, ys[i]], [x, ys[i + 1]]); };
+  const ys = [0, 120, 300, 480, 720];
+  for (const x of [150, 310, 640, 760, 880]) vertical(x, ys);
+  for (const y of [120, 300, 480]) { horizontal(y, [0, 150, 310, 460]); horizontal(y, [540, 640, 760, 880, 1000]); }
+  horizontal(300, [460, 500, 540]);
+  vertical(500, [300, 480, 720, 790]);
+
+  const dijkstra = (start) => {
+    const dist = new Map(), prev = new Map(), open = new Set(edges.keys());
+    for (const k of open) dist.set(k, Infinity);
+    dist.set(start, 0);
+    while (open.size) {
+      let current = null, best = Infinity;
+      for (const k of open) if ((dist.get(k) || Infinity) < best) { best = dist.get(k); current = k; }
+      if (current === null) break;
+      open.delete(current);
+      for (const e of edges.get(current) || []) {
+        if (!open.has(e.to)) continue;
+        const nd = best + e.d;
+        if (nd < (dist.get(e.to) || Infinity)) { dist.set(e.to, nd); prev.set(e.to, current); }
       }
     }
-    return clean([[sx, sy], [sx, best.roadY], [best.fromX, best.roadY], [best.toX, best.roadY], [tx, best.roadY], [tx, ty]]);
+    return { dist, prev };
+  };
+  if (sx === tx || sy === ty) return clean([[sx, sy], [tx, ty]]);
+  const access = (p, node) => {
+    const [x, y] = node;
+    const out = [];
+    if ([120, 300, 480].includes(y)) out.push({ d: Math.abs(p[0] - x) + Math.abs(p[1] - y), path: [[p[0], p[1]], [p[0], y], [x, y]] });
+    out.push({ d: Math.abs(p[0] - x) + Math.abs(p[1] - y), path: [[p[0], p[1]], [x, p[1]], [x, y]] });
+    return out;
+  };
+  const turns = (path) => path.reduce((n, p, i) => i > 1 && (p[0] - path[i - 1][0]) * (path[i - 1][0] - path[i - 2][0]) + (p[1] - path[i - 1][1]) * (path[i - 1][1] - path[i - 2][1]) === 0 ? n + 1 : n, 0);
+  const backtracks = (path) => path.reduce((n, p, i) => i > 1 && p[0] === path[i - 2][0] && p[1] === path[i - 2][1] ? n + 1 : n, 0);
+  const all = [...nodes.entries()];
+  let best = null;
+  for (const [sk, sn] of all) {
+    const search = dijkstra(sk);
+    for (const [tk, tn] of all) {
+      const graphDistance = search.dist.get(tk);
+      if (!Number.isFinite(graphDistance)) continue;
+      const graph = [];
+      let cur = tk;
+      while (cur) { graph.unshift(nodes.get(cur)); cur = search.prev.get(cur); }
+      for (const startAccess of access([sx, sy], sn)) for (const targetAccess of access([tx, ty], tn)) {
+        const path = clean([...startAccess.path, ...graph.slice(1), ...targetAccess.path.slice(0, -1).reverse(), [tx, ty]]);
+        const score = startAccess.d + graphDistance + targetAccess.d + backtracks(path) * 100000 + turns(path) * 0.001;
+        if (!best || score < best.score) best = { score, path };
+      }
+    }
   }
-  const midRoad = BRIDGE_Y;
-  const sRoad = nearestIn(H_ROADS, sy);
-  const tRoad = nearestIn(H_ROADS, ty);
-  return clean([[sx, sy], [sx, sRoad], [sVRoad, sRoad], [sVRoad, midRoad], [BRIDGE_X, midRoad], [tVRoad, midRoad], [tVRoad, tRoad], [tx, tRoad], [tx, ty]]);
+  if (!best) return clean([[sx, sy], [tx, sy], [tx, ty]]);
+  return clean(best.path);
 }
 
 // Building centers (in the 1000×850 map space).

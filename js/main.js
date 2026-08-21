@@ -59,6 +59,7 @@ const ui = initUI(game, {
 // Movement loop: sample every 50ms for smooth interpolation.
 let lastMoveLoc = state.Location;
 setInterval(() => {
+  game.regenStamina(0.05);
   if (state.MovingTo && !state.InFight) {
     const result = game.moveStep(0.05);
     ui.render();
