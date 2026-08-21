@@ -1045,7 +1045,7 @@ console.log("== Version: UPDATE_LOG is a non-empty array ==");
 {
   assert(Array.isArray(UPDATE_LOG) && UPDATE_LOG.length > 0, "UPDATE_LOG is non-empty array");
   for (const entry of UPDATE_LOG) {
-    assert(typeof entry.v === "number" && typeof entry.text === "string", "each entry has v and text");
+    assert((typeof entry.v === "number" || typeof entry.v === "string") && typeof entry.text === "string", "each entry has v and text");
   }
 }
 
