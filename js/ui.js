@@ -187,7 +187,7 @@ export function initUI(game, opts = {}) {
     btnRival: $("btnRival"), rivalOverlay: $("rivalOverlay"), btnRivalClose: $("btnRivalClose"),
     // location overlay
     locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"),
-    locFightersTitle: $("locFightersTitle"), locFightersList: $("locFightersList"), btnLocClose: $("btnLocClose"),
+    locFightersTitle: $("locFightersTitle"), locFightersList: $("locFightersList"), btnLocClose: $("btnLocClose"), btnReturnHome: $("btnReturnHome"),
     cookPanel: $("cookPanel"), cookList: $("cookList"), homeTaskPanel: $("homeTaskPanel"),
     // logger
     btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
@@ -269,7 +269,13 @@ export function initUI(game, opts = {}) {
   const buildingEls = {};
   const roamerEls = {};
 
+  function closeAllTransientUIs() {
+    document.querySelectorAll(".overlay.show").forEach((overlay) => overlay.classList.remove("show"));
+    el.newsFloater?.classList.remove("show");
+  }
+
   function clickBuilding(key) {
+    closeAllTransientUIs();
     const loc = LOCATIONS[key];
     if (!loc) return;
     if (key === "home") {
@@ -557,8 +563,11 @@ export function initUI(game, opts = {}) {
   }
 
   function openRoamerRoster(key) {
+    closeAllTransientUIs();
     const r = ROAMERS.find((x) => x.key === key);
     if (!r) return;
+    if (el.cookPanel) el.cookPanel.style.display = "none";
+    if (el.homeTaskPanel) el.homeTaskPanel.style.display = "none";
     const challengers = game.roamerChallengers(key);
     game.noteRoamerSeen(key);
     openLocKey = null;
@@ -915,7 +924,11 @@ export function initUI(game, opts = {}) {
     }
 
     addRow("Rest");
-    if (key === "home") addRow("OddJobs");
+    if (key === "home") {
+      addRow("Pushups");
+      addRow("Situps");
+      addRow("OddJobs");
+    }
   }
 
   function renderLocFighters(key) {
@@ -966,6 +979,7 @@ export function initUI(game, opts = {}) {
   }
 
   function openLocationOverlay(key) {
+    closeAllTransientUIs();
     const loc = LOCATIONS[key];
     if (!loc) return;
     openLocKey = key;
@@ -1127,6 +1141,7 @@ export function initUI(game, opts = {}) {
   }
 
   function openJobs() {
+    closeAllTransientUIs();
     tutorialAdvanceTo("work");
     el.jobList.style.display = "";
     el.jobGameArea.style.display = "none";
@@ -1315,6 +1330,7 @@ export function initUI(game, opts = {}) {
 
   // ------------------------------------------------------------ Arena Hub UI --
   function openArena() {
+    closeAllTransientUIs();
     el.arenaOverlay.classList.add("show");
   }
 
@@ -1513,6 +1529,7 @@ export function initUI(game, opts = {}) {
   }
 
   function openStore(type) {
+    closeAllTransientUIs();
     storeType = type || "cstore";
     storeTab = type === "clinic" ? "clinic" : (type === "gym" ? "training" : "food");
     renderStore();
@@ -2214,6 +2231,7 @@ export function initUI(game, opts = {}) {
   }
 
   function openCombat(view) {
+    closeAllTransientUIs();
     activeView = view;
     combatMeta = {
       mode: view.mode || "fight",
@@ -2514,7 +2532,7 @@ export function initUI(game, opts = {}) {
   // rival overlay
   if (el.btnRival) el.btnRival.addEventListener("click", () => {
     if (el.rivalOverlay.classList.contains("show")) el.rivalOverlay.classList.remove("show");
-    else { el.locOverlay.classList.remove("show"); renderRival(); el.rivalOverlay.classList.add("show"); }
+    else { closeAllTransientUIs(); renderRival(); el.rivalOverlay.classList.add("show"); }
   });
   el.btnRivalClose.addEventListener("click", () => el.rivalOverlay.classList.remove("show"));
   el.rivalOverlay.addEventListener("click", (e) => {
@@ -2523,6 +2541,12 @@ export function initUI(game, opts = {}) {
 
   // location overlay
   el.btnLocClose.addEventListener("click", () => el.locOverlay.classList.remove("show"));
+  el.btnReturnHome.addEventListener("click", () => {
+    el.locOverlay.classList.remove("show");
+    if (state.Location === "home" && !state.MovingTo) { openLocationOverlay("home"); return; }
+    game.beginMove("home");
+    render();
+  });
   el.locOverlay.addEventListener("click", (e) => {
     if (e.target === el.locOverlay) el.locOverlay.classList.remove("show");
   });

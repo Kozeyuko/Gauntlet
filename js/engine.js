@@ -2188,6 +2188,7 @@ export function createGame(state, opts = {}) {
   }
 
   function hasTraining(activityKey) {
+    if (state.Location === "home" && TRAINING.home && TRAINING.home[activityKey]) return true;
     const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
     if (!gymEntry) return true;
     if (gymEntry.unlock === "permanent") {
@@ -2200,6 +2201,7 @@ export function createGame(state, opts = {}) {
 
   function canAddToTask(activityKey) {
     if (!ACTIVITIES[activityKey]) return false;
+    if (state.Location === "home" && TRAINING.home && TRAINING.home[activityKey]) return true;
     const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
     if (!gymEntry) return true;
     if (gymEntry.unlock === "permanent") {

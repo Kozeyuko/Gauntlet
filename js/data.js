@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.10;
+export const GAME_VERSION = 2.11;
 export const UPDATE_LOG = [
+  { v: 2.11, text: "• Fixed Home Pushups and Situps training availability.\n• Added a visible Return Home button to location panels.\n• Removed cooking and Home task panels from random fighter rosters.\n• Enforced one visible UI overlay at a time.\n• Replaced road tie-breaking with shortest street-pair routing to remove unnecessary detours." },
   { v: 2.10, text: "• Added a mobile PANEL drawer that slides in from the left.\n• The map now keeps the full mobile viewport instead of sharing space with the stats column.\n• Added a dimmed backdrop and close-state button for the drawer.\n• Desktop layout remains unchanged." },
   { v: 2.8, text: "• Removed task Repeat and Advance Day controls.\n• Home task queues are now one-shot and completed tasks leave the queue.\n• Added live stat previews while training at Home.\n• Stopped task-outside-Home news spam and paused task auto-run when leaving Home.\n• Added timer hover details for routes, roamers, and auto-jobs.\n• Auto-job now runs every 2 seconds, with a 2–5 minute level-scaled leave-area grace period.\n• Corrected route segment snapping and rebuilt box positions away from road corridors.\n• Added two local UI style sketches." },
   { v: 2.6, text: "• Boxed every location, including Home, starter locations, stores, gyms, and Arena.\n• Moved Arena to the far-right wall.\n• Added Inventory Equipment tab.\n• Combat is automatic; Speed controls hit cadence; Intelligence controls crit chance.\n• Failed escape resumes combat." },
@@ -799,38 +800,27 @@ function side(x) {
 
 // Compute a list of [x,y] waypoints along the road network from (sx,sy) to (tx,ty).
 export function computeRoute(sx, sy, tx, ty) {
-  const pts = [[sx, sy]];
-  const sRoad = nearestIn(H_ROADS, sy);
-  const tRoad = nearestIn(H_ROADS, ty);
+  const clean = (points) => points.filter((p, i) => i === 0 || p[0] !== points[i - 1][0] || p[1] !== points[i - 1][1]);
   const sSide = side(sx), tSide = side(tx);
   const sVRoad = nearestVRoad(sx);
   const tVRoad = nearestVRoad(tx);
-
   if (sSide === tSide) {
-    // Same side of the river — simple L-shaped routing.
-    if (Math.abs(sy - sRoad) > 1) pts.push([sx, sRoad]);
-    if (Math.abs(sx - sVRoad) > 1) pts.push([sVRoad, sRoad]);
-    if (Math.abs(sVRoad - tVRoad) > 1) pts.push([tVRoad, sRoad]);
-    if (Math.abs(sRoad - tRoad) > 1) pts.push([tVRoad, tRoad]);
-    if (Math.abs(tx - tVRoad) > 1) pts.push([tx, tRoad]);
-    if (Math.abs(ty - tRoad) > 1) pts.push([tx, ty]);
-  } else {
-    // Cross-river: must use the mid-road (y=300) bridge at x=500.
-    const midRoad = BRIDGE_Y;
-    if (Math.abs(sy - sRoad) > 1) pts.push([sx, sRoad]);
-    if (Math.abs(sx - sVRoad) > 1) pts.push([sVRoad, sRoad]);
-    if (Math.abs(sRoad - midRoad) > 1) pts.push([sVRoad, midRoad]);
-    if (Math.abs(sVRoad - BRIDGE_X) > 1) pts.push([BRIDGE_X, midRoad]);
-    if (Math.abs(BRIDGE_X - tVRoad) > 1) pts.push([tVRoad, midRoad]);
-    if (Math.abs(midRoad - tRoad) > 1) pts.push([tVRoad, tRoad]);
-    if (Math.abs(tx - tVRoad) > 1) pts.push([tx, tRoad]);
-    if (Math.abs(ty - tRoad) > 1) pts.push([tx, ty]);
+    const verticals = sSide === "west" ? V_ROADS_WEST : sSide === "east" ? V_ROADS_EAST : [BRIDGE_X];
+    let best = null;
+    for (const roadY of H_ROADS) {
+      for (const fromX of verticals) {
+        for (const toX of verticals) {
+          const distance = Math.abs(sy - roadY) + Math.abs(sx - fromX) + Math.abs(fromX - toX) + Math.abs(tx - toX) + Math.abs(ty - roadY);
+          if (!best || distance < best.distance) best = { roadY, fromX, toX, distance };
+        }
+      }
+    }
+    return clean([[sx, sy], [sx, best.roadY], [best.fromX, best.roadY], [best.toX, best.roadY], [tx, best.roadY], [tx, ty]]);
   }
-
-  // Always end at exact target.
-  const last = pts[pts.length - 1];
-  if (last[0] !== tx || last[1] !== ty) pts.push([tx, ty]);
-  return pts;
+  const midRoad = BRIDGE_Y;
+  const sRoad = nearestIn(H_ROADS, sy);
+  const tRoad = nearestIn(H_ROADS, ty);
+  return clean([[sx, sy], [sx, sRoad], [sVRoad, sRoad], [sVRoad, midRoad], [BRIDGE_X, midRoad], [tVRoad, midRoad], [tVRoad, tRoad], [tx, tRoad], [tx, ty]]);
 }
 
 // Building centers (in the 1000×850 map space).
