@@ -26,6 +26,7 @@ import {
   GAME_VERSION,
   UPDATE_LOG,
   trainChain,
+  GYM_TRAINING,
   GYM_GEAR,
   MAIN_GYM,
   EQUIPMENT,
@@ -930,7 +931,23 @@ export function initUI(game, opts = {}) {
   function renderGymTrainers(key) {
     const loc = LOCATIONS[key];
     el.locFightersTitle.textContent = "Trainers & Modes";
-    el.locFightersList.innerHTML = "";    if (loc.styleGym && STYLES[loc.styleGym]) {
+    el.locFightersList.innerHTML = "";
+    for (const item of GYM_TRAINING) {
+      const owned = game.hasTraining(item.key) && item.unlock === "permanent";
+      const stock = item.unlock === "consumable" ? Number(state.Consumables?.[item.key] || 0) : 0;
+      const row = document.createElement("div"); row.className = "ghostrow";
+      const main = document.createElement("div"); main.className = "gmain";
+      main.innerHTML = `<div class="gnm">${item.name}</div><div class="gsub">${item.desc || "Learn this technique to add it to the task board."}${item.requires ? ` Requires ${item.requiresName}.` : ""}${item.unlock === "consumable" ? ` Stock: ${stock}` : ""}</div>`;
+      const btn = document.createElement("button"); btn.className = "btn small-btn";
+      if (owned) { btn.textContent = "LEARNED"; btn.classList.add("owned"); btn.disabled = true; }
+      else if (item.unlock === "consumable" && stock > 0) { btn.textContent = "LEARNED"; btn.classList.add("owned"); btn.disabled = true; }
+      else {
+        btn.textContent = fmtCash(game.shopPrice ? game.shopPrice(item.cost) : item.cost);
+        btn.addEventListener("click", () => { game.buyTraining(item.key); renderGymTrainers(key); render(); });
+      }
+      row.appendChild(main); row.appendChild(btn); el.locFightersList.appendChild(row);
+    }
+    if (loc.styleGym && STYLES[loc.styleGym]) {
       const style = STYLES[loc.styleGym];
       const learned = !!game.learnedStyles()[loc.styleGym];
       const row = document.createElement("div"); row.className = "ghostrow";
@@ -1864,9 +1881,19 @@ export function initUI(game, opts = {}) {
         const act = ACTIVITIES[key];
         const locked = !game.canAddToTask(key);
         const b = document.createElement("button");
+        const chain = trainChain(key);
+        const tier = chain ? game.trainTier(key) : 0;
+        const progress = Number(state.TrainProgress?.[key] || 0);
+        const next = chain?.tiers?.[tier + 1];
+        const current = chain?.tiers?.[tier];
+        const xpTip = chain
+          ? (next ? `${act.name}: ${current.name}. Training XP ${progress}/${next.req} to ${next.name}.` : `${act.name}: ${current?.name || act.name}. Maximum training tier reached.`)
+          : `${act.name}: no advanced tier progression.`;
+        b.setAttribute("data-tip", xpTip);
+        b.title = xpTip;
         b.className = "btn small-btn" + (locked ? " locked" : "");
         b.textContent = act.name;
-        if (locked) b.title = "Buy this training at the gym first";
+        if (locked) b.title = `${xpTip} Spend Cash with a trainer to learn this training.`;
         b.addEventListener("click", () => {
           if (game.addTask(key)) {
             renderTasklistFull();

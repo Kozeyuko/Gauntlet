@@ -2183,6 +2183,10 @@ export function createGame(state, opts = {}) {
   function buyTraining(activityKey) {
     const item = GYM_TRAINING.find((t) => t.key === activityKey);
     if (!item) return false;
+    if (item.requires && !(Array.isArray(state.OwnedItems) && state.OwnedItems.includes(item.requires))) {
+      logMsg(`You need ${item.requiresName} before learning ${item.name}.`);
+      return false;
+    }
     const price = shopPrice(item.cost);
     if (num(state.Money) < price) {
       logMsg(`Not enough Cash to buy ${item.name} training (${price.toFixed(2)} Cash).`);
@@ -2207,11 +2211,14 @@ export function createGame(state, opts = {}) {
   }
 
   function hasTraining(activityKey) {
-    return !!ACTIVITIES[activityKey];
+    const item = GYM_TRAINING.find((t) => t.key === activityKey);
+    if (!item) return !!ACTIVITIES[activityKey];
+    if (item.unlock === "consumable") return Number(state.Consumables?.[activityKey] || 0) > 0;
+    return Array.isArray(state.OwnedTraining) && state.OwnedTraining.includes(activityKey);
   }
 
   function canAddToTask(activityKey) {
-    return !!ACTIVITIES[activityKey];
+    return hasTraining(activityKey);
   }
 
   // ---- equipment ----
@@ -2384,6 +2391,12 @@ export function createGame(state, opts = {}) {
     const locKey = String(state.Location ?? "home");
     const loc = LOCATIONS[locKey] || LOCATIONS.home;
     const locName = loc.name;
+
+    if (actKey !== "Rest" && actKey !== "OddJobs" && act.attr && !hasTraining(actKey)) {
+      logMsg(`You haven't learned ${act.name} yet. Learn it from a trainer first.`);
+      actKey = "Rest";
+      act = ACTIVITIES.Rest;
+    }
 
     if (actKey === "Rest") {
       state.Stamina = Math.min(maxStamina(), stamina + 35);
