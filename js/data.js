@@ -36,9 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.9;
+export const GAME_VERSION = 2.10;
 export const UPDATE_LOG = [
-  { v: 2.9, text: "• Applied the Tactical Dense command-console skin.\n• Tightened the header, vitals, panels, buttons, map frame, task queue, and overlays.\n• Added teal live-state accents, squared tactical cards, denser spacing, and monospace UI treatment.\n• Preserved the existing mobile map scroll behavior and game mechanics." },
+  { v: 2.10, text: "• Added a mobile PANEL drawer that slides in from the left.\n• The map now keeps the full mobile viewport instead of sharing space with the stats column.\n• Added a dimmed backdrop and close-state button for the drawer.\n• Desktop layout remains unchanged." },
   { v: 2.8, text: "• Removed task Repeat and Advance Day controls.\n• Home task queues are now one-shot and completed tasks leave the queue.\n• Added live stat previews while training at Home.\n• Stopped task-outside-Home news spam and paused task auto-run when leaving Home.\n• Added timer hover details for routes, roamers, and auto-jobs.\n• Auto-job now runs every 2 seconds, with a 2–5 minute level-scaled leave-area grace period.\n• Corrected route segment snapping and rebuilt box positions away from road corridors.\n• Added two local UI style sketches." },
   { v: 2.6, text: "• Boxed every location, including Home, starter locations, stores, gyms, and Arena.\n• Moved Arena to the far-right wall.\n• Added Inventory Equipment tab.\n• Combat is automatic; Speed controls hit cadence; Intelligence controls crit chance.\n• Failed escape resumes combat." },
   { v: 2.5, text: "• Moved task management to Home.\n• Added randomized reincarnation entrances.\n• Added Scrounge for Cash, food stacks, auto-eating, percentage recovery, and Charisma pricing." },

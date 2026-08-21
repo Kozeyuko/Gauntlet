@@ -227,6 +227,7 @@ export function initUI(game, opts = {}) {
     // update log
     updateOverlay: $("updateOverlay"), btnUpdateLog: $("btnUpdateLog"),
     btnUpdateClose: $("btnUpdateClose"), updateList: $("updateList"),
+    btnMobilePanel: $("btnMobilePanel"), mobileDrawerBackdrop: $("mobileDrawerBackdrop"),
     updateHeader: $("updateHeader"),
     // statistics
     btnStats: $("btnStats"), statsOverlay: $("statsOverlay"),
@@ -1905,6 +1906,16 @@ export function initUI(game, opts = {}) {
 
   el.btnUpdateLog.addEventListener("click", () => openUpdateLog());
   el.btnUpdateClose.addEventListener("click", () => el.updateOverlay.classList.remove("show"));
+  const mobileDrawer = document.querySelector(".col-left");
+  const setMobileDrawer = (open) => {
+    if (!mobileDrawer) return;
+    mobileDrawer.classList.toggle("mobile-open", open);
+    el.mobileDrawerBackdrop.classList.toggle("show", open);
+    el.btnMobilePanel.classList.toggle("gold", open);
+    el.btnMobilePanel.textContent = open ? "CLOSE PANEL" : "PANEL";
+  };
+  el.btnMobilePanel.addEventListener("click", () => setMobileDrawer(!mobileDrawer.classList.contains("mobile-open")));
+  el.mobileDrawerBackdrop.addEventListener("click", () => setMobileDrawer(false));
   el.updateOverlay.addEventListener("click", (e) => {
     if (e.target === el.updateOverlay) el.updateOverlay.classList.remove("show");
   });

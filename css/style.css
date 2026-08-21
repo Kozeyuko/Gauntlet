@@ -1270,7 +1270,14 @@ header { gap: 10px; padding: 8px 12px; border-bottom-color: var(--line); backgro
 .tutorial-modal { border-left: 3px solid var(--green); }
 [data-tip]:hover::after, [data-tip].show::after { border-radius: 2px; font-family: var(--mono); font-size: 10px; }
 @media (max-width: 900px) {
-  header { padding: 5px 6px; }
-  .vital { padding: 3px 4px; }
-  .gamecols { gap: 6px; padding: 6px; }
+  .mobile-panel-btn { display: inline-flex !important; }
+  .mobile-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 110; }
+  .mobile-drawer-backdrop.show { opacity: 1; pointer-events: auto; }
+  .col-left { position: fixed; z-index: 120; left: 0; top: 0; bottom: 0; width: min(88vw, 340px); max-width: 340px; padding: 52px 8px 12px; overflow-y: auto; background: #0d141c; border-right: 1px solid var(--line); box-shadow: 12px 0 28px rgba(0,0,0,.45); transform: translateX(-105%); transition: transform .22s ease; }
+  .col-left.mobile-open { transform: translateX(0); }
+  #topbar { position: relative; z-index: 130; }
+  #citymap { position: relative; z-index: 1; }
+}
+@media (min-width: 901px) {
+  .mobile-panel-btn, .mobile-drawer-backdrop { display: none !important; }
 }
