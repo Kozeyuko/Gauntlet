@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.3;
+export const GAME_VERSION = 2.4;
 export const UPDATE_LOG = [
+  { v: 2.4, text: "v2.4: tasks moved into the Home base UI and only run at Home; Home opens from anywhere without forcing travel; map/store placement refreshed; Scrounge for Cash renamed and Home-only with a rare tier-0 Hobo keepsake fight; food purchases come in stacks of five with best-food auto-eating; raw carrots, potatoes, and rice added; food and clinic recovery use percentages; Charisma increases cash and discounts all stores up to 50%; auto-fight uses Ultimates; gym wins ask about the next rival and guarantee style affinity progress." },
   { v: 2.3, text: "v2.3: route timing now uses the full route with instant rerouting and no same-location detours; movement grants more Speed; map fighters open challenger rosters; gym fighter clicks open combat correctly; arena moved to the river's right-middle square; opponent readouts use Total Power (all stats ÷ 30); escape is a one-use Speed-vs-Speed chance; News opens by default and glows on unread entries; Aptitude purchases multiply current Aptitude by 1.5; ADMIN code opens a testing console." },
   { v: 2.2, text: "v2.2: fast map travel (20-30s baseline, ~1s at high Speed), dashed route line + ETA box while traveling, no random fights while walking (use the Searching-for-Trouble toggle), randomized NPC stats by tier (tier 1 low / 2 mid / 3 high), central locations (gym, store, clinic, job board) moved near home, and news is now a floating box in the top-left opened from the NEWS button." },
   { v: 2.1, text: "v2.1: jobs manual play is indefinite (no round cap, stamina cost scales 5→1 by level, ends on 3 fails or quit), stats display 0 but work as 1, slower style mastery, no fight round cap (win by KO or stamina drain), map movement follows streets with reliable arrival, tasks persist on the tab until removed, auto button shows true state, Statistics menu, mobile layout fixes." },
@@ -134,7 +135,7 @@ export const ATTRIBUTES = [
 // ------------------------------------------------------------------ ACTIVITIES --
 export const ACTIVITIES = {
   Rest: { name: "Resting", cost: 0 },
-  OddJobs: { name: "Odd Jobs", cost: 10, moneyBase: 3, moneyCha: 0.5 },
+  OddJobs: { name: "Scrounge for Cash", cost: 10, moneyBase: 3, moneyCha: 0.5 },
   Pushups: { name: "Pushups", cost: 10, attr: "Str", gain: 0.10 },
   Situps: { name: "Situps", cost: 10, attr: "Tou", gain: 0.10 },
   Squats: { name: "Squats", cost: 10, attr: "Spd", gain: 0.10 },
@@ -156,7 +157,7 @@ export const ACTIVITY_ALIAS = {
 // Display order for the activities grid.
 export const ACTIVITY_LIST = [
   { key: "Rest", label: "Rest" },
-  { key: "OddJobs", label: "Odd Jobs" },
+  { key: "OddJobs", label: "Scrounge for Cash" },
   { key: "Pushups", label: "Pushups (Str)" },
   { key: "Situps", label: "Situps (Tou)" },
   { key: "Squats", label: "Squats (Spd)" },
@@ -170,7 +171,7 @@ export const ACTIVITY_LIST = [
 // ------------------------------------------------------------------ STORE --
 // Convenience store: food, drinks, and gear (the old general store inventory).
 export const CSTORE_ITEMS = [
-  { key: "rice", name: "Rice bowl", desc: "Restores 20 Nutrition", price: 5, nutrition: 20, cat: "food" },
+  { key: "rice", name: "Rice bowl", desc: "Restores 20% Nutrition", price: 5, nutritionPct: 0.20, cat: "food" },
   { key: "protein", name: "Protein shake", desc: "+5 Strength for this life", price: 15, stat: "Str", amount: 5, cat: "drinks" },
   { key: "energy", name: "Energy drink", desc: "+5 Speed for this life", price: 15, stat: "Spd", amount: 5, cat: "drinks" },
   { key: "focus", name: "Focus tea", desc: "+5 Intelligence for this life", price: 15, stat: "Int", amount: 5, cat: "drinks" },
@@ -178,19 +179,22 @@ export const CSTORE_ITEMS = [
   { key: "charm", name: "Charm perfume", desc: "+5 Charisma for this life", price: 20, stat: "Cha", amount: 5, cat: "drinks" },
   { key: "rawmeat", name: "Raw Meat", desc: "Cook at home for Grilled Meat", price: 4, raw: true, cookTo: "grilledmeat", cat: "rawfood" },
   { key: "rawchicken", name: "Raw Chicken", desc: "Cook at home for Fried Chicken", price: 5, raw: true, cookTo: "chicken", cat: "rawfood" },
-  { key: "hotdog", name: "Hot Dog", desc: "Restores 25 Nutrition", price: 6, nutrition: 25, cat: "food" },
-  { key: "pizza", name: "Pizza Slice", desc: "Restores 40 Nutrition", price: 8, nutrition: 40, cat: "food" },
-  { key: "chicken", name: "Fried Chicken", desc: "Restores 35 Nutrition", price: 7, nutrition: 35, cat: "food" },
-  { key: "tacos", name: "Tacos", desc: "Restores 45 Nutrition", price: 9, nutrition: 45, cat: "food" },
-  { key: "grilledmeat", name: "Grilled Meat", desc: "Restores 50 Nutrition", price: 0, nutrition: 50, notSold: true, cat: "food" },
+  { key: "rawcarrot", name: "Raw Carrot", desc: "Cook at home", price: 2, raw: true, cat: "rawfood" },
+  { key: "rawpotato", name: "Raw Potato", desc: "Cook at home", price: 2, raw: true, cat: "rawfood" },
+  { key: "rawrice", name: "Raw Rice", desc: "Cook at home", price: 2, raw: true, cat: "rawfood" },
+  { key: "hotdog", name: "Hot Dog", desc: "Restores 25% Nutrition", price: 6, nutritionPct: 0.25, cat: "food" },
+  { key: "pizza", name: "Pizza Slice", desc: "Restores 40% Nutrition", price: 8, nutritionPct: 0.40, cat: "food" },
+  { key: "chicken", name: "Fried Chicken", desc: "Restores 35% Nutrition", price: 7, nutritionPct: 0.35, cat: "food" },
+  { key: "tacos", name: "Tacos", desc: "Restores 45% Nutrition", price: 9, nutritionPct: 0.45, cat: "food" },
+  { key: "grilledmeat", name: "Grilled Meat", desc: "Restores 50% Nutrition", price: 0, nutritionPct: 0.50, notSold: true, cat: "food" },
   { key: "mat", name: "Old Training Mat", desc: "Required for Shadow Boxing training", price: 15, permanent: true, cat: "gear" },
 ];
 
 // Clinic: cheap medical/healing items.
 export const CLINIC_ITEMS = [
-  { key: "bandages", name: "Bandages", desc: "Restore 25 Health", price: 8, health: 25, cat: "clinic" },
-  { key: "medkit", name: "Medkit", desc: "Restore 60 Health", price: 20, health: 60, cat: "clinic" },
-  { key: "fullrecovery", name: "Full recovery", desc: "Restore 100 Health + 50 Stamina", price: 40, health: 100, stamina: 50, cat: "clinic" },
+  { key: "bandages", name: "Bandages", desc: "Restore 25% Health", price: 8, healthPct: 0.25, cat: "clinic" },
+  { key: "medkit", name: "Medkit", desc: "Restore 50% Health", price: 20, healthPct: 0.50, cat: "clinic" },
+  { key: "fullrecovery", name: "Full recovery", desc: "Restore 100% Health + 50% Stamina", price: 40, healthPct: 1, staminaPct: 0.50, cat: "clinic" },
   { key: "checkup", name: "Checkup", desc: "+2 Toughness for this life", price: 25, stat: "Tou", amount: 2, cat: "clinic" },
 ];
 

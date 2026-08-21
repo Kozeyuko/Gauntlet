@@ -187,6 +187,7 @@ export function initUI(game, opts = {}) {
     // location overlay
     locOverlay: $("locOverlay"), locName: $("locName"), locTier: $("locTier"), locFlavor: $("locFlavor"),
     locFightersTitle: $("locFightersTitle"), locFightersList: $("locFightersList"), btnLocClose: $("btnLocClose"),
+    cookPanel: $("cookPanel"), cookList: $("cookList"), homeTaskPanel: $("homeTaskPanel"),
     // logger
     btnLog: $("btnLog"), logOverlay: $("logOverlay"), logFull: $("logFull"),
     logStats: $("logStats"), btnLogClear: $("btnLogClear"), btnLogClose: $("btnLogClose"),
@@ -269,13 +270,20 @@ export function initUI(game, opts = {}) {
   function clickBuilding(key) {
     const loc = LOCATIONS[key];
     if (!loc) return;
+    if (key === "home") {
+      openLocationOverlay("home");
+      return;
+    }
     if (isLocked(key)) {
       game.logMsg("Locked — beat more rivals.");
       render();
       return;
     }
+    if (!state.MovingTo && state.Location === key) {
+      openArrivalOverlay(key);
+      return;
+    }
     if (state.MovingTo) {
-      // Clicking another destination while traveling reroutes immediately.
       game.beginMove(key);
       render();
       return;
@@ -896,7 +904,7 @@ export function initUI(game, opts = {}) {
     }
 
     addRow("Rest");
-    addRow("OddJobs");
+    if (key === "home") addRow("OddJobs");
   }
 
   function renderLocFighters(key) {
@@ -963,6 +971,7 @@ export function initUI(game, opts = {}) {
     } else if (el.cookPanel) {
       el.cookPanel.style.display = "none";
     }
+    if (el.homeTaskPanel) el.homeTaskPanel.style.display = isHome ? "" : "none";
     el.locOverlay.classList.add("show");
   }
 
@@ -1293,7 +1302,7 @@ export function initUI(game, opts = {}) {
   }
 
   // ------------------------------------------------------------ Chained Roamers UI --
-  let currentChain = null; // { key, step }
+  let currentChain = null; // { key, step } or { kind:"location", locKey, n }
 
   function promptChain(key, nextStep) {
     currentChain = { key, step: nextStep };
@@ -1304,6 +1313,12 @@ export function initUI(game, opts = {}) {
   el.btnChainNext.addEventListener("click", () => {
     el.chainOverlay.classList.remove("show");
     if (!currentChain) return;
+    if (currentChain.kind === "location") {
+      const view = game.beginLocationFight(currentChain.locKey, currentChain.n);
+      if (view) openCombat(view);
+      else render();
+      return;
+    }
     const view = game.beginRoamerFight(currentChain.key, currentChain.step);
     if (view) openCombat(view);
     else render();
@@ -1412,6 +1427,7 @@ export function initUI(game, opts = {}) {
     }
     el.storeList.innerHTML = "";
     for (const item of items) {
+      const displayPrice = game.shopPrice ? game.shopPrice(item.price) : item.price;
       const row = document.createElement("div");
       row.className = "storerow";
       const main = document.createElement("div");
@@ -1434,8 +1450,8 @@ export function initUI(game, opts = {}) {
           btn.textContent = `Needs item`;
           btn.classList.add("cantafford");
         } else {
-          btn.textContent = fmtCash(item.price);
-          if (num(state.Money) < item.price) btn.classList.add("cantafford");
+          btn.textContent = fmtCash(displayPrice);
+          if (num(state.Money) < displayPrice) btn.classList.add("cantafford");
           btn.addEventListener("click", () => {
             game.buyTraining(item.key);
             renderStore();
@@ -1454,7 +1470,7 @@ export function initUI(game, opts = {}) {
             render();
           });
         } else {
-          btn.textContent = `${fmtCash(item.price)}`;
+          btn.textContent = `${fmtCash(displayPrice)}`;
           btn.addEventListener("click", () => {
             game.buyEquipment(item.key);
             renderStore();
@@ -1463,7 +1479,7 @@ export function initUI(game, opts = {}) {
           });
         }
       } else {
-        btn.textContent = `${fmtCash(item.price)}`;
+        btn.textContent = `${fmtCash(displayPrice)}`;
         btn.addEventListener("click", () => {
           game.buyItem(item.key);
           renderStore();
@@ -1471,8 +1487,8 @@ export function initUI(game, opts = {}) {
         });
       }
       const money = num(state.Money);
-      if (!item._isEquip && money < item.price) btn.classList.add("cantafford");
-      if (item._isEquip && !item._owned && money < item.price) btn.classList.add("cantafford");
+      if (!item._isEquip && money < displayPrice) btn.classList.add("cantafford");
+      if (item._isEquip && !item._owned && money < displayPrice) btn.classList.add("cantafford");
       row.appendChild(main);
       row.appendChild(btn);
       el.storeList.appendChild(row);
@@ -2125,6 +2141,10 @@ export function initUI(game, opts = {}) {
     if (!activeView || activeView.finished) return;
     stopAuto();
     autoTimer = setTimeout(() => {
+      if (activeView.ultReady && activeView.modeRounds <= 0) {
+        const uv = game.activateUlt();
+        if (uv) { activeView = uv; renderCombat(uv); maybeAuto(); return; }
+      }
       const skills = activeView.skills;
       const skill = skills[Math.floor(Math.random() * skills.length)];
       const v = game.fightMove(skill.name);
@@ -2164,6 +2184,10 @@ export function initUI(game, opts = {}) {
         const nextV = game.beginGuFight(nextW);
         if (nextV) openCombat(nextV);
       }, 500);
+    } else if (meta && meta.mode === "location" && view.win && Number(view.locationNext || 0) <= 5) {
+      currentChain = { kind: "location", locKey: view.locKey, n: view.locationNext };
+      el.chainPrompt.textContent = `You beat the gym rival. Challenge rival #${view.locationNext} next?`;
+      el.chainOverlay.classList.add("show");
     } else {
       showResult(view.win, String(state.LastMsg ?? ""));
     }

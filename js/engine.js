@@ -325,6 +325,11 @@ export function createGame(state, opts = {}) {
   // ---- attribute helpers ----
   const attrValue = (id) => Math.max(1, num(state[id]) + num(state.TempBoosts && state.TempBoosts[id]));
   const attrApt = (id) => Math.max(1, num(state[id + "Ap"]));
+  const chaBonus = () => Math.min(0.5, Math.max(0, attrValue("Cha")) / 15000);
+  const shopPrice = (base) => Math.max(0.01, Math.round(Number(base || 0) * (1 - chaBonus()) * 100) / 100);
+  const foodNutrition = (item) => item && item.nutritionPct ? maxNutrition() * item.nutritionPct : Number(item && item.nutrition || 0);
+  const clinicHealth = (item) => item && item.healthPct ? maxHealth() * item.healthPct : Number(item && item.health || 0);
+  const clinicStamina = (item) => item && item.staminaPct ? maxStamina() * item.staminaPct : Number(item && item.stamina || 0);
   function num(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -1014,7 +1019,14 @@ export function createGame(state, opts = {}) {
     let bet = 0;
     let extra = {};
 
-    if (num(state.Encounter) >= 1) {
+    if (num(state.Encounter) >= 2) {
+      mode = "encounter";
+      state.Encounter = 0;
+      foeStats = { Str: 1, Tou: 1, Spd: 1, Int: 1, Cha: 0 };
+      foeStyle = "Brawling";
+      foeName = "A Hobo (Tier 0)";
+      extra = { hobo: true, rewardMoney: 1, rewardXp: 1, style: foeStyle };
+    } else if (num(state.Encounter) >= 1) {
       mode = "encounter";
       state.Encounter = 0;
       const s = ENC_MIN + R() * (ENC_MAX - ENC_MIN);
@@ -1099,6 +1111,11 @@ export function createGame(state, opts = {}) {
         state.Money = num(state.Money) + reward;
         state.Wins = num(state.Wins) + 1;
         addStyleXp(activeStyle(), 0.5 + (extra.n || 1) * 0.2);
+        if (extra.style) {
+          const affinity = styleKnowledge(extra.style);
+          if (affinity < KNOWLEDGE_UNMASTERED) addKnowledge(extra.style, KNOWLEDGE_UNMASTERED - affinity);
+          else if (affinity < 25) addKnowledge(extra.style, 25 - affinity);
+        }
         applyFightGains(true, result.foeStats, result);
         const locKey = extra.locKey;
         if (locKey && !state.LocationFights) state.LocationFights = {};
@@ -1615,6 +1632,10 @@ export function createGame(state, opts = {}) {
     if (!battle) return null;
     const view = combatantToView(battle.me, battle.foe);
     view.foeName = battle.foeName || battle.extra.name;
+    if (battle.mode === "location") {
+      view.locKey = battle.extra.locKey;
+      view.locationNext = Number(battle.extra.n || 0) + 1;
+    }
     view.round = battle.round;
     view.finished = false;
     view.events = [];
@@ -1955,11 +1976,12 @@ export function createGame(state, opts = {}) {
   function buyItem(key) {
     const item = ALL_STORE_ITEMS.find((i) => i.key === key);
     if (!item) return false;
-    if (num(state.Money) < item.price) {
+    const price = shopPrice(item.price);
+    if (num(state.Money) < price) {
       logMsg("Not enough Cash.");
       return false;
     }
-    state.Money = num(state.Money) - item.price;
+    state.Money = num(state.Money) - price;
     state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
 
     // Permanent items (e.g. mat) go to OwnedItems
@@ -1976,12 +1998,13 @@ export function createGame(state, opts = {}) {
     if (!Array.isArray(state.Inventory)) state.Inventory = [];
     const inv = state.Inventory;
     const existing = inv.find((e) => e.key === item.key);
+    const purchaseQty = (item.cat === "food" || item.cat === "rawfood") ? 5 : 1;
     if (existing) {
-      existing.qty += 1;
+      existing.qty += purchaseQty;
     } else {
-      inv.push({ key: item.key, qty: 1 });
+      inv.push({ key: item.key, qty: purchaseQty });
     }
-    logMsg(`Bought ${item.name} — in inventory (qty ${existing ? existing.qty : 1}).`, "store");
+    logMsg(`Bought ${item.name} — in inventory (qty ${existing ? existing.qty : purchaseQty}).`, "store");
     return true;
   }
 
@@ -1993,14 +2016,14 @@ export function createGame(state, opts = {}) {
     if (!item) return false;
     if (item.permanent) return false;
     if (item.raw) return false;
-    if (item.nutrition) {
-      state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
+    if (item.nutrition || item.nutritionPct) {
+      state.Nutrition = clamp(num(state.Nutrition) + foodNutrition(item), 0, maxNutrition());
     }
-    if (item.health) {
-      state.Health = clamp(num(state.Health) + item.health, 0, maxHealth());
+    if (item.health || item.healthPct) {
+      state.Health = clamp(num(state.Health) + clinicHealth(item), 0, maxHealth());
     }
-    if (item.stamina) {
-      state.Stamina = clamp(num(state.Stamina) + item.stamina, 0, maxStamina());
+    if (item.stamina || item.staminaPct) {
+      state.Stamina = clamp(num(state.Stamina) + clinicStamina(item), 0, maxStamina());
     }
     if (item.stat) {
       if (!state.TempBoosts) state.TempBoosts = {};
@@ -2019,29 +2042,16 @@ export function createGame(state, opts = {}) {
   function autoEatFood() {
     if (num(state.Nutrition) > 30) return;
     const inv = Array.isArray(state.Inventory) ? state.Inventory : [];
-    // Try rice first
-    const rice = inv.find((e) => e.key === "rice");
-    if (rice && rice.qty > 0) {
-      state.Nutrition = clamp(num(state.Nutrition) + 20, 0, maxNutrition());
-      rice.qty -= 1;
-      if (rice.qty <= 0) {
-        state.Inventory = inv.filter((e) => e.qty > 0);
-      }
-      logMsg("Ate rice from inventory (+20 Nutrition).", "eat");
-      return;
-    }
-    // Try any non-raw prepared food
-    for (const e of inv) {
-      if (e.qty <= 0) continue;
-      const item = ALL_STORE_ITEMS.find((i) => i.key === e.key);
-      if (!item || item.raw || !item.nutrition) continue;
-      state.Nutrition = clamp(num(state.Nutrition) + item.nutrition, 0, maxNutrition());
-      e.qty -= 1;
-      if (e.qty <= 0) {
-        state.Inventory = inv.filter((x) => x.qty > 0);
-      }
-      logMsg(`Ate ${item.name} from inventory (+${item.nutrition} Nutrition).`, "eat");
-      return;
+    const candidates = inv.map((e) => ({ entry: e, item: ALL_STORE_ITEMS.find((i) => i.key === e.key) }))
+      .filter((x) => x.entry.qty > 0 && x.item && !x.item.raw && (x.item.nutrition || x.item.nutritionPct))
+      .sort((a, b) => foodNutrition(b.item) - foodNutrition(a.item));
+    const choice = candidates[0];
+    if (choice) {
+      const amount = foodNutrition(choice.item);
+      state.Nutrition = clamp(num(state.Nutrition) + amount, 0, maxNutrition());
+      choice.entry.qty -= 1;
+      state.Inventory = inv.filter((e) => e.qty > 0);
+      logMsg(`Ate ${choice.item.name} from inventory (+${Math.round(amount)} Nutrition).`, "eat");
     }
   }
 
@@ -2109,18 +2119,19 @@ export function createGame(state, opts = {}) {
   function buyTraining(activityKey) {
     const item = GYM_TRAINING.find((t) => t.key === activityKey);
     if (!item) return false;
-    if (num(state.Money) < item.cost) {
-      logMsg(`Not enough Cash to buy ${item.name} training (${item.cost} Cash).`);
+    const price = shopPrice(item.cost);
+    if (num(state.Money) < price) {
+      logMsg(`Not enough Cash to buy ${item.name} training (${price.toFixed(2)} Cash).`);
       return false;
     }
     if (item.unlock === "permanent") {
       if (!Array.isArray(state.OwnedTraining)) state.OwnedTraining = [];
       if (state.OwnedTraining.includes(activityKey)) return false;
-      state.Money = num(state.Money) - item.cost;
+      state.Money = num(state.Money) - price;
       state.OwnedTraining.push(activityKey);
       logMsg(`Bought ${item.name} training for ${item.cost} Cash.`, "store");
     } else if (item.unlock === "consumable") {
-      state.Money = num(state.Money) - item.cost;
+      state.Money = num(state.Money) - price;
       if (!state.Consumables) state.Consumables = {};
       state.Consumables[activityKey] = (state.Consumables[activityKey] || 0) + (item.uses || 1);
       logMsg(`Bought ${item.name} x${item.uses || 1} for ${item.cost} Cash.`, "store");
@@ -2160,11 +2171,12 @@ export function createGame(state, opts = {}) {
     if (!item) return false;
     if (!Array.isArray(state.OwnedEquipment)) state.OwnedEquipment = [];
     if (state.OwnedEquipment.includes(key)) return false;
-    if (num(state.Money) < item.cost) {
-      logMsg(`Not enough Cash to buy ${item.name} (${item.cost} Cash).`);
+    const price = shopPrice(item.cost);
+    if (num(state.Money) < price) {
+      logMsg(`Not enough Cash to buy ${item.name} (${price.toFixed(2)} Cash).`);
       return false;
     }
-    state.Money = num(state.Money) - item.cost;
+    state.Money = num(state.Money) - price;
     state.OwnedEquipment.push(key);
     state.Cha = num(state.Cha) + 0.02 * attrApt("Cha");
     if (!state.Equipment) state.Equipment = {};
@@ -2281,6 +2293,10 @@ export function createGame(state, opts = {}) {
   function doDay() {
     if (num(state.Health) <= 0) return;
     if (state.InFight) return;
+    if (Array.isArray(state.TaskList) && state.TaskList.length > 0 && state.Location !== "home") {
+      logMsg("Return Home to run your task board.");
+      return;
+    }
 
     // 1) Nutrition
     autoEatFood();
@@ -2336,10 +2352,16 @@ export function createGame(state, opts = {}) {
       state.Stamina = Math.min(maxStamina(), stamina + 35);
       state.Health = Math.min(maxHealth(), num(state.Health) + 2);
     } else if (actKey === "OddJobs") {
-      const money = act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha);
-      state.Money = num(state.Money) + money;
-      state.Stamina = stamina - act.cost;
-      logMsg(`Odd jobs: +${money} Cash.`, "money");
+      if (locKey !== "home") {
+        state.Stamina = Math.min(maxStamina(), stamina + 35);
+        logMsg("Scrounge for Cash is only available at Home.");
+      } else {
+        const money = Math.round((act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha)) * (1 + chaBonus()));
+        state.Money = num(state.Money) + money;
+        state.Stamina = stamina - act.cost;
+        logMsg(`Scrounge for Cash: +${money} Cash.`, "money");
+        if (R() < 0.01) { state.Encounter = 2; logMsg("A weak hobo challenges you. A keepsake fight begins.", "fight"); }
+      }
     } else if (act.attr) {
       const chain = trainChain(actKey);
       const tierIdx = chain ? trainTier(actKey) : 0;
@@ -2420,6 +2442,10 @@ export function createGame(state, opts = {}) {
   function advanceDay() {
     if (num(state.Health) <= 0) return false;
     if (state.InFight) return false;
+    if (Array.isArray(state.TaskList) && state.TaskList.length > 0 && state.Location !== "home") {
+      logMsg("Return Home to run your task board.");
+      return false;
+    }
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     if (tl.length === 0) return false;
 
@@ -2439,10 +2465,16 @@ export function createGame(state, opts = {}) {
       state.Stamina = Math.min(maxStamina(), stamina + 35);
       state.Health = Math.min(maxHealth(), num(state.Health) + 2);
     } else if (actKey === "OddJobs") {
-      const money = act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha);
-      state.Money = num(state.Money) + money;
-      state.Stamina = stamina - act.cost;
-      logMsg(`Odd jobs: +${money} Cash.`, "money");
+      if (locKey !== "home") {
+        state.Stamina = Math.min(maxStamina(), stamina + 35);
+        logMsg("Scrounge for Cash is only available at Home.");
+      } else {
+        const money = Math.round((act.moneyBase + Math.floor(attrValue("Cha") * act.moneyCha)) * (1 + chaBonus()));
+        state.Money = num(state.Money) + money;
+        state.Stamina = stamina - act.cost;
+        logMsg(`Scrounge for Cash: +${money} Cash.`, "money");
+        if (R() < 0.01) { state.Encounter = 2; logMsg("A weak hobo challenges you. A keepsake fight begins.", "fight"); }
+      }
     } else if (act.attr) {
       if (!hasTraining(actKey)) {
         state.Stamina = Math.min(maxStamina(), stamina + 35);
@@ -2570,6 +2602,8 @@ export function createGame(state, opts = {}) {
     view.foeStyleName = STYLES[foe.style].name;
     view.playerStyleName = STYLES[activeStyle()].name;
     view.mode = "location";
+    view.locKey = locKey;
+    view.locationNext = n + 1;
     view.round = 0;
     view.auto = state.AutoBattle === true;
     view.events = [];
@@ -2580,7 +2614,7 @@ export function createGame(state, opts = {}) {
     state,
     rng: R,
     // helpers exposed for tests/UI
-    attrValue, attrApt, potential, rankIndexFor, updatePotential,
+    attrValue, attrApt, potential, shopPrice, rankIndexFor, updatePotential,
     learnedStyles, activeStyle, styleXpMap,
     knowledgeMap, styleKnowledge, addKnowledge,
     knownSkillList, knownSkillSet, learnSkill,

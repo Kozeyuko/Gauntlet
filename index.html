@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.3">
+<link rel="stylesheet" href="css/style.css?v=2.4">
 </head>
 <body>
 
@@ -79,32 +79,8 @@
   </aside>
   <section id="citymap" aria-label="City map"></section>
 
-  <!-- RIGHT: tasklist + life/save -->
+  <!-- RIGHT: life/save -->
   <aside class="col-right">
-    <section class="panel tasklist-panel">
-      <h3>Tasks</h3>
-      <div id="taskQueueQuick" class="taskqueue"></div>
-      <div class="btnrow" style="margin-top:8px">
-        <button class="btn small-btn" id="btnTaskRepeatQuick">Repeat: OFF</button>
-        <button class="btn small-btn" id="btnTaskAdvanceQuick">ADVANCE DAY</button>
-      </div>
-      <div class="btnrow" style="margin-top:4px">
-        <button class="btn small-btn" id="btnTaskPlayQuick">PLAY</button>
-        <button class="btn small-btn" id="btnTaskAutoQuick">AUTO: OFF</button>
-        <select id="taskSpeedQuick" class="small-btn">
-          <option value="100">Fast</option>
-          <option value="500" selected>Normal</option>
-          <option value="1000">Slow</option>
-        </select>
-      </div>
-      <section class="panel" style="margin-top:10px">
-        <h3>Add Activity</h3>
-        <div id="taskActivityListQuick" class="taskactivity"></div>
-      </section>
-      <div class="btnrow" style="margin-top:8px">
-        <button class="btn small-btn" id="btnLookingQuick" data-tip="When ON, you'll encounter random fights with random NPCs while moving. Off by default.">SEARCHING FOR TROUBLE: OFF</button>
-      </div>
-    </section>
     <div class="footbtns">
       <button class="btn orange" id="btnReincarnate">REBIRTH</button>
       <button class="btn small-btn" id="btnReset">RESET SAVE</button>
@@ -208,6 +184,13 @@
     <section class="panel" id="cookPanel" style="display:none">
       <h3>Cook</h3>
       <div class="loclist" id="cookList"></div>
+    </section>
+    <section class="panel" id="homeTaskPanel" style="display:none">
+      <h3>Home Task Board</h3>
+      <div id="taskQueueQuick" class="taskqueue"></div>
+      <div class="btnrow" style="margin-top:8px"><button class="btn small-btn" id="btnTaskRepeatQuick">Repeat: OFF</button><button class="btn small-btn" id="btnTaskAdvanceQuick">ADVANCE DAY</button></div>
+      <div class="btnrow" style="margin-top:4px"><button class="btn small-btn" id="btnTaskPlayQuick">PLAY</button><button class="btn small-btn" id="btnTaskAutoQuick">AUTO: OFF</button><select id="taskSpeedQuick" class="small-btn"><option value="100">Fast</option><option value="500" selected>Normal</option><option value="1000">Slow</option></select></div>
+      <section class="panel" style="margin-top:10px"><h3>Add Activity</h3><div id="taskActivityListQuick" class="taskactivity"></div></section>
     </section>
     <div class="acts">
       <button class="btn" id="btnLocClose">Close</button>
@@ -352,7 +335,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.3</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.4</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
@@ -488,6 +471,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.3"></script>
+<script type="module" src="js/main.js?v=2.4"></script>
 </body>
 </html>
