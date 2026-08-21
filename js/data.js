@@ -36,16 +36,18 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.6;
+export const GAME_VERSION = 2.7;
 export const UPDATE_LOG = [
-  { v: 2.6, text: "v2.6: every visible location now occupies its own boxed map block, including Home, gym, clinic, job board, convenience store, and Arena; Arena sits against the far-right wall; equipment is managed from the Inventory Equipment tab; combat is always automatic with Speed controlling hit cadence from 0.50s toward 0.05s; Intelligence controls crit chance from 0% to 50%; and a failed escape resumes the automatic battle loop." },
-  { v: 2.4, text: "v2.4: tasks moved into the Home base UI and only run at Home; Home opens from anywhere without forcing travel; map/store placement refreshed; Scrounge for Cash renamed and Home-only with a rare tier-0 Hobo keepsake fight; food purchases come in stacks of five with best-food auto-eating; raw carrots, potatoes, and rice added; food and clinic recovery use percentages; Charisma increases cash and discounts all stores up to 50%; auto-fight uses Ultimates; gym wins ask about the next rival and guarantee style affinity progress." },
-  { v: 2.3, text: "v2.3: route timing now uses the full route with instant rerouting and no same-location detours; movement grants more Speed; map fighters open challenger rosters; gym fighter clicks open combat correctly; arena moved to the river's right-middle square; opponent readouts use Total Power (all stats ÷ 30); escape is a one-use Speed-vs-Speed chance; News opens by default and glows on unread entries; Aptitude purchases multiply current Aptitude by 1.5; ADMIN code opens a testing console." },
-  { v: 2.2, text: "v2.2: fast map travel (20-30s baseline, ~1s at high Speed), dashed route line + ETA box while traveling, no random fights while walking (use the Searching-for-Trouble toggle), randomized NPC stats by tier (tier 1 low / 2 mid / 3 high), central locations (gym, store, clinic, job board) moved near home, and news is now a floating box in the top-left opened from the NEWS button." },
-  { v: 2.1, text: "v2.1: jobs manual play is indefinite (no round cap, stamina cost scales 5→1 by level, ends on 3 fails or quit), stats display 0 but work as 1, slower style mastery, no fight round cap (win by KO or stamina drain), map movement follows streets with reliable arrival, tasks persist on the tab until removed, auto button shows true state, Statistics menu, mobile layout fixes." },
-  { v: 2.0, text: "v2: decimal cash, auto-work jobs, City Gym store, tasklist UI, traversable city map, job rework, stat-gain rework, gyms fight-only (training via purchased programs), removed 60s auto-work button, mobile zoom fix." },
-  { v: 1.01, text: "New: training progression ladders, inventory & tasklist, skill status effects (poison/buff/debuff/limb), style tiers, locked gyms & The Inside hidden until their rival is beaten, money in vitals, zero-stat start, build-editor fix." },
-  { v: 1.0, text: "Launch: train, fight rivals, learn styles, reincarnate." },
+  { v: 2.7, text: "• Added random trainee fights after the main gym roster.\n• Added player Total Power to Vitals.\n• Unified stat and gain displays to four decimal places.\n• Added a skip-able first-run tutorial with glowing targets.\n• Compacted the mobile header and made the map scroll as a readable larger canvas.\n• Converted the update history to concise bullet lists." },
+  { v: 2.6, text: "• Boxed every location, including Home, starter locations, stores, gyms, and Arena.\n• Moved Arena to the far-right wall.\n• Added Inventory Equipment tab.\n• Combat is automatic; Speed controls hit cadence; Intelligence controls crit chance.\n• Failed escape resumes combat." },
+  { v: 2.5, text: "• Moved task management to Home.\n• Added randomized reincarnation entrances.\n• Added Scrounge for Cash, food stacks, auto-eating, percentage recovery, and Charisma pricing." },
+  { v: 2.4, text: "• Moved tasks into the Home base.\n• Added Scrounge for Cash and rare Hobo encounter.\n• Added food stacks, percentage recovery, Charisma pricing, auto Ultimates, and gym progression." },
+  { v: 2.3, text: "• Fixed route timing, rerouting, map rosters, gym combat, Arena placement, TP, escape, News, Aptitudes, and ADMIN testing." },
+  { v: 2.2, text: "• Added fast travel, route ETA, optional street encounters, tiered opponents, central locations, and floating News." },
+  { v: 2.1, text: "• Reworked jobs, style mastery, combat rounds, map travel, persistent tasks, auto-run, statistics, and mobile layout." },
+  { v: 2.0, text: "• Added decimal cash, auto-work, City Gym, tasklists, city travel, job progression, and training programs." },
+  { v: 1.01, text: "• Added training ladders, inventory, status effects, style tiers, locked gyms, money, and zero-stat starts." },
+  { v: 1.0, text: "• Launch: train, fight rivals, learn styles, and reincarnate." },
 ];
 export function versionCompare(a, b) {
   if (a > b) return 1;

@@ -2395,7 +2395,7 @@ export function createGame(state, opts = {}) {
         sxp = ` — style mastery +${STYLEXP_TRAIN}`;
       }
       const tierLabel = tier ? ` [${tier.name}]` : "";
-      logMsg(`Training: +${gain.toFixed(2)} ${attrName}${tierLabel}.${sxp}`, "train");
+      logMsg(`Training: +${gain.toFixed(4)} ${attrName}${tierLabel}.${sxp}`, "train");
 
       if (chain) {
         if (tierIdx + 1 < chain.tiers.length) {
@@ -2506,7 +2506,7 @@ export function createGame(state, opts = {}) {
         state.Stamina = stamina - cost;
         if (act.staminaBonus) state.Stamina = Math.min(maxStamina(), num(state.Stamina) + act.staminaBonus);
         const attrName = ATTRIBUTES.find((a) => a.id === act.attr).name;
-        logMsg(`Training: +${gain.toFixed(2)} ${attrName} (advance day).`, "train");
+        logMsg(`Training: +${gain.toFixed(4)} ${attrName} (advance day).`, "train");
 
         if (chain && tierIdx + 1 < chain.tiers.length) {
           state.TrainProgress[actKey] = (state.TrainProgress[actKey] || 0) + 1;
@@ -2586,6 +2586,18 @@ export function createGame(state, opts = {}) {
     if (!state.LocationFighterCache) state.LocationFighterCache = {};
     if (!Array.isArray(state.LocationFighterCache[locKey])) {
       state.LocationFighterCache[locKey] = locationRivals(locKey);
+      if (loc.styleGym || loc.tier > 0) {
+        const p = Math.max(1, potential());
+        const trainee = Math.max(1, 0.75 + R() * 0.5);
+        state.LocationFighterCache[locKey].push({
+          n: 6,
+          name: "Random Gym Trainee",
+          style: loc.styleGym || "Brawling",
+          stats: { Str: Math.floor(p * 0.22 * trainee), Tou: Math.floor(p * 0.22 * trainee), Spd: Math.floor(p * 0.22 * trainee), Int: Math.floor(p * 0.18 * trainee), Cha: Math.floor(p * 0.08 * trainee) },
+          rewardMoney: 2,
+          rewardXp: 1,
+        });
+      }
     }
     const rivals = state.LocationFighterCache[locKey];
     const beaten = state.LocationFights?.[locKey] || [];

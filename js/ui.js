@@ -138,7 +138,7 @@ export function initUI(game, opts = {}) {
     barHealth: $("barHealth"), barHealthTxt: $("barHealthTxt"),
     barStamina: $("barStamina"), barStaminaTxt: $("barStaminaTxt"),
     barNutrition: $("barNutrition"), barNutritionTxt: $("barNutritionTxt"),
-    hMoneyLeft: $("hMoneyLeft"),
+    hMoneyLeft: $("hMoneyLeft"), hTP: $("hTP"),
     attrsBody: $("attrsBody"),
     activitiesGrid: $("activitiesGrid"),
     stylesGrid: $("stylesGrid"),
@@ -160,6 +160,7 @@ export function initUI(game, opts = {}) {
     btnLooking: $("btnLooking"), btnGhosts: $("btnGhosts"),
     btnLookingQuick: $("btnLookingQuick"),
     btnNews: $("btnNews"), newsFloater: $("newsFloater"), btnNewsClose: $("btnNewsClose"),
+    tutorialOverlay: $("tutorialOverlay"), tutorialTitle: $("tutorialTitle"), tutorialText: $("tutorialText"), btnTutorialSkip: $("btnTutorialSkip"), btnTutorialNext: $("btnTutorialNext"),
     logList: $("logList"),
     btnReincarnate: $("btnReincarnate"),
     btnReset: $("btnReset"),
@@ -272,6 +273,7 @@ export function initUI(game, opts = {}) {
     const loc = LOCATIONS[key];
     if (!loc) return;
     if (key === "home") {
+      tutorialAdvanceTo("home");
       openLocationOverlay("home");
       return;
     }
@@ -296,7 +298,7 @@ export function initUI(game, opts = {}) {
   function openArrivalOverlay(key) {
     if (key === "cstore") { openStore("cstore"); return; }
     if (key === "clinic") { openStore("clinic"); return; }
-    if (key === MAIN_GYM) { openStore("gym"); return; }
+    if (key === MAIN_GYM) { tutorialAdvanceTo("gym"); openLocationOverlay("gym"); return; }
     if (key === "jobboard") { openJobs(); return; }
     if (key === "arena") { openArena(); return; }
     openLocationOverlay(key);
@@ -323,6 +325,7 @@ export function initUI(game, opts = {}) {
     const pin = loc.glyph ? `<span class="pin glyph">${loc.glyph}</span>` : `<span class="pin"></span>`;
     b.innerHTML = `${pin}<span class="lock"></span><span class="blbl">${loc.label}</span>`;
     b.setAttribute("data-tip", buildingBaseTip(loc.key));
+    b.dataset.tutorial = loc.key;
     b.addEventListener("click", () => clickBuilding(loc.key));
     buildingEls[loc.key] = b;
     mapLayer.appendChild(b);
@@ -379,9 +382,9 @@ export function initUI(game, opts = {}) {
     return `Str ${stats.Str} · Tou ${stats.Tou} · Spd ${stats.Spd} · Int ${stats.Int} · Cha ${stats.Cha}`;
   };
   const fmtTP = (stats) => {
-    if (!stats) return "TP 0.00";
+    if (!stats) return "TP 0.0000";
     const total = ["Str", "Tou", "Spd", "Int", "Cha"].reduce((sum, k) => sum + (Number(stats[k]) || 0), 0);
-    return `TP ${(total / 30).toFixed(2)}`;
+    return `TP ${(total / 30).toFixed(4)}`;
   };
 
   const clampRivalIdx = () => Math.min(Math.max(Number(state.RivalIdx) || 1, 1), MAX_TOTAL);
@@ -420,6 +423,8 @@ export function initUI(game, opts = {}) {
     setBar(el.barStamina, el.barStaminaTxt, Number(state.Stamina) || 0, game.maxStamina());
     setBar(el.barNutrition, el.barNutritionTxt, Number(state.Nutrition) || 0, game.maxNutrition());
     el.hMoneyLeft.textContent = fmtCash(state.Money);
+    const tp = (ATTRIBUTES.reduce((sum, a) => sum + (Number(state[a.id]) || 0), 0) / 30).toFixed(4);
+    el.hTP.textContent = tp;
   }
 
   function renderAttrs() {
@@ -430,8 +435,8 @@ export function initUI(game, opts = {}) {
       const tip = `${a.name} — ${a.desc} Aptitude ×${apt.toFixed(2)} (multiplier applied to all gains).`;
       html += `<div class="attrrow" data-tip="${tip}" title="${tip}">
         <span class="nm">${a.name}</span>
-        <span class="val">${val.toFixed(2)}</span>
-        <span class="apt">×${apt.toFixed(2)}</span>
+        <span class="val">${val.toFixed(4)}</span>
+        <span class="apt">×${apt.toFixed(4)}</span>
         <button class="btn tiny-btn apt-buy" data-attr="${a.id}" title="Spend $25 to multiply this Aptitude by 1.5">+1.5×</button>
       </div>`;
     }
@@ -912,7 +917,7 @@ export function initUI(game, opts = {}) {
     const loc = LOCATIONS[key];
     if (!el.locFightersList || !el.locFightersTitle) return;
     el.locFightersList.innerHTML = "";
-    if (!loc.styleGym) {
+    if (!loc.styleGym && loc.tier === 0) {
       el.locFightersTitle.textContent = "Style";
       const div = document.createElement("div");
       div.className = "small";
@@ -920,15 +925,15 @@ export function initUI(game, opts = {}) {
       el.locFightersList.appendChild(div);
       return;
     }
-    const styleId = loc.styleGym;
+    const styleId = loc.styleGym || "Brawling";
     const st = STYLES[styleId];
     const learned = game.learnedStyles()[styleId];
     const xp = game.styleXpMap()[styleId] || 0;
     let tier = 0;
     for (let i = 0; i < MASTERY_TIERS.length; i++) if (xp >= MASTERY_TIERS[i]) tier = i + 1;
     const next = MASTERY_TIERS[tier] || null;
-    el.locFightersTitle.textContent = `Fighters (${game.locationFightsBeaten(key)}/5 cleared)`;
     const rivals = game.locationFightList(key);
+    el.locFightersTitle.textContent = `Fighters (${game.locationFightsBeaten(key)}/${Math.max(5, rivals.length - 1)} cleared)`;
     for (const r of rivals) {
       const row = document.createElement("div");
       row.className = "ghostrow" + (r.beaten ? " defeated" : (!r.unlocked ? " locked" : ""));
@@ -1113,6 +1118,7 @@ export function initUI(game, opts = {}) {
   }
 
   function openJobs() {
+    tutorialAdvanceTo("work");
     el.jobList.style.display = "";
     el.jobGameArea.style.display = "none";
     el.jobGameArea.innerHTML = "";
@@ -1121,6 +1127,7 @@ export function initUI(game, opts = {}) {
   }
 
   function startJobMinigame(job) {
+    tutorialAdvanceTo("gym");
     if (!game.jobCanWork(job.key)) {
       game.logMsg("Too tired to work.");
       render();
@@ -2258,6 +2265,51 @@ export function initUI(game, opts = {}) {
     el.ghostOverlay.classList.add("show");
   }
 
+  // ------------------------------------------------------------ first-run tutorial --
+  const tutorialSteps = [
+    { title: "1 · Find work", text: "Go to the Job Board to find your first source of cash.", target: "jobboard" },
+    { title: "2 · Work a shift", text: "Choose a job and press WORK SHIFT. Finish it to earn Cash and XP.", target: "work" },
+    { title: "3 · Visit the gym", text: "Go to the gym and review its training and fighter roster.", target: "gym" },
+    { title: "4 · Train at Home", text: "Return Home and choose a task from the Home Task Board.", target: "home" },
+  ];
+  let tutorialStep = 0;
+  function clearTutorialGlow() {
+    document.querySelectorAll(".tutorial-glow").forEach((node) => node.classList.remove("tutorial-glow"));
+  }
+  function applyTutorialGlow(target) {
+    clearTutorialGlow();
+    if (target === "work") document.querySelector(".work-btn:not(:disabled)")?.classList.add("tutorial-glow");
+    else document.querySelector(`[data-tutorial="${target}"]`)?.classList.add("tutorial-glow");
+  }
+  function renderTutorialStep() {
+    const step = tutorialSteps[tutorialStep];
+    if (!step) { closeTutorial(); return; }
+    el.tutorialTitle.textContent = step.title;
+    el.tutorialText.textContent = step.text;
+    el.btnTutorialNext.textContent = tutorialStep === tutorialSteps.length - 1 ? "FINISH" : "NEXT";
+    applyTutorialGlow(step.target);
+  }
+  function closeTutorial() {
+    clearTutorialGlow();
+    el.tutorialOverlay.classList.remove("show");
+    try { localStorage.setItem("gauntlet-tutorial-seen", "1"); } catch (_) { /* private mode */ }
+  }
+  function openTutorial() {
+    tutorialStep = 0;
+    renderTutorialStep();
+    el.tutorialOverlay.classList.add("show");
+  }
+  function tutorialAdvanceTo(target) {
+    const idx = tutorialSteps.findIndex((step) => step.target === target);
+    if (idx >= 0 && el.tutorialOverlay.classList.contains("show")) { tutorialStep = idx; renderTutorialStep(); }
+  }
+  el.btnTutorialNext.addEventListener("click", () => {
+    tutorialStep += 1;
+    if (tutorialStep >= tutorialSteps.length) closeTutorial();
+    else renderTutorialStep();
+  });
+  el.btnTutorialSkip.addEventListener("click", closeTutorial);
+
   // ------------------------------------------------------------ event wiring --
   el.btnFight.addEventListener("click", () => {
     pauseAutoRun();
@@ -2569,6 +2621,7 @@ export function initUI(game, opts = {}) {
     game.setName(raw || "Rookie");
     el.nameOverlay.classList.remove("show");
     render();
+    if (firstLaunch) openTutorial();
   }
   el.btnNameBegin.addEventListener("click", submitName);
   el.nameInput.addEventListener("keydown", (e) => {

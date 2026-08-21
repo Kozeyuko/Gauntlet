@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.6">
+<link rel="stylesheet" href="css/style.css?v=2.7">
 </head>
 <body>
 
@@ -37,6 +37,18 @@
   <div class="loglist" id="logList"></div>
 </div>
 
+<!-- ============ FIRST-RUN TUTORIAL ============ -->
+<div class="overlay tutorial-overlay" id="tutorialOverlay">
+  <div class="modal tutorial-modal">
+    <h2 id="tutorialTitle">First steps</h2>
+    <p id="tutorialText"></p>
+    <div class="acts">
+      <button class="btn" id="btnTutorialSkip">SKIP TUTORIAL</button>
+      <button class="btn gold" id="btnTutorialNext">NEXT</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ THREE-COLUMN GAME SCREEN ============ -->
 <div class="gamecols">
   <!-- LEFT: stats / career panel -->
@@ -55,6 +67,7 @@
         <span class="barlbl" data-tip="Nutrition — decays over time.">NUT</span>
         <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
       </div>
+      <div class="barrow money"><span class="barlbl">TP</span><b id="hTP" class="gold">0.00</b></div>
       <div class="barrow money"><span class="barlbl" data-tip="Your cash. Spend it wisely.">MONEY</span><b id="hMoneyLeft" class="gold">30</b></div>
     </section>
     <section class="panel">
@@ -335,7 +348,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.6</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.7</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
@@ -475,6 +488,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.6"></script>
+<script type="module" src="js/main.js?v=2.7"></script>
 </body>
 </html>

@@ -1199,7 +1199,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.6, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.7, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1640,7 +1640,7 @@ console.log("== Part D: locationFightList returns 5 fighters with status ==");
   const state = freshState();
   const g = createGame(state, { rng: makeRng(1) });
   const list = g.locationFightList("spar");
-  assert(list.length === 5, "list has 5 entries");
+  assert(list.length === 6, "list has 5 rivals plus random trainee");
   assert(list[0].unlocked === true, "fighter 1 unlocked");
   assert(list[0].beaten === false, "fighter 1 not beaten");
   assert(list[1].unlocked === false, "fighter 2 locked");
