@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.14;
+export const GAME_VERSION = 2.15;
 export const UPDATE_LOG = [
+  { v: 2.15, text: "• Redirected all legacy gym-store calls into the actual gym overlay.\n• Training Gear now displays the dedicated gym item directly.\n• Purchased one-time gym gear disappears from the shop.\n• Prevented duplicate purchases of dedicated gym gear." },
   { v: 2.14, text: "• Fixed gym Training Gear tabs opening the stale store UI.\n• Added one unique, persistent gear purchase to each combat gym.\n• Removed old gym training/rest panels; gyms now focus on trainers, modes, and gear.\n• Task boards can now be used from any location without returning home.\n• Task-board AUTO now repeats continuously until stopped, depleted, or interrupted by combat/death." },
   { v: 2.13, text: "• Removed the Attributes Aptitude purchase buttons.\n• Removed the empty next-rank header placeholder.\n• Smoothed movement sampling from 150ms to 50ms.\n• Made combat start from and write back to the authoritative Vitals HP/Stamina.\n• Added a real-time UI pulse for money, auto-job timers, open panels, and stats." },
   { v: 2.12, text: "• Fixed the route line so it only draws forward from the active segment.\n• Home tasks now persist and rotate until removed with the red X.\n• Removed Home Activities and Home Style panels.\n• Added horizontal location tabs.\n• Gyms now show Trainers and Training Gear tabs.\n• Added trainer programs and special-mode requirement rows.\n• Added explicit Return Home control.\n• Prevented unrelated panels from appearing in random fighter rosters." },

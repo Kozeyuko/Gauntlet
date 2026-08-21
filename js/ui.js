@@ -951,6 +951,11 @@ export function initUI(game, opts = {}) {
       return;
     }
     const owned = Array.isArray(state.OwnedGymGear) && state.OwnedGymGear.includes(item.key);
+    el.locFightersList.innerHTML = "";
+    if (owned) {
+      el.locFightersList.innerHTML = `<div class="small">All dedicated gear from this gym has been purchased.</div>`;
+      return;
+    }
     const row = document.createElement("div"); row.className = "ghostrow";
     const main = document.createElement("div"); main.className = "gmain";
     main.innerHTML = `<div class="gnm">${item.name}</div><div class="gsub">${item.desc} · ${fmtCash(item.cost)}</div>`;
@@ -1571,9 +1576,13 @@ export function initUI(game, opts = {}) {
   }
 
   function openStore(type) {
+    if (type === "gym") {
+      openLocationOverlay(MAIN_GYM);
+      return;
+    }
     closeAllTransientUIs();
     storeType = type || "cstore";
-    storeTab = type === "clinic" ? "clinic" : (type === "gym" ? "training" : "food");
+    storeTab = type === "clinic" ? "clinic" : (type === "gym" ? "gear" : "food");
     renderStore();
     el.storeOverlay.classList.add("show");
   }
