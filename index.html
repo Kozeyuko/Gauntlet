@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.5">
+<link rel="stylesheet" href="css/style.css?v=2.6">
 </head>
 <body>
 
@@ -335,7 +335,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.5</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.6</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
@@ -411,7 +411,11 @@
 <div class="overlay" id="inventoryOverlay">
   <div class="modal">
     <h2>Inventory</h2>
-    <div class="sub">Consumables stored for later use. Food (rice) is eaten automatically when hungry.</div>
+    <div class="sub">Items and equipment carried by your fighter.</div>
+    <div class="store-tabs" id="inventoryTabs">
+      <button class="store-tab active" id="inventoryTabItems">ITEMS</button>
+      <button class="store-tab" id="inventoryTabEquipment">EQUIPMENT</button>
+    </div>
     <div class="storelist" id="inventoryList"></div>
     <div class="small" id="inventoryEmpty" style="display:none">No items in inventory.</div>
     <div class="acts">
@@ -471,6 +475,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.5"></script>
+<script type="module" src="js/main.js?v=2.6"></script>
 </body>
 </html>

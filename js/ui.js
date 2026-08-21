@@ -219,6 +219,7 @@ export function initUI(game, opts = {}) {
     // inventory
     btnInventory: $("btnInventory"), inventoryOverlay: $("inventoryOverlay"),
     inventoryList: $("inventoryList"), inventoryEmpty: $("inventoryEmpty"),
+    inventoryTabItems: $("inventoryTabItems"), inventoryTabEquipment: $("inventoryTabEquipment"),
     btnInventoryClose: $("btnInventoryClose"),
     // tasklist quick (now the full editor)
     taskActivityListQuick: $("taskActivityListQuick"),
@@ -316,7 +317,7 @@ export function initUI(game, opts = {}) {
     const pos = MAP_POS[loc.key];
     if (!pos) return;
     const b = document.createElement("div");
-    b.className = "bldg" + (["gym","cstore","clinic","jobboard"].includes(loc.key) ? " store-place" : "");
+    b.className = "bldg map-box";
     b.style.left = pct(pos[0], MAP_W);
     b.style.top = pct(pos[1], MAP_H);
     const pin = loc.glyph ? `<span class="pin glyph">${loc.glyph}</span>` : `<span class="pin"></span>`;
@@ -1646,47 +1647,46 @@ export function initUI(game, opts = {}) {
   });
 
   // ------------------------------------------------------------ inventory overlay --
+  let inventoryTab = "items";
   function renderInventory() {
     const inv = game.inventory();
     el.inventoryList.innerHTML = "";
-    if (inv.length === 0) {
-      el.inventoryEmpty.style.display = "";
+    el.inventoryTabItems.classList.toggle("active", inventoryTab === "items");
+    el.inventoryTabEquipment.classList.toggle("active", inventoryTab === "equipment");
+    if (inventoryTab === "equipment") {
+      const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
+      const equipped = state.Equipment || {};
+      if (!owned.length) {
+        el.inventoryEmpty.style.display = "";
+        return;
+      }
+      el.inventoryEmpty.style.display = "none";
+      for (const key of owned) {
+        const item = EQUIPMENT.find((x) => x.key === key);
+        if (!item) continue;
+        const row = document.createElement("div"); row.className = "invrow";
+        row.innerHTML = `<div class="smain"><div class="snm">${item.name}</div><div class="ssub">${item.desc} · ${item.slot}</div></div>`;
+        const btn = document.createElement("button"); btn.className = "btn small-btn";
+        btn.textContent = equipped[item.slot] === key ? "UNEQUIP" : "EQUIP";
+        btn.addEventListener("click", () => { if (equipped[item.slot] === key) game.unequipItem(key); else game.equipItem(key); renderInventory(); render(); });
+        row.appendChild(btn); el.inventoryList.appendChild(row);
+      }
       return;
     }
+    if (inv.length === 0) { el.inventoryEmpty.style.display = ""; return; }
     el.inventoryEmpty.style.display = "none";
     for (const entry of inv) {
       const item = [...CSTORE_ITEMS, ...CLINIC_ITEMS].find((i) => i.key === entry.key);
       if (!item || item.buff) continue;
-      const row = document.createElement("div");
-      row.className = "invrow";
-      const main = document.createElement("div");
-      main.className = "smain";
-      const nm = document.createElement("div");
-      nm.className = "snm";
-      nm.textContent = item.name;
-      const sub = document.createElement("div");
-      sub.className = "ssub";
-      sub.textContent = item.desc;
-      main.appendChild(nm);
-      main.appendChild(sub);
-      const qty = document.createElement("span");
-      qty.className = "invqty";
-      qty.textContent = `×${entry.qty}`;
-      row.appendChild(main);
-      row.appendChild(qty);
-      if (!item.buff) {
-        const btn = document.createElement("button");
-        btn.className = "btn small-btn";
-        btn.textContent = "USE";
-        btn.disabled = entry.qty <= 0;
-        btn.addEventListener("click", () => {
-          game.useItem(entry.key);
-          renderInventory();
-          render();
-        });
-        row.appendChild(btn);
-      }
-      el.inventoryList.appendChild(row);
+      const row = document.createElement("div"); row.className = "invrow";
+      const main = document.createElement("div"); main.className = "smain";
+      const nm = document.createElement("div"); nm.className = "snm"; nm.textContent = item.name;
+      const sub = document.createElement("div"); sub.className = "ssub"; sub.textContent = item.desc;
+      main.append(nm, sub); row.appendChild(main);
+      const qty = document.createElement("span"); qty.className = "invqty"; qty.textContent = `×${entry.qty}`; row.appendChild(qty);
+      const btn = document.createElement("button"); btn.className = "btn small-btn"; btn.textContent = "USE"; btn.disabled = entry.qty <= 0;
+      btn.addEventListener("click", () => { game.useItem(entry.key); renderInventory(); render(); });
+      row.appendChild(btn); el.inventoryList.appendChild(row);
     }
   }
 
@@ -1696,6 +1696,8 @@ export function initUI(game, opts = {}) {
   }
 
   el.btnInventory.addEventListener("click", openInventory);
+  el.inventoryTabItems.addEventListener("click", () => { inventoryTab = "items"; renderInventory(); });
+  el.inventoryTabEquipment.addEventListener("click", () => { inventoryTab = "equipment"; renderInventory(); });
   el.btnInventoryClose.addEventListener("click", () => el.inventoryOverlay.classList.remove("show"));
   el.inventoryOverlay.addEventListener("click", (e) => {
     if (e.target === el.inventoryOverlay) el.inventoryOverlay.classList.remove("show");
@@ -2136,8 +2138,13 @@ export function initUI(game, opts = {}) {
     }
   }
 
+  function combatHitInterval(view) {
+    const spd = Math.max(0, Number(view && view.playerSpeed) || 0);
+    const bonus = spd <= 5000 ? 0.33 * (spd / 5000) : Math.min(0.5, 0.33 + 0.17 * ((spd - 5000) / 5000));
+    return Math.max(50, Math.round(500 / (1 + bonus * 18)));
+  }
+
   function maybeAuto() {
-    if (state.AutoBattle !== true) return;
     if (!activeView || activeView.finished) return;
     stopAuto();
     autoTimer = setTimeout(() => {
@@ -2156,7 +2163,7 @@ export function initUI(game, opts = {}) {
         if (v.finished) finishCombat(v);
         else { activeView = v; renderCombat(v); maybeAuto(); }
       }
-    }, 450);
+    }, combatHitInterval(activeView));
   }
 
   function finishCombat(view) {
@@ -2401,6 +2408,7 @@ export function initUI(game, opts = {}) {
       el.btnEscape.disabled = true;
       el.btnEscape.textContent = "ESCAPE USED";
       renderCombat(activeView);
+      maybeAuto();
     }
   });
 

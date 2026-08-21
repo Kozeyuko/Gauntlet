@@ -129,7 +129,8 @@ header {
   .vital { padding: 0 4px; }
 }
 
-/* ---------- city map (default view) ---------- */
+#btnAutoFight { display: none !important; }
+
 #citymap {
   flex: 1;
   width: 100%;
@@ -746,6 +747,8 @@ header {
 .ultline .small { white-space: nowrap; color: var(--purple); }
 
 .combatbottom { display: flex; gap: 18px; margin-top: 16px; }
+.combat .movescol h3, .combat #moveList, .combat #btnUlt, .combat #btnAuto { display: none !important; }
+.combat .movescol { min-width: 140px; }
 .logcol { flex: 1; min-width: 0; }
 .movescol { width: 320px; flex: none; }
 .log {
@@ -1186,9 +1189,21 @@ header {
 .route-line { stroke: var(--gold); stroke-dasharray: 6 4; fill: none; stroke-width: 2.5; }
 .eta-box { position: absolute; transform: translateX(-50%); background: rgba(0,0,0,.75); border: 1px solid var(--gold); color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 11px; z-index: 6; pointer-events: none; }
 
-/* beginner store blocks have wider touch targets between the streets */
-.bldg.store-place { padding: 14px; margin: -14px; }
-.bldg.store-place .blbl { font-weight: 700; }
+#citymap .bldg.map-box {
+  width: 72px;
+  min-width: 72px;
+  height: 56px;
+  min-height: 56px;
+  padding: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgba(20,25,33,.96), rgba(11,15,21,.96));
+  box-shadow: 0 3px 8px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.03);
+}
+#citymap .bldg.map-box:hover { border-color: var(--gold); transform: translate(-50%, -50%) translateY(-2px); }
+#citymap .bldg.map-box .pin { width: 18px; height: 18px; }
+#citymap .bldg.map-box .blbl { max-width: 68px; text-align: center; }
 
 /* ---------- floating news box (top-left) ---------- */
 .news-floater { position: fixed; top: 8px; left: 8px; width: 300px; max-width: 90vw; max-height: 60vh; overflow-y: auto; background: var(--panel2); border: 1px solid var(--gold-dim); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 90; display: none; padding: 10px; }

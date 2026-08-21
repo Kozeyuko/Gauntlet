@@ -212,7 +212,7 @@ export function freshState() {
     Money: START_MONEY, AgeDays: START_AGE_DAYS, Lives: 0, Wins: 0,
     RivalIdx: 1, Location: "home", Activity: "Rest",
     Looking: false, Styles: "Brawling", ActiveStyle: "Brawling",
-    StyleXp: "", PotRank: 0, InFight: false, AutoBattle: false,
+    StyleXp: "", PotRank: 0, InFight: false, AutoBattle: true,
     StyleKnowledge: "", KnownSkills: "", Build: "",
     JobXp: "", JobLevel: "", JobCooldowns: {},
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
@@ -326,7 +326,12 @@ export function createGame(state, opts = {}) {
   // ---- attribute helpers ----
   const attrValue = (id) => Math.max(1, num(state[id]) + num(state.TempBoosts && state.TempBoosts[id]));
   const attrApt = (id) => Math.max(1, num(state[id + "Ap"]));
-  const chaBonus = () => Math.min(0.5, Math.max(0, attrValue("Cha")) / 15000);
+  const softCap50 = (value) => {
+    const v = Math.max(0, Number(value) || 0);
+    if (v <= 5000) return 0.33 * (v / 5000);
+    return Math.min(0.5, 0.33 + 0.17 * ((v - 5000) / 5000));
+  };
+  const chaBonus = () => softCap50(attrValue("Cha"));
   const shopPrice = (base) => Math.max(0.01, Math.round(Number(base || 0) * (1 - chaBonus()) * 100) / 100);
   const foodNutrition = (item) => item && item.nutritionPct ? maxNutrition() * item.nutritionPct : Number(item && item.nutrition || 0);
   const clinicHealth = (item) => item && item.healthPct ? maxHealth() * item.healthPct : Number(item && item.health || 0);
@@ -898,7 +903,7 @@ export function createGame(state, opts = {}) {
     }
 
     const dmg = (stats.Str + stats.Int * 0.2) * styleDmg;
-    const crit = 0.08 + stats.Int * 0.004 + style.crit;
+    const crit = Math.min(0.5, softCap50(stats.Int) + num(style.crit || 0));
     const dodge = Math.min(0.45, stats.Spd * 0.01 + style.dodge);
     const stam = COMBAT_STAM_BASE + stats.Tou;
     const drain = 6 * (1 + stats.Str / STR_DRAIN_DIV) * Math.pow(0.75, stats.Tou / TOU_EFF_DIV);
@@ -2621,7 +2626,7 @@ export function createGame(state, opts = {}) {
     state,
     rng: R,
     // helpers exposed for tests/UI
-    attrValue, attrApt, potential, shopPrice, rankIndexFor, updatePotential,
+    attrValue, attrApt, potential, shopPrice, softCap50, rankIndexFor, updatePotential,
     learnedStyles, activeStyle, styleXpMap,
     knowledgeMap, styleKnowledge, addKnowledge,
     knownSkillList, knownSkillSet, learnSkill,

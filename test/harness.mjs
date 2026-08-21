@@ -1199,7 +1199,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.5, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.6, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -2350,15 +2350,13 @@ console.log("== v2.2: locationRivals stats are randomized across calls ==");
   assert(true, "locationRivals may randomize (checked no crash)");
 }
 
-console.log("== v2.2: central locations near home ==");
+console.log("== v2.5: every location has a distinct map box ==");
 {
-  const home = MAP_POS.home;
-  for (const key of ["gym", "cstore", "clinic", "jobboard"]) {
-    const p = MAP_POS[key];
-    assert(!!p, `${key} has a position`);
-    const d = Math.max(Math.abs(p[0]-home[0]), Math.abs(p[1]-home[1]));
-    assert(d < 200, `${key} near home (chebyshev ${d} < 200)`);
-  }
+  const keys = Object.keys(MAP_POS).filter((key) => key !== "inside");
+  const spots = new Set(keys.map((key) => MAP_POS[key].join(",")));
+  assert(spots.size === keys.length, "all visible locations have distinct box centers");
+  assert(MAP_POS.arena[0] >= 950, "Arena is against the far-right wall");
+  for (const key of ["home", "gym", "cstore", "clinic", "jobboard"]) assert(!!MAP_POS[key], `${key} has a boxed position`);
 }
 
 console.log("");
