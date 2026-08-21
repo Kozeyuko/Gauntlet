@@ -381,7 +381,7 @@ console.log("== Iron Spar: Pushups trains Str after purchase ==");
   assert(String(state.LastMsg).includes("Training"), "log shows training");
 }
 
-console.log("== Iron Spar: unoffered activity falls back to Rest ==");
+console.log("== Iron Spar: task-board training works without gym training purchases ==");
 {
   const state = freshState();
   state.Stamina = 50; // set below max so rest increases it
@@ -393,10 +393,10 @@ console.log("== Iron Spar: unoffered activity falls back to Rest ==");
   const spdBefore = state.Spd;
   const staminaBefore = state.Stamina;
   g.doDay();
-  assert(state.Spd === spdBefore, "no stat gain");
+  assert(state.Spd > spdBefore, "task-board training gains the stat");
   assert(state.Money === moneyBefore, "no cash lost");
-  assert(state.Stamina > staminaBefore, "stamina restored (rested)");
-  assert(String(state.LastMsg).includes("haven't purchased training"), "log explains no training purchased");
+  assert(state.Stamina < staminaBefore, "training spends stamina");
+  assert(!String(state.LastMsg).includes("haven't purchased training"), "no gym purchase gate remains");
 }
 
 console.log("== Home Pushups: free, Str grows ==");
@@ -1194,7 +1194,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.13, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.14, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1287,8 +1287,8 @@ console.log("== Part B: buyTraining / hasTraining ==");
   const state = boostedState();
   state.Location = "spar";
   const g = createGame(state, { rng: makeRng(1) });
-  assert(g.hasTraining("Pushups") === false, "no Pushups initially");
-  assert(g.hasTraining("Situps") === false, "no Situps initially");
+  assert(g.hasTraining("Pushups") === true, "Pushups available from task board");
+  assert(g.hasTraining("Situps") === true, "Situps available from task board");
   // non-gym training is always available
   assert(g.hasTraining("Running") === true, "Running always available");
 
@@ -1312,7 +1312,7 @@ console.log("== Part B: buyTraining fails with no money ==");
   const g = createGame(state, { rng: makeRng(1) });
   const bought = g.buyTraining("Pushups");
   assert(bought === false, "can't buy with no money");
-  assert(g.hasTraining("Pushups") === false, "still no Pushups");
+  assert(g.hasTraining("Pushups") === true, "Pushups remains available without a gym purchase");
 }
 
 console.log("== Part B: canAddToTask ==");
@@ -1322,7 +1322,7 @@ console.log("== Part B: canAddToTask ==");
   state.Money = 100;
   const g = createGame(state, { rng: makeRng(1) });
   assert(g.canAddToTask("Running") === true, "Running always addable");
-  assert(g.canAddToTask("Pushups") === false, "Pushups locked before purchase");
+  assert(g.canAddToTask("Pushups") === true, "Pushups always addable from task board");
   g.buyTraining("Pushups");
   assert(g.canAddToTask("Pushups") === true, "Pushups unlocked after purchase");
 }
@@ -1334,11 +1334,8 @@ console.log("== Part B: addTask gates on training purchase ==");
   state.Money = 0;
   const g = createGame(state, { rng: makeRng(1) });
   const added = g.addTask("Pushups");
-  assert(added === false, "can't add Pushups without purchase");
-  state.Money = 100;
-  g.buyTraining("Pushups");
-  const added2 = g.addTask("Pushups");
-  assert(added2 === true, "can add Pushups after purchase");
+  assert(added === true, "task board can add Pushups without purchase");
+  assert(g.taskList().length === 1, "one task was added");
 }
 
 console.log("== Part B: Roadworks consumable ==");
@@ -1347,7 +1344,7 @@ console.log("== Part B: Roadworks consumable ==");
   state.Location = "spar";
   state.Money = 100;
   const g = createGame(state, { rng: makeRng(1) });
-  assert(g.hasTraining("Roadworks") === false, "no Roadworks initially");
+  assert(g.hasTraining("Roadworks") === true, "Roadworks is available from task board");
   const bought = g.buyTraining("Roadworks");
   assert(bought === true, "buyRoadworks returns true");
   assert(state.Consumables.Roadworks === 10, "Roadworks stock = 10");

@@ -26,7 +26,7 @@ import {
   GAME_VERSION,
   UPDATE_LOG,
   trainChain,
-  GYM_TRAINING,
+  GYM_GEAR,
   MAIN_GYM,
   EQUIPMENT,
   MAP_POS,
@@ -929,17 +929,8 @@ export function initUI(game, opts = {}) {
 
   function renderGymTrainers(key) {
     const loc = LOCATIONS[key];
-    const programs = game.trainingAt(key) || {};
     el.locFightersTitle.textContent = "Trainers & Modes";
-    el.locFightersList.innerHTML = "";
-    for (const [activityKey, program] of Object.entries(programs)) {
-      const row = document.createElement("div"); row.className = "ghostrow";
-      row.innerHTML = `<div class="gmain"><div class="gnm">${ACTIVITIES[activityKey]?.name || activityKey}</div><div class="gsub">Gain ×${Number(program.gain || 1).toFixed(2)} · ${fmtCash(program.cost || 0)} per session</div></div>`;
-      const btn = document.createElement("button"); btn.className = "btn small-btn"; btn.textContent = "TRAIN";
-      btn.addEventListener("click", () => { game.setActivity(activityKey); game.doDay(); render(); });
-      row.appendChild(btn); el.locFightersList.appendChild(row);
-    }
-    if (loc.styleGym && STYLES[loc.styleGym]) {
+    el.locFightersList.innerHTML = "";    if (loc.styleGym && STYLES[loc.styleGym]) {
       const style = STYLES[loc.styleGym];
       const learned = !!game.learnedStyles()[loc.styleGym];
       const row = document.createElement("div"); row.className = "ghostrow";
@@ -949,6 +940,28 @@ export function initUI(game, opts = {}) {
       row.appendChild(btn); el.locFightersList.appendChild(row);
     }
     if (!el.locFightersList.children.length) el.locFightersList.innerHTML = `<div class="small">No trainer programs available here yet.</div>`;
+  }
+
+  function renderGymGear(key) {
+    const item = GYM_GEAR[key];
+    el.locFightersTitle.textContent = "Training Gear";
+    el.locFightersList.innerHTML = "";
+    if (!item) {
+      el.locFightersList.innerHTML = `<div class="small">No dedicated gear is available here.</div>`;
+      return;
+    }
+    const owned = Array.isArray(state.OwnedGymGear) && state.OwnedGymGear.includes(item.key);
+    const row = document.createElement("div"); row.className = "ghostrow";
+    const main = document.createElement("div"); main.className = "gmain";
+    main.innerHTML = `<div class="gnm">${item.name}</div><div class="gsub">${item.desc} · ${fmtCash(item.cost)}</div>`;
+    const btn = document.createElement("button"); btn.className = "btn small-btn";
+    btn.textContent = owned ? "OWNED" : fmtCash(game.shopPrice ? game.shopPrice(item.cost) : item.cost);
+    if (owned) { btn.classList.add("owned"); btn.disabled = true; }
+    else {
+      if (num(state.Money) < (game.shopPrice ? game.shopPrice(item.cost) : item.cost)) btn.classList.add("cantafford");
+      btn.addEventListener("click", () => { game.buyGymGear(key); renderGymGear(key); render(); });
+    }
+    row.appendChild(main); row.appendChild(btn); el.locFightersList.appendChild(row);
   }
 
   function renderLocTabs(key) {
@@ -967,11 +980,12 @@ export function initUI(game, opts = {}) {
       el.locTabs.querySelectorAll(".store-tab").forEach((b) => b.classList.toggle("active", b.dataset.locTab === id));
       if (id === "tasks") renderTasklistQuick();
       if (id === "cook") renderCookPanel();
+      if (id === "trainers") renderGymTrainers(key);
+      if (id === "gear") renderGymGear(key);
     };
     tabs.forEach((tab) => {
       const b = document.createElement("button"); b.className = "store-tab"; b.dataset.locTab = tab.id; b.textContent = tab.label;
       b.addEventListener("click", () => {
-        if (tab.id === "gear") { closeAllTransientUIs(); openStore("gym"); return; }
         select(tab.id);
       });
       el.locTabs.appendChild(b);
@@ -1433,7 +1447,7 @@ export function initUI(game, opts = {}) {
   let storeType = "cstore";
   let storeTab = "food";
   const STORE_TABS = ["food", "rawfood", "drinks", "clinic", "gear"];
-  const STORE_TYPE_TABS = { cstore: ["food", "rawfood", "drinks"], clinic: ["clinic"], gym: ["training", "gear"] };
+  const STORE_TYPE_TABS = { cstore: ["food", "rawfood", "drinks"], clinic: ["clinic"], gym: ["gear"] };
 
   function renderStoreTabs() {
     if (!el.storeTabs) return;
@@ -1455,20 +1469,7 @@ export function initUI(game, opts = {}) {
     if (storeType === "clinic") {
       return CLINIC_ITEMS.filter((i) => i.cat === storeTab || storeTab === "clinic");
     }
-    if (storeType === "gym" && storeTab === "training") {
-      const money = num(state.Money);
-      return GYM_TRAINING.filter((t) => !t.home).map((t) => {
-        const owned = game.hasTraining(t.key);
-        const consumable = t.unlock === "consumable";
-        const stock = consumable ? (state.Consumables[t.key] || 0) : 0;
-        const locked = t.requires && !state.OwnedItems.includes(t.requires);
-        return {
-          key: t.key, name: t.name, desc: locked ? `Needs ${t.requiresName}` : (consumable ? `Stock: ${stock}` : (owned ? "Owned" : "")),
-          price: t.cost, cat: "training",
-          _isGymTraining: true, _owned: owned, _consumable: consumable, _stock: stock, _locked: locked,
-        };
-      });
-    }
+    if (storeType === "gym" && storeTab === "training") return [];
     if (storeTab === "gear") {
       const owned = Array.isArray(state.OwnedEquipment) ? state.OwnedEquipment : [];
       const equipped = state.Equipment || {};
@@ -1841,7 +1842,7 @@ export function initUI(game, opts = {}) {
     }
     if (el.taskLiveStats) {
       const values = ["Str", "Tou", "Spd", "Int", "Cha"].map((id) => `${id} ${Number(state[id] || 0).toFixed(4)}`);
-      el.taskLiveStats.textContent = state.Location === "home" ? `During Home training · ${values.join(" · ")}` : "Return Home to use the task board.";
+      el.taskLiveStats.textContent = `Task board active · ${values.join(" · ")}`;
     }
     if (el.taskActivityListQuick) {
       const autoOn = !!taskAutoInterval;
@@ -1891,8 +1892,7 @@ export function initUI(game, opts = {}) {
         const ms = el.taskSpeedQuick ? Number(el.taskSpeedQuick.value) || 500 : 500;
         taskAutoInterval = setInterval(() => {
           const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
-          const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
-          if (state.Health <= 0 || state.InFight || state.Location !== "home" || tl.length === 0 || allDone) {
+          if (state.Health <= 0 || state.InFight || tl.length === 0) {
             clearInterval(taskAutoInterval);
             taskAutoInterval = null;
             renderTasklistQuick();
@@ -1915,8 +1915,7 @@ export function initUI(game, opts = {}) {
     const ms = Number(speedEl.value) || 500;
     taskAutoInterval = setInterval(() => {
       const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
-      const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
-      if (state.Health <= 0 || state.InFight || state.Location !== "home" || tl.length === 0 || allDone) {
+      if (state.Health <= 0 || state.InFight || tl.length === 0) {
         clearInterval(taskAutoInterval);
         taskAutoInterval = null;
         renderTasklistQuick();

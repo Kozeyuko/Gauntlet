@@ -65,6 +65,7 @@ import {
   trainChain,
   versionCompare,
   GYM_TRAINING,
+  GYM_GEAR,
   MAIN_GYM,
   EQUIPMENT,
   LOC_RIVAL_TIERS,
@@ -198,7 +199,7 @@ export const PERSISTENT_KEYS = [
   "SeenVersion",
   "TrainTiers", "TrainProgress",
   "PurchasedTraining",
-  "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
+  "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems", "OwnedGymGear",
   "LocationFights", "LocationFighterCache", "RoamerChallengerCache", "RoamerSeenAt", "RoamerZones", "UnlockedTiers",
   "PlayerX", "PlayerY", "EntranceSide", "MovingTo", "MoveProgress", "RunCooldown",
 ];
@@ -234,6 +235,7 @@ export function freshState() {
     Equipment: {},
     OwnedEquipment: [],
     OwnedItems: [],
+    OwnedGymGear: [],
     LocationFights: {},
     LocationFighterCache: {},
     RoamerChallengerCache: {},
@@ -2205,31 +2207,30 @@ export function createGame(state, opts = {}) {
   }
 
   function hasTraining(activityKey) {
-    if (state.Location === "home" && TRAINING.home && TRAINING.home[activityKey]) return true;
-    const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
-    if (!gymEntry) return true;
-    if (gymEntry.unlock === "permanent") {
-      return Array.isArray(state.OwnedTraining) && state.OwnedTraining.includes(activityKey);
-    } else if (gymEntry.unlock === "consumable") {
-      return state.Consumables && (state.Consumables[activityKey] || 0) > 0;
-    }
-    return false;
+    return !!ACTIVITIES[activityKey];
   }
 
   function canAddToTask(activityKey) {
-    if (!ACTIVITIES[activityKey]) return false;
-    if (state.Location === "home" && TRAINING.home && TRAINING.home[activityKey]) return true;
-    const gymEntry = GYM_TRAINING.find((t) => t.key === activityKey);
-    if (!gymEntry) return true;
-    if (gymEntry.unlock === "permanent") {
-      return Array.isArray(state.OwnedTraining) && state.OwnedTraining.includes(activityKey);
-    } else if (gymEntry.unlock === "consumable") {
-      return state.Consumables && (state.Consumables[activityKey] || 0) > 0;
-    }
-    return false;
+    return !!ACTIVITIES[activityKey];
   }
 
   // ---- equipment ----
+  function buyGymGear(locKey) {
+    const item = GYM_GEAR[locKey];
+    if (!item) return false;
+    if (!Array.isArray(state.OwnedGymGear)) state.OwnedGymGear = [];
+    if (state.OwnedGymGear.includes(item.key)) return false;
+    const price = shopPrice(item.cost);
+    if (num(state.Money) < price) {
+      logMsg(`Not enough Cash to buy ${item.name} (${price.toFixed(2)} Cash).`);
+      return false;
+    }
+    state.Money = num(state.Money) - price;
+    state.OwnedGymGear.push(item.key);
+    logMsg(`Bought ${item.name}. Its training bonus is now active.`, "store");
+    return true;
+  }
+
   function buyEquipment(key) {
     const item = EQUIPMENT.find((e) => e.key === key);
     if (!item) return false;
@@ -2279,6 +2280,10 @@ export function createGame(state, opts = {}) {
           mult *= item.buffMult;
         }
       }
+    }
+    const ownedGym = Array.isArray(state.OwnedGymGear) ? state.OwnedGymGear : [];
+    for (const item of Object.values(GYM_GEAR)) {
+      if (ownedGym.includes(item.key) && (!item.attrs || item.attrs.includes(attr))) mult *= item.buffMult;
     }
     return mult;
   }
@@ -2339,7 +2344,6 @@ export function createGame(state, opts = {}) {
   function doDay() {
     if (num(state.Health) <= 0) return;
     if (state.InFight) return;
-    if (state.Location !== "home" && Array.isArray(state.TaskList) && state.TaskList.length > 0) return false;
 
     // 1) Nutrition
     autoEatFood();
@@ -2380,16 +2384,6 @@ export function createGame(state, opts = {}) {
     const locKey = String(state.Location ?? "home");
     const loc = LOCATIONS[locKey] || LOCATIONS.home;
     const locName = loc.name;
-
-    // Training via tasklist works anywhere the player has purchased the training
-    // (from the City Gym), regardless of current location.
-    if (actKey !== "Rest" && actKey !== "OddJobs" && act.attr) {
-      if (!hasTraining(actKey)) {
-        logMsg(`You haven't purchased training for ${actKey} yet.`);
-        actKey = "Rest";
-        act = ACTIVITIES.Rest;
-      }
-    }
 
     if (actKey === "Rest") {
       state.Stamina = Math.min(maxStamina(), stamina + 35);
@@ -2698,7 +2692,7 @@ export function createGame(state, opts = {}) {
     // day
     doDay, advanceDay, advanceNDays,
     // gym training
-    buyTraining, hasTraining, canAddToTask,
+    buyTraining, buyGymGear, hasTraining, canAddToTask,
     // location rivals
     locationFightsBeaten, canFightLocation, locationFightList, beginLocationFight,
     // equipment
