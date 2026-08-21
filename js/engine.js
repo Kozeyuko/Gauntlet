@@ -909,7 +909,7 @@ export function createGame(state, opts = {}) {
     const isPlayer = opts.isPlayer === true;
     const build = isPlayer ? activeBuild() : null;
     const style = STYLES[styleId] || STYLES.Brawling;
-    const hp = HP_BASE + stats.Tou * HP_PER_TOU;
+    const hp = isPlayer ? maxHealth() : HP_BASE + stats.Tou * HP_PER_TOU;
 
     let skills;
     if (build) {
@@ -934,7 +934,7 @@ export function createGame(state, opts = {}) {
     const dmg = (stats.Str + stats.Int * 0.2) * styleDmg;
     const crit = Math.min(0.5, softCap50(stats.Int) + num(style.crit || 0));
     const dodge = Math.min(0.45, stats.Spd * 0.01 + style.dodge);
-    const stam = COMBAT_STAM_BASE + stats.Tou;
+    const stam = isPlayer ? maxStamina() : COMBAT_STAM_BASE + stats.Tou;
     const drain = 6 * (1 + stats.Str / STR_DRAIN_DIV) * Math.pow(0.75, stats.Tou / TOU_EFF_DIV);
     return {
       rawStats: { ...stats },
@@ -945,6 +945,18 @@ export function createGame(state, opts = {}) {
       ultName: style.ult && style.ult.name ? style.ult.name : "Berserk",
       status: { poison: null, buff: null, debuff: null, limbArm: false, limbLeg: false },
     };
+  }
+
+  function hydratePlayerCombatant(me) {
+    me.hp = clamp(num(state.Health), 0, me.maxHp);
+    me.stam = clamp(num(state.Stamina), 0, me.maxStam);
+    return me;
+  }
+
+  function syncPlayerVitalsFromCombatant(me) {
+    state.Health = clamp(num(me.hp), 0, maxHealth());
+    state.Stamina = clamp(num(me.stam), 0, maxStamina());
+    clampVitals();
   }
 
   function pickSkill(c) {
@@ -962,7 +974,7 @@ export function createGame(state, opts = {}) {
   }
 
   function resolveFight(foeStats, foeStyle) {
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(foeStats, foeStyle);
     let round = 0;
     const MAX_ROUNDS = 10000;
@@ -1016,7 +1028,8 @@ export function createGame(state, opts = {}) {
       stampEvents(events, roundStart, round, me, foe);
     }
     const win = (me.hp > 0 && foe.hp <= 0) || (me.hp > 0 && foe.stam <= 0 && me.stam > 0);
-    return { win, rounds: round, playerHpLeft: Math.max(0, me.hp), playerSkill: me.skillName, foeSkill: foe.skillName, events, attacksLanded, dodges, dmgDealt, dmgTaken, foeStats };
+    syncPlayerVitalsFromCombatant(me);
+    return { win, rounds: round, playerHpLeft: Math.max(0, me.hp), playerStamLeft: Math.max(0, me.stam), playerSkill: me.skillName, foeSkill: foe.skillName, events, attacksLanded, dodges, dmgDealt, dmgTaken, foeStats };
   }
 
   function meHpLost(result) {
@@ -1106,6 +1119,9 @@ export function createGame(state, opts = {}) {
   }
 
   function concludeFight(mode, extra, idx, pot, bet, result) {
+    if (Number.isFinite(Number(result.playerHpLeft))) state.Health = clamp(Number(result.playerHpLeft), 0, maxHealth());
+    if (Number.isFinite(Number(result.playerStamLeft))) state.Stamina = clamp(Number(result.playerStamLeft), 0, maxStamina());
+    clampVitals();
     if (result.win) {
       if (mode === "ladder") {
         const moneyGain = extra.rewardMoney + Math.floor(attrValue("Cha") * 0.5);
@@ -1205,7 +1221,7 @@ export function createGame(state, opts = {}) {
       updatePotential();
     } else {
       const dmg = Math.max(5, Math.floor(meHpLost(result)));
-      state.Health = num(state.Health) - dmg;
+      // Combat HP is already authoritative; keep the result synchronized with Vitals.
       if (mode === "inside") {
         addStyleXp(activeStyle(), STYLEXP_LOSS);
         applyFightGains(false, result.foeStats, result);
@@ -1362,7 +1378,7 @@ export function createGame(state, opts = {}) {
       return null;
     }
 
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(foeStats, foeStyle);
     if (!extra.style) extra.style = foeStyle;
     battle = { me, foe, mode: "ghost", extra, idx: 0, bet: 0, pot: potential(), round: 0, foeStats };
@@ -1518,7 +1534,7 @@ export function createGame(state, opts = {}) {
     if (roamerStatus(key) !== "ready") return null;
     const challengers = roamerChallengers(key);
     const built = challengers[Math.max(0, Math.min(challengers.length - 1, Number(challengerIndex) || 0))] || buildChainedRoamer(roamer, step);
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(built.stats, built.style);
     battle = { me, foe, mode: "roamer", extra: built, idx: 0, bet: 0, pot: potential(), round: 0, foeStats: built.stats };
     state.InFight = true;
@@ -1559,7 +1575,7 @@ export function createGame(state, opts = {}) {
       style: foeStyle,
       reward: 30 * round + Math.floor(pot / 10),
     };
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(foeStats, foeStyle);
     battle = { me, foe, mode: "tourney", extra, idx: 0, bet: 0, pot, round: 0, foeStats };
     state.InFight = true;
@@ -1597,7 +1613,7 @@ export function createGame(state, opts = {}) {
       style: foeStyle,
       reward: 20 * wave,
     };
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(foeStats, foeStyle);
     battle = { me, foe, mode: "gu", extra, idx: 0, bet: 0, pot, round: 0, foeStats };
     state.InFight = true;
@@ -1643,7 +1659,7 @@ export function createGame(state, opts = {}) {
     if (battle) return null;
     const setup = setupFoe();
     if (!setup) return null;
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foe = makeCombatant(setup.foeStats, setup.foeStyle);
     const extra = setup.extra;
     if (!extra.style) extra.style = setup.foeStyle;
@@ -1761,12 +1777,13 @@ export function createGame(state, opts = {}) {
     const MAX_COMBAT_ROUNDS = 10000;
     const roundNum = battle.round;
     stampEvents(events, 0, roundNum, me, foe);
+    syncPlayerVitalsFromCombatant(me);
     const finished = me.hp <= 0 || foe.hp <= 0 || me.stam <= 0 || foe.stam <= 0 || roundNum >= MAX_COMBAT_ROUNDS;
     if (finished) {
       if (me.hp <= 0 && foe.hp <= 0) me.hp = 0;
       const won = (me.hp > 0 && foe.hp <= 0) || (me.hp > 0 && foe.stam <= 0 && me.stam > 0);
       const result = {
-        win: won, rounds: roundNum, playerHpLeft: Math.max(0, me.hp),
+        win: won, rounds: roundNum, playerHpLeft: Math.max(0, me.hp), playerStamLeft: Math.max(0, me.stam),
         playerSkill: chosen.name, foeSkill: foeSkill.name,
         attacksLanded: battle.attacksLanded, dodges: battle.dodges,
         dmgDealt: battle.dmgDealt, dmgTaken: battle.dmgTaken,
@@ -2625,7 +2642,7 @@ export function createGame(state, opts = {}) {
     const rivals = locationFightList(locKey);
     const foe = rivals[n - 1];
     if (!foe) return null;
-    const me = makeCombatant(currentStats(), activeStyle(), { isPlayer: true });
+    const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
     const foeCombatant = makeCombatant(foe.stats, foe.style);
     const extra = { ...foe, locKey, locName: LOCATIONS[locKey]?.name || locKey };
     if (!extra.style) extra.style = foe.style;

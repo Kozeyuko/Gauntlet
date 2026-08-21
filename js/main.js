@@ -56,11 +56,11 @@ const ui = initUI(game, {
   onSave: persist,
 });
 
-// Movement loop: ticks every 150ms, advances position when traveling.
+// Movement loop: sample every 50ms for smooth interpolation.
 let lastMoveLoc = state.Location;
 setInterval(() => {
   if (state.MovingTo && !state.InFight) {
-    const result = game.moveStep(0.15);
+    const result = game.moveStep(0.05);
     ui.render();
     if (result && result.arrived) {
       ui.signalArrival(state.Location);
@@ -71,7 +71,10 @@ setInterval(() => {
   if (!state.MovingTo && lastMoveLoc !== state.Location) {
     lastMoveLoc = state.Location;
   }
-}, 150);
+}, 50);
+
+// Real-time UI pulse: keep vitals, money, auto-job grace, cooldowns, and open panels synchronized.
+setInterval(() => ui.render(), 250);
 
 // Debug handle (dev console access; harmless in production).
 window.__game = game;

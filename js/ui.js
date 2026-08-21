@@ -414,7 +414,7 @@ export function initUI(game, opts = {}) {
     el.hLives.textContent = String(Math.floor(Number(state.Lives) || 0));
     el.hWins.textContent = String(Math.floor(Number(state.Wins) || 0));
     el.hRank.textContent = state.PotRankName || "-";
-    el.hNext.textContent = state.PotNext || "";
+    if (el.hNext) el.hNext.textContent = state.PotNext || "";
   }
 
   function setBar(bar, txt, value, max = 100) {
@@ -443,17 +443,9 @@ export function initUI(game, opts = {}) {
         <span class="nm">${a.name}</span>
         <span class="val">${val.toFixed(4)}</span>
         <span class="apt">×${apt.toFixed(4)}</span>
-        <button class="btn tiny-btn apt-buy" data-attr="${a.id}" title="Spend $25 to multiply this Aptitude by 1.5">+1.5×</button>
       </div>`;
     }
     el.attrsBody.innerHTML = html;
-    el.attrsBody.querySelectorAll(".apt-buy").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        game.buyAptitude(btn.dataset.attr);
-        render();
-      });
-    });
   }
 
   function renderStyles() {

@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.12;
+export const GAME_VERSION = 2.13;
 export const UPDATE_LOG = [
+  { v: 2.13, text: "• Removed the Attributes Aptitude purchase buttons.\n• Removed the empty next-rank header placeholder.\n• Smoothed movement sampling from 150ms to 50ms.\n• Made combat start from and write back to the authoritative Vitals HP/Stamina.\n• Added a real-time UI pulse for money, auto-job timers, open panels, and stats." },
   { v: 2.12, text: "• Fixed the route line so it only draws forward from the active segment.\n• Home tasks now persist and rotate until removed with the red X.\n• Removed Home Activities and Home Style panels.\n• Added horizontal location tabs.\n• Gyms now show Trainers and Training Gear tabs.\n• Added trainer programs and special-mode requirement rows.\n• Added explicit Return Home control.\n• Prevented unrelated panels from appearing in random fighter rosters." },
   { v: 2.11, text: "• Fixed Home Pushups and Situps training availability.\n• Added a visible Return Home button to location panels.\n• Removed cooking and Home task panels from random fighter rosters.\n• Enforced one visible UI overlay at a time.\n• Replaced road tie-breaking with shortest street-pair routing to remove unnecessary detours." },
   { v: "2.10", text: "• Added a mobile PANEL drawer that slides in from the left.\n• The map now keeps the full mobile viewport instead of sharing space with the stats column.\n• Added a dimmed backdrop and close-state button for the drawer.\n• Desktop layout remains unchanged." },

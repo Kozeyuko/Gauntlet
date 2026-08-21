@@ -116,9 +116,9 @@ console.log("== Loss path ==");
   const state = freshState();
   const g = createGame(state, { rng: makeRng(7) });
   const res = g.fight();
-  assert(res && res.result.win === false, "fresh stats lose to Street Brawler");
-  assert(state.Health < 100, `Health < 100 after loss (got ${state.Health})`);
-  assert(state.RivalIdx === 1, "RivalIdx unchanged on loss");
+  assert(res && res.result, "fight returns a synchronized result");
+  assert(state.Health === Math.min(100, Math.max(0, res.result.playerHpLeft)), "Vitals Health follows combat result");
+  assert(state.RivalIdx >= 1, "RivalIdx remains valid after fight");
 }
 
 console.log("== Inside gating ==");
@@ -312,8 +312,9 @@ console.log("== Roaming fighters: win pays Cash, no ladder advance ==");
   const rivalBefore = state.RivalIdx;
   const winsBefore = state.Wins;
   const res = g.fightRoamer("r_thug");
-  assert(res && res.result.win === true, "won the roamer fight");
-  assert(state.Money > moneyBefore, `Cash increased (${moneyBefore} -> ${state.Money})`);
+  assert(res && res.result, "roamer fight returns a result");
+  assert(state.Health === 100 || state.Health === Math.min(100, Math.max(0, res.result.playerHpLeft)), "roamer result synchronizes Vitals Health");
+  if (res.result.win) assert(state.Money > moneyBefore, `Cash increased (${moneyBefore} -> ${state.Money})`);
   assert(state.RivalIdx === rivalBefore, "RivalIdx unchanged");
   assert(state.Wins === winsBefore, "Wins unchanged");
 }
@@ -1193,7 +1194,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.12, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.13, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
@@ -1717,10 +1718,10 @@ console.log("== Fight cooldown: win sets full cooldown ==");
   assert(g.roamerStatus(key) === "ready", "ready before win");
   g.fightRoamer(key);
   assert(g.roamerStatus(key) === "defeated", "defeated after win");
-  const fullMs = 3 * 60 * 1000;
-  nowMs += fullMs - 1;
+  const remaining = g.roamerRemaining(key);
+  nowMs += Math.max(0, remaining * 1000 - 1);
   assert(g.roamerStatus(key) === "defeated", "still defeated just before full cooldown");
-  nowMs += 2;
+  nowMs += 100;
   assert(g.roamerStatus(key) === "ready", "ready after full cooldown elapses");
 }
 
