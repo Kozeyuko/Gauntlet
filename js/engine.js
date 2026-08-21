@@ -191,7 +191,7 @@ export const PERSISTENT_KEYS = [
   "StyleKnowledge", "KnownSkills", "Build",
   "JobXp", "JobLevel", "JobCooldowns",
   "InFight", "AutoBattle",
-  "AutoJobKey",
+  "AutoJobKey", "AutoJobStartedAt", "AutoJobLastLocation",
   "StoreBuffs", "TempBoosts",
   "Log", "Roamers", "Name", "NewsSeen",
   "Inventory", "TaskList", "TaskRepeat", "TaskIndex",
@@ -218,7 +218,7 @@ export function freshState() {
     StoreBuffs: [], TempBoosts: { Str: 0, Tou: 0, Spd: 0, Int: 0, Cha: 0 },
     NewsSeen: 0,
     AutoRun: false,
-    AutoJobKey: "",
+    AutoJobKey: "", AutoJobStartedAt: 0, AutoJobLastLocation: "",
     Roamers: {},
     Name: "You",
     Inventory: [],
@@ -585,16 +585,31 @@ export function createGame(state, opts = {}) {
     return jobStaminaCost(job, jobLevel(jobKey));
   }
 
+  function autoJobGraceMs(jobKey) {
+    const level = jobLevel(jobKey);
+    return (120 + Math.max(0, Math.min(9, level - 1)) * 20) * 1000;
+  }
+
   function doAutoJob(jobKey) {
     const job = JOBS.find((j) => j.key === jobKey);
     if (!job) return { success: false };
     const level = jobLevel(jobKey);
+    const now = getNow();
+    if (!state.AutoJobStartedAt || state.AutoJobLastLocation !== state.Location) {
+      if (state.Location === "jobboard") state.AutoJobStartedAt = now;
+      state.AutoJobLastLocation = state.Location;
+    }
+    if (state.Location !== "jobboard" && state.AutoJobStartedAt && now - Number(state.AutoJobStartedAt) > autoJobGraceMs(jobKey)) {
+      state.AutoJobKey = "";
+      state.AutoJobStartedAt = 0;
+      state.AutoJobLastLocation = state.Location;
+      return { success: false, expired: true };
+    }
     const cost = jobStaminaCost(job, level);
     if (num(state.Stamina) < cost) {
       logMsg("Too tired to work. Rest first.", "job");
       return { success: false };
     }
-    const now = getNow();
     const cooldowns = state.JobCooldowns || {};
     const last = Number(cooldowns[jobKey]) || 0;
     if (now < last + JOB_AUTO_COOLDOWN_MS) {
@@ -627,14 +642,28 @@ export function createGame(state, opts = {}) {
     return Math.max(0, last + JOB_AUTO_COOLDOWN_MS - now);
   }
 
+  function autoJobRemaining(jobKey) {
+    if (!state.AutoJobKey || !state.AutoJobStartedAt) return 0;
+    return Math.max(0, autoJobGraceMs(jobKey) - (getNow() - Number(state.AutoJobStartedAt)));
+  }
+
   function setAutoJob(jobKey) {
     if (jobKey && !JOBS.find((j) => j.key === jobKey)) return false;
     state.AutoJobKey = jobKey || "";
+    if (state.AutoJobKey) {
+      state.AutoJobStartedAt = getNow();
+      state.AutoJobLastLocation = state.Location;
+    } else {
+      state.AutoJobStartedAt = 0;
+      state.AutoJobLastLocation = "";
+    }
     return true;
   }
 
   function clearAutoJob() {
     state.AutoJobKey = "";
+    state.AutoJobStartedAt = 0;
+    state.AutoJobLastLocation = "";
     return true;
   }
 
@@ -1853,6 +1882,8 @@ export function createGame(state, opts = {}) {
     const segLen = Math.sqrt(dx * dx + dy * dy);
     if (segLen < 1) {
       // Segment done — advance to next.
+      state.PlayerX = tx;
+      state.PlayerY = ty;
       state.routeIndex = idx + 1;
       state.moveSegmentStartX = tx;
       state.moveSegmentStartY = ty;
@@ -1878,6 +1909,8 @@ export function createGame(state, opts = {}) {
     }
     if (state.MoveProgress >= 1) {
       // Segment complete — advance to next waypoint.
+      state.PlayerX = tx;
+      state.PlayerY = ty;
       state.routeIndex = idx + 1;
       state.moveSegmentStartX = tx;
       state.moveSegmentStartY = ty;
@@ -2260,8 +2293,8 @@ export function createGame(state, opts = {}) {
     const idx = Math.min(state.TaskIndex || 0, tl.length - 1);
     const item = tl[idx];
     if (!item || typeof item !== "object") {
-      if (state.TaskRepeat) { state.TaskIndex = 0; }
-      else { state.TaskIndex = 0; }
+      state.TaskList.splice(idx, 1);
+      state.TaskIndex = Math.min(idx, Math.max(0, state.TaskList.length - 1));
       return;
     }
     // Decrement consumable training stock if applicable
@@ -2274,26 +2307,9 @@ export function createGame(state, opts = {}) {
     if (item.n > 1) {
       item.n -= 1;
     } else {
-      if (state.TaskRepeat) {
-        state.TaskIndex = idx + 1;
-        if (state.TaskIndex >= tl.length) {
-          state.TaskIndex = 0;
-          for (const t of tl) { if (t && typeof t === "object") t.n = t.origN !== undefined ? t.origN : 1; }
-        }
-      } else {
-        // Mark done but keep in list — don't splice.
-        item.n = 0;
-        // Advance to next unfinished task, or stop.
-        let next = idx + 1;
-        while (next < tl.length && tl[next].n <= 0) next++;
-        if (next < tl.length) {
-          state.TaskIndex = next;
-        } else {
-          state.TaskIndex = 0;
-          // All done — reset counts for potential re-use.
-          for (const t of tl) { if (t && typeof t === "object" && t.n <= 0) t.n = t.origN !== undefined ? t.origN : 1; }
-        }
-      }
+      // Completed tasks are removed from the one-shot Home queue.
+      state.TaskList.splice(idx, 1);
+      state.TaskIndex = Math.min(idx, Math.max(0, state.TaskList.length - 1));
     }
   }
 
@@ -2305,10 +2321,7 @@ export function createGame(state, opts = {}) {
   function doDay() {
     if (num(state.Health) <= 0) return;
     if (state.InFight) return;
-    if (Array.isArray(state.TaskList) && state.TaskList.length > 0 && state.Location !== "home") {
-      logMsg("Return Home to run your task board.");
-      return;
-    }
+    if (state.Location !== "home" && Array.isArray(state.TaskList) && state.TaskList.length > 0) return false;
 
     // 1) Nutrition
     autoEatFood();
@@ -2454,10 +2467,6 @@ export function createGame(state, opts = {}) {
   function advanceDay() {
     if (num(state.Health) <= 0) return false;
     if (state.InFight) return false;
-    if (Array.isArray(state.TaskList) && state.TaskList.length > 0 && state.Location !== "home") {
-      logMsg("Return Home to run your task board.");
-      return false;
-    }
     const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
     if (tl.length === 0) return false;
 
@@ -2656,7 +2665,7 @@ export function createGame(state, opts = {}) {
     // movement
     beginMove, moveStep, arriveAt, tryEscape,
     // jobs
-    jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, jobCanWork,
+    jobLevel, jobXp, doJobShift, doJobAction, doAutoJob, jobCooldownRemaining, autoJobRemaining, jobCanWork,
     setAutoJob, clearAutoJob, autoJobActive, jobActionStaminaCost,
     // arena modes
     beginTourneyFight, beginGuFight,

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GAUNTLET — Rise of Styles</title>
-<link rel="stylesheet" href="css/style.css?v=2.7">
+<link rel="stylesheet" href="css/style.css?v=2.8">
 </head>
 <body>
 
@@ -67,7 +67,7 @@
         <span class="barlbl" data-tip="Nutrition — decays over time.">NUT</span>
         <div class="bar nut"><i id="barNutrition"></i><span id="barNutritionTxt">100 / 100</span></div>
       </div>
-      <div class="barrow money"><span class="barlbl">TP</span><b id="hTP" class="gold">0.00</b></div>
+      <div class="barrow money"><span class="barlbl" data-tip="Total Power = (Strength + Toughness + Speed + Intelligence + Charisma) ÷ 30.">TP</span><b id="hTP" class="gold">0.0000</b></div>
       <div class="barrow money"><span class="barlbl" data-tip="Your cash. Spend it wisely.">MONEY</span><b id="hMoneyLeft" class="gold">30</b></div>
     </section>
     <section class="panel">
@@ -201,8 +201,8 @@
     <section class="panel" id="homeTaskPanel" style="display:none">
       <h3>Home Task Board</h3>
       <div id="taskQueueQuick" class="taskqueue"></div>
-      <div class="btnrow" style="margin-top:8px"><button class="btn small-btn" id="btnTaskRepeatQuick">Repeat: OFF</button><button class="btn small-btn" id="btnTaskAdvanceQuick">ADVANCE DAY</button></div>
-      <div class="btnrow" style="margin-top:4px"><button class="btn small-btn" id="btnTaskPlayQuick">PLAY</button><button class="btn small-btn" id="btnTaskAutoQuick">AUTO: OFF</button><select id="taskSpeedQuick" class="small-btn"><option value="100">Fast</option><option value="500" selected>Normal</option><option value="1000">Slow</option></select></div>
+      <div class="taskstatus" id="taskLiveStats">Ready at Home.</div>
+      <div class="btnrow" style="margin-top:4px"><button class="btn small-btn" id="btnTaskPlayQuick">TRAIN ONCE</button><button class="btn small-btn" id="btnTaskAutoQuick">AUTO: OFF</button><select id="taskSpeedQuick" class="small-btn"><option value="100">Fast</option><option value="500" selected>Normal</option><option value="1000">Slow</option></select></div>
       <section class="panel" style="margin-top:10px"><h3>Add Activity</h3><div id="taskActivityListQuick" class="taskactivity"></div></section>
     </section>
     <div class="acts">
@@ -348,7 +348,7 @@
       </div>
     </div>
     <div class="optrow">
-      <span class="small" style="margin-right:auto">GAUNTLET v2.7</span>
+      <span class="small" style="margin-right:auto">GAUNTLET v2.8</span>
     </div>
     <div class="optrow">
       <span>Save / Load</span>
@@ -488,6 +488,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2.7"></script>
+<script type="module" src="js/main.js?v=2.8"></script>
 </body>
 </html>

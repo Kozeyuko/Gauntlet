@@ -36,9 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.7;
+export const GAME_VERSION = 2.8;
 export const UPDATE_LOG = [
-  { v: 2.7, text: "• Added random trainee fights after the main gym roster.\n• Added player Total Power to Vitals.\n• Unified stat and gain displays to four decimal places.\n• Added a skip-able first-run tutorial with glowing targets.\n• Compacted the mobile header and made the map scroll as a readable larger canvas.\n• Converted the update history to concise bullet lists." },
+  { v: 2.8, text: "• Removed task Repeat and Advance Day controls.\n• Home task queues are now one-shot and completed tasks leave the queue.\n• Added live stat previews while training at Home.\n• Stopped task-outside-Home news spam and paused task auto-run when leaving Home.\n• Added timer hover details for routes, roamers, and auto-jobs.\n• Auto-job now runs every 2 seconds, with a 2–5 minute level-scaled leave-area grace period.\n• Corrected route segment snapping and rebuilt box positions away from road corridors.\n• Added two local UI style sketches." },
   { v: 2.6, text: "• Boxed every location, including Home, starter locations, stores, gyms, and Arena.\n• Moved Arena to the far-right wall.\n• Added Inventory Equipment tab.\n• Combat is automatic; Speed controls hit cadence; Intelligence controls crit chance.\n• Failed escape resumes combat." },
   { v: 2.5, text: "• Moved task management to Home.\n• Added randomized reincarnation entrances.\n• Added Scrounge for Cash, food stacks, auto-eating, percentage recovery, and Charisma pricing." },
   { v: 2.4, text: "• Moved tasks into the Home base.\n• Added Scrounge for Cash and rare Hobo encounter.\n• Added food stacks, percentage recovery, Charisma pricing, auto Ultimates, and gym progression." },
@@ -124,7 +124,7 @@ export function jobXpForLevel(job, level) {
   return Math.round(job.xpToLevel * Math.pow(1.5, level - 1));
 }
 export const JOB_AUTO_RATE = 0.5;
-export const JOB_AUTO_COOLDOWN_MS = 60 * 1000;
+export const JOB_AUTO_COOLDOWN_MS = 2 * 1000;
 
 // ------------------------------------------------------------------ ATTRIBUTES --
 export const ATTRIBUTES = [
@@ -834,14 +834,12 @@ export function computeRoute(sx, sy, tx, ty) {
 
 // Building centers (in the 1000×850 map space).
 export const MAP_POS = {
-  home: [55, 60], gym: [130, 60], spar: [230, 60], wat: [330, 60], tatami: [420, 60],
-  roda: [600, 60], dohyo: [700, 60], foundry: [800, 60], mikazuki: [900, 60], stormpg: [970, 60],
-  lightning: [55, 240], sanctum: [130, 240], estate: [230, 240], clinic: [330, 240], cstore: [420, 240],
-  jobboard: [600, 240], oldhouse: [800, 240], niko: [900, 240], raishin: [970, 240],
-  spirit: [55, 420], kaiwan: [130, 420], silat: [230, 420], hunt: [330, 420], sword: [420, 420],
-  xiyi: [600, 420], kyoku: [700, 420], shotokan: [800, 420], taekwon: [900, 420], wrestling: [970, 420],
-  kickbox: [55, 620], kungfu: [130, 620], aikido: [230, 620], kali: [330, 620], ironbox: [420, 620],
-  boran: [600, 620], guihun: [700, 620], ultra: [800, 620], arena: [970, 620],
+  home: [75, 60], gym: [230, 60], spar: [380, 60], wat: [590, 60], tatami: [700, 60], roda: [820, 60], dohyo: [940, 60],
+  foundry: [75, 210], mikazuki: [230, 210], stormpg: [380, 210], lightning: [590, 210], sanctum: [700, 210], estate: [820, 210], clinic: [940, 210],
+  cstore: [75, 390], jobboard: [230, 390], oldhouse: [380, 390], niko: [590, 390], raishin: [700, 390], spirit: [820, 390], kaiwan: [940, 390],
+  silat: [75, 600], hunt: [230, 600], sword: [380, 600], xiyi: [590, 600], kyoku: [700, 600], shotokan: [820, 600], taekwon: [940, 600],
+  wrestling: [75, 680], kickbox: [230, 680], kungfu: [380, 680], aikido: [590, 680], kali: [700, 680], ironbox: [820, 680], boran: [940, 680],
+  guihun: [75, 540], ultra: [230, 540], arena: [965, 540],
   inside: [500, 790],
 };
 

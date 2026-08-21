@@ -237,8 +237,7 @@ export function initUI(game, opts = {}) {
     adminItem: $("adminItem"), adminQty: $("adminQty"), adminMoney: $("adminMoney"),
     adminStr: $("adminStr"), adminTou: $("adminTou"), adminSpd: $("adminSpd"), adminInt: $("adminInt"), adminCha: $("adminCha"),
     // tasklist quick
-    taskQueueQuick: $("taskQueueQuick"),
-    btnTaskRepeatQuick: $("btnTaskRepeatQuick"), btnTaskAdvanceQuick: $("btnTaskAdvanceQuick"),
+    taskQueueQuick: $("taskQueueQuick"), taskLiveStats: $("taskLiveStats"),
     btnTaskPlayQuick: $("btnTaskPlayQuick"), btnTaskAutoQuick: $("btnTaskAutoQuick"),
     taskSpeedQuick: $("taskSpeedQuick"),
     // save / load
@@ -542,6 +541,8 @@ export function initUI(game, opts = {}) {
       }
       const etaSec = Math.max(0, Math.round(rem / Math.max(0.01, speed)));
       etaBox.textContent = `~${etaSec}s`;
+      etaBox.title = `Estimated travel time remaining: ${etaSec} seconds`;
+      etaBox.setAttribute("data-tip", `Travel time remaining: ${etaSec} seconds`);
       etaBox.style.display = "block";
       etaBox.style.left = pct(px, MAP_W);
       etaBox.style.top = `calc(${pct(py, MAP_H)} + 14px)`;
@@ -597,10 +598,13 @@ export function initUI(game, opts = {}) {
       elR.classList.toggle("defeated", status === "defeated");
       const cnt = elR.querySelector(".rcount");
       if (status === "defeated") {
-        cnt.textContent = fmtCountdown(game.roamerRemaining(key));
+        const remaining = game.roamerRemaining(key);
+        cnt.textContent = fmtCountdown(remaining);
         cnt.style.display = "";
+        elR.title = `${r ? r.name : key} respawns in ${fmtCountdown(remaining)}`;
       } else {
         cnt.style.display = "none";
+        elR.title = `${r ? r.name : key} is ready now`;
       }
     }
   }
@@ -1073,7 +1077,8 @@ export function initUI(game, opts = {}) {
       const cost = jobStaminaCost(j, lvl);
       const canAfford = num(state.Stamina) >= cost;
       const isAutoActive = activeAuto === j.key;
-
+      const autoRemaining = isAutoActive && game.autoJobRemaining ? game.autoJobRemaining(j.key) : 0;
+      const autoTip = isAutoActive ? `Auto-job grace remaining: ${Math.ceil(autoRemaining / 1000)}s. Returning to the Job Board restarts the timer.` : "Start auto-work; it runs every 2 seconds and continues briefly after leaving the Job Board.";
       const card = document.createElement("div");
       card.className = "jobcard" + (isAutoActive ? " auto-active" : "");
       card.innerHTML = `
@@ -1096,6 +1101,9 @@ export function initUI(game, opts = {}) {
         </div>
       `;
 
+      const autoBtn = card.querySelector(".auto-toggle-btn");
+      autoBtn.title = autoTip;
+      autoBtn.setAttribute("data-tip", autoTip);
       card.querySelector(".work-btn").addEventListener("click", () => startJobMinigame(j));
       card.querySelector(".auto-toggle-btn").addEventListener("click", () => {
         if (isAutoActive) {
@@ -1772,11 +1780,11 @@ export function initUI(game, opts = {}) {
         el.taskQueueQuick.appendChild(row);
       }
     }
-    const repeatOn = state.TaskRepeat === true;
-    el.btnTaskRepeatQuick.textContent = `Repeat: ${repeatOn ? "ON" : "OFF"}`;
-    el.btnTaskRepeatQuick.classList.toggle("on", repeatOn);
-    // Auto button: reflect whether taskAutoInterval is active.
-    if (el.btnTaskAutoQuick) {
+    if (el.taskLiveStats) {
+      const values = ["Str", "Tou", "Spd", "Int", "Cha"].map((id) => `${id} ${Number(state[id] || 0).toFixed(4)}`);
+      el.taskLiveStats.textContent = state.Location === "home" ? `During Home training · ${values.join(" · ")}` : "Return Home to use the task board.";
+    }
+    if (el.taskActivityListQuick) {
       const autoOn = !!taskAutoInterval;
       el.btnTaskAutoQuick.textContent = `Auto: ${autoOn ? "ON" : "OFF"}`;
       el.btnTaskAutoQuick.classList.toggle("on", autoOn);
@@ -1805,20 +1813,6 @@ export function initUI(game, opts = {}) {
     renderTasklistFull();
   }
 
-  if (el.btnTaskRepeatQuick) {
-    el.btnTaskRepeatQuick.addEventListener("click", () => {
-      state.TaskRepeat = state.TaskRepeat !== true;
-      renderTasklistQuick();
-    });
-  }
-  if (el.btnTaskAdvanceQuick) {
-    el.btnTaskAdvanceQuick.addEventListener("click", () => {
-      if (el.jobsOverlay.classList.contains("show") && el.jobGameArea.style.display !== "none") return;
-      game.advanceDay();
-      renderTasklistQuick();
-      render();
-    });
-  }
   if (el.btnTaskPlayQuick) {
     el.btnTaskPlayQuick.addEventListener("click", () => {
       if (el.jobsOverlay.classList.contains("show") && el.jobGameArea.style.display !== "none") return;
@@ -1839,7 +1833,7 @@ export function initUI(game, opts = {}) {
         taskAutoInterval = setInterval(() => {
           const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
           const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
-          if (state.Health <= 0 || state.InFight || tl.length === 0 || allDone) {
+          if (state.Health <= 0 || state.InFight || state.Location !== "home" || tl.length === 0 || allDone) {
             clearInterval(taskAutoInterval);
             taskAutoInterval = null;
             renderTasklistQuick();
@@ -1863,7 +1857,7 @@ export function initUI(game, opts = {}) {
     taskAutoInterval = setInterval(() => {
       const tl = Array.isArray(state.TaskList) ? state.TaskList : [];
       const allDone = tl.length > 0 && tl.every((t) => !t || typeof t !== "object" || t.n <= 0);
-      if (state.Health <= 0 || state.InFight || tl.length === 0 || allDone) {
+      if (state.Health <= 0 || state.InFight || state.Location !== "home" || tl.length === 0 || allDone) {
         clearInterval(taskAutoInterval);
         taskAutoInterval = null;
         renderTasklistQuick();
@@ -1876,6 +1870,7 @@ export function initUI(game, opts = {}) {
     }, ms);
   }
   if (el.taskSpeedQuick) {
+    el.taskSpeedQuick.title = "Training action interval. Hover job and map controls to see their remaining timers.";
     el.taskSpeedQuick.addEventListener("change", () => restartAutoIfRunning(el.taskSpeedQuick));
   }
 
