@@ -1192,7 +1192,7 @@ console.log("== Training ladder: snapshot preserves tiers ==");
 console.log("== Part A: GAME_VERSION is float ==");
 {
   assert(typeof GAME_VERSION === "number", "GAME_VERSION is a number");
-  assert(GAME_VERSION === 2.8, "GAME_VERSION === 2.1");
+  assert(GAME_VERSION === 2.9, "GAME_VERSION === 2.1");
 }
 
 console.log("== Part A: versionCompare ==");
