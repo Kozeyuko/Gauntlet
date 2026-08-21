@@ -1186,6 +1186,10 @@ header {
 .route-line { stroke: var(--gold); stroke-dasharray: 6 4; fill: none; stroke-width: 2.5; }
 .eta-box { position: absolute; transform: translateX(-50%); background: rgba(0,0,0,.75); border: 1px solid var(--gold); color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 11px; z-index: 6; pointer-events: none; }
 
+/* beginner store blocks have wider touch targets between the streets */
+.bldg.store-place { padding: 14px; margin: -14px; }
+.bldg.store-place .blbl { font-weight: 700; }
+
 /* ---------- floating news box (top-left) ---------- */
 .news-floater { position: fixed; top: 8px; left: 8px; width: 300px; max-width: 90vw; max-height: 60vh; overflow-y: auto; background: var(--panel2); border: 1px solid var(--gold-dim); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 90; display: none; padding: 10px; }
 .news-floater.show { display: block; }

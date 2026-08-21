@@ -200,7 +200,7 @@ export const PERSISTENT_KEYS = [
   "PurchasedTraining",
   "OwnedTraining", "Consumables", "Equipment", "OwnedEquipment", "OwnedItems",
   "LocationFights", "LocationFighterCache", "RoamerChallengerCache", "RoamerSeenAt", "RoamerZones", "UnlockedTiers",
-  "PlayerX", "PlayerY", "MovingTo", "MoveProgress", "RunCooldown",
+  "PlayerX", "PlayerY", "EntranceSide", "MovingTo", "MoveProgress", "RunCooldown",
 ];
 
 // ------------------------------------------------------------------ STATE --
@@ -242,6 +242,7 @@ export function freshState() {
     UnlockedTiers: {},
     PlayerX: MAP_POS.home[0],
     PlayerY: MAP_POS.home[1],
+    EntranceSide: "west",
     MovingTo: null,
     MoveProgress: 0,
     RunCooldown: 0,
@@ -817,6 +818,9 @@ export function createGame(state, opts = {}) {
     state.Money = START_MONEY;
     state.AgeDays = START_AGE_DAYS;
     state.Activity = "Rest";
+    state.EntranceSide = R() < 0.5 ? "west" : "east";
+    state.PlayerX = state.EntranceSide === "west" ? 25 : 975;
+    state.PlayerY = 60;
     logMsg(`Death: ${cause}. The body remembers: aptitudes increased from your training!`, "life");
     updatePotential();
   }
@@ -850,6 +854,9 @@ export function createGame(state, opts = {}) {
     state.Money = START_MONEY;
     state.AgeDays = START_AGE_DAYS;
     state.Activity = "Rest";
+    state.EntranceSide = R() < 0.5 ? "west" : "east";
+    state.PlayerX = state.EntranceSide === "west" ? 25 : 975;
+    state.PlayerY = 60;
     logMsg(`REBIRTH #${state.Lives}! Potential ${pot} granted aptitude multiplier x${mult.toFixed(2)}!`, "life");
     updatePotential();
     return true;

@@ -316,7 +316,7 @@ export function initUI(game, opts = {}) {
     const pos = MAP_POS[loc.key];
     if (!pos) return;
     const b = document.createElement("div");
-    b.className = "bldg";
+    b.className = "bldg" + (["gym","cstore","clinic","jobboard"].includes(loc.key) ? " store-place" : "");
     b.style.left = pct(pos[0], MAP_W);
     b.style.top = pct(pos[1], MAP_H);
     const pin = loc.glyph ? `<span class="pin glyph">${loc.glyph}</span>` : `<span class="pin"></span>`;

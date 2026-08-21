@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.4;
+export const GAME_VERSION = 2.5;
 export const UPDATE_LOG = [
+  { v: 2.5, text: "v2.5: Home is the task-management base; map store blocks have wider touch areas; reincarnations randomly enter from the west or east; same-location clicks open their UI; Scrounge, food, clinic, Charisma pricing, gym prompts, and auto-fight changes are fully integrated." },
   { v: 2.4, text: "v2.4: tasks moved into the Home base UI and only run at Home; Home opens from anywhere without forcing travel; map/store placement refreshed; Scrounge for Cash renamed and Home-only with a rare tier-0 Hobo keepsake fight; food purchases come in stacks of five with best-food auto-eating; raw carrots, potatoes, and rice added; food and clinic recovery use percentages; Charisma increases cash and discounts all stores up to 50%; auto-fight uses Ultimates; gym wins ask about the next rival and guarantee style affinity progress." },
   { v: 2.3, text: "v2.3: route timing now uses the full route with instant rerouting and no same-location detours; movement grants more Speed; map fighters open challenger rosters; gym fighter clicks open combat correctly; arena moved to the river's right-middle square; opponent readouts use Total Power (all stats ÷ 30); escape is a one-use Speed-vs-Speed chance; News opens by default and glows on unread entries; Aptitude purchases multiply current Aptitude by 1.5; ADMIN code opens a testing console." },
   { v: 2.2, text: "v2.2: fast map travel (20-30s baseline, ~1s at high Speed), dashed route line + ETA box while traveling, no random fights while walking (use the Searching-for-Trouble toggle), randomized NPC stats by tier (tier 1 low / 2 mid / 3 high), central locations (gym, store, clinic, job board) moved near home, and news is now a floating box in the top-left opened from the NEWS button." },
