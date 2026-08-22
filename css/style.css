@@ -1285,5 +1285,5 @@ header { gap: 10px; padding: 8px 12px; border-bottom-color: var(--line); backgro
 }
 @media (min-width: 901px) {
   .mobile-drawer-backdrop { display: none !important; }
-  .col-left.panel-hidden { display: none; }
+  .col-left.panel-hidden { transform: translateX(-110%); opacity: 0; pointer-events: none; transition: transform .22s ease, opacity .22s ease; }
 }

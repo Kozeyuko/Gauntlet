@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.17;
+export const GAME_VERSION = 2.18;
 export const UPDATE_LOG = [
+  { v: 2.18, text: "• Fixed PC PANEL closing so it slides the left panel away without reflowing the map.\n• Preserved the map grid column and prevented map-corner collapse after panel or map clicks." },
   { v: 2.17, text: "• Rebuilt map routing as a shortest-path road graph with no diagonal segments or immediate backtracks.\n• Mobile layout now stacks the right column below the map instead of beside it.\n• PANEL is available on PC and mobile; opening it locks page scrolling.\n• Outside clicks dismiss mobile popups and overlays.\n• News now stays below the header.\n• Live Job Board updates preserve DOM nodes to prevent hover flicker.\n• Locations regenerate 10% max Stamina per second.\n• Auto-job stops immediately when Stamina reaches zero and shows turns remaining." },
   { v: 2.16, text: "• Restored trainer purchase requirements for basic techniques.\n• Learned techniques can be queued and used from Home or any task-board location.\n• Advanced training names and multipliers are earned through training XP.\n• Added hover details showing current training tier XP and the next technique requirement." },
   { v: 2.15, text: "• Redirected all legacy gym-store calls into the actual gym overlay.\n• Training Gear now displays the dedicated gym item directly.\n• Purchased one-time gym gear disappears from the shop.\n• Prevented duplicate purchases of dedicated gym gear." },
