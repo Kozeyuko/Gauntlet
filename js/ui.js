@@ -932,7 +932,7 @@ export function initUI(game, opts = {}) {
     const loc = LOCATIONS[key];
     el.locFightersTitle.textContent = "Trainers & Modes";
     el.locFightersList.innerHTML = "";
-    for (const item of GYM_TRAINING) {
+    for (const item of (key === "gym" ? GYM_TRAINING : [])) {
       const owned = game.hasTraining(item.key) && item.unlock === "permanent";
       const stock = item.unlock === "consumable" ? Number(state.Consumables?.[item.key] || 0) : 0;
       const row = document.createElement("div"); row.className = "ghostrow";
@@ -940,7 +940,6 @@ export function initUI(game, opts = {}) {
       main.innerHTML = `<div class="gnm">${item.name}</div><div class="gsub">${item.desc || "Learn this technique to add it to the task board."}${item.requires ? ` Requires ${item.requiresName}.` : ""}${item.unlock === "consumable" ? ` Stock: ${stock}` : ""}</div>`;
       const btn = document.createElement("button"); btn.className = "btn small-btn";
       if (owned) { btn.textContent = "LEARNED"; btn.classList.add("owned"); btn.disabled = true; }
-      else if (item.unlock === "consumable" && stock > 0) { btn.textContent = "LEARNED"; btn.classList.add("owned"); btn.disabled = true; }
       else {
         btn.textContent = fmtCash(game.shopPrice ? game.shopPrice(item.cost) : item.cost);
         btn.addEventListener("click", () => { game.buyTraining(item.key); renderGymTrainers(key); render(); });
@@ -960,6 +959,7 @@ export function initUI(game, opts = {}) {
   }
 
   function renderGymGear(key) {
+    if (key !== "gym") return;
     const item = GYM_GEAR[key];
     el.locFightersTitle.textContent = "Training Gear";
     el.locFightersList.innerHTML = "";
@@ -990,9 +990,11 @@ export function initUI(game, opts = {}) {
     const loc = LOCATIONS[key];
     const tabs = key === "home"
       ? [{ id: "tasks", label: "TASKS" }, { id: "cook", label: "COOK" }]
-      : (loc && loc.tier > 0)
+      : key === "gym"
         ? [{ id: "trainers", label: "TRAINERS" }, { id: "gear", label: "TRAINING GEAR" }]
-        : [{ id: "activities", label: "ACTIVITIES" }];
+        : (loc && loc.tier > 0)
+          ? [{ id: "fighters", label: "FIGHTERS" }, { id: "trainers", label: "TRAINERS" }]
+          : [{ id: "activities", label: "ACTIVITIES" }];
     el.locTabs.innerHTML = "";
     const select = (id) => {
       el.activitiesPanel.style.display = id === "activities" ? "" : "none";
@@ -1004,6 +1006,7 @@ export function initUI(game, opts = {}) {
       if (id === "cook") renderCookPanel();
       if (id === "trainers") renderGymTrainers(key);
       if (id === "gear") renderGymGear(key);
+      if (id === "fighters") renderLocFighters(key);
     };
     tabs.forEach((tab) => {
       const b = document.createElement("button"); b.className = "store-tab"; b.dataset.locTab = tab.id; b.textContent = tab.label;
@@ -1017,7 +1020,7 @@ export function initUI(game, opts = {}) {
 
   function renderLocFighters(key) {
     const loc = LOCATIONS[key];
-    if (loc && loc.tier > 0) { renderGymTrainers(key); return; }
+    if (key === "gym") { renderGymTrainers(key); return; }
     if (!el.locFightersList || !el.locFightersTitle) return;
     el.locFightersList.innerHTML = "";
     if (!loc.styleGym && loc.tier === 0) {
@@ -1166,13 +1169,24 @@ export function initUI(game, opts = {}) {
       const job = JOBS.find((j) => j.key === key);
       if (!job) return;
       const lvl = game.jobLevel(key);
+      const xp = game.jobXp(key);
+      const needed = jobXpForLevel(job, lvl);
+      const pay = jobPay(job, lvl);
       const cost = jobStaminaCost(job, lvl);
       const turnsLeft = Math.floor(num(state.Stamina) / Math.max(1, cost));
       const active = activeAuto === key;
       const remain = active && game.autoJobRemaining ? game.autoJobRemaining(key) : 0;
       const tip = active ? `Auto-job grace remaining: ${Math.ceil(remain / 1000)}s · ${turnsLeft} turns from current Stamina. It stops automatically at 0 Stamina.` : `Start auto-work; ${turnsLeft} turns available from current Stamina. It stops automatically at 0 Stamina.`;
       const btn = card.querySelector(".auto-toggle-btn");
-      if (btn) { btn.textContent = active ? "AUTO: ON" : "AUTO: OFF"; btn.classList.toggle("on", active); btn.title = tip; btn.setAttribute("data-tip", tip); }
+      const levelEl = card.querySelector(".job-level");
+      const fill = card.querySelector(".job-xp-fill");
+      const meta = card.querySelector(".jmeta");
+      const workBtn = card.querySelector(".work-btn");
+      if (levelEl) levelEl.textContent = `Lv. ${lvl}`;
+      if (fill) fill.style.width = `${Math.min(100, (xp / Math.max(1, needed)) * 100)}%`;
+      if (meta) meta.innerHTML = `<span>XP: ${xp} / ${needed}</span> · <span>Cost: ${cost} STA</span> · <span>Pay: ~${fmtCash(pay)}</span>`;
+      if (workBtn) workBtn.disabled = num(state.Stamina) < cost;
+      if (btn) { btn.textContent = active ? "AUTO: ON" : "AUTO: OFF"; btn.classList.toggle("on", active); btn.title = tip; if (!btn.matches(":hover")) btn.setAttribute("data-tip", tip); }
       card.classList.toggle("auto-active", active);
     });
   }
@@ -1197,10 +1211,10 @@ export function initUI(game, opts = {}) {
       card.innerHTML = `
         <div class="jhead">
           <span>${j.name}</span>
-          <span class="gold">Lv. ${lvl}</span>
+          <span class="gold job-level">Lv. ${lvl}</span>
         </div>
         <div class="jdesc">${j.desc}</div>
-        <div class="jbar"><i style="width:${Math.min(100, (xp / needed) * 100)}%"></i></div>
+        <div class="jbar"><i class="job-xp-fill" style="width:${Math.min(100, (xp / needed) * 100)}%"></i></div>
         <div class="jmeta">
           <span>XP: ${xp} / ${needed}</span> · 
           <span>Cost: ${cost} STA</span> · 
@@ -1450,7 +1464,7 @@ export function initUI(game, opts = {}) {
       else render();
       return;
     }
-    const view = game.beginRoamerFight(currentChain.key, currentChain.step);
+    const view = game.beginRoamerFight(currentChain.key, currentChain.step, currentChain.step - 1);
     if (view) openCombat(view);
     else render();
   });
@@ -1849,7 +1863,8 @@ export function initUI(game, opts = {}) {
         num.textContent = `${i + 1}.`;
         const nm = document.createElement("span");
         nm.className = "tname";
-        nm.textContent = act ? act.name : item.act;
+        const chainName = game.trainTierName ? game.trainTierName(item.act) : null;
+        nm.textContent = act ? (chainName || act.name) : item.act;
         const cnt = document.createElement("span");
         cnt.className = "tcnt";
         cnt.textContent = `×${item.n}`;
@@ -1913,7 +1928,8 @@ export function initUI(game, opts = {}) {
         b.setAttribute("data-tip", xpTip);
         b.title = xpTip;
         b.className = "btn small-btn" + (locked ? " locked" : "");
-        b.textContent = act.name;
+        const currentTrainingName = game.trainTierName ? game.trainTierName(key) : null;
+        b.textContent = currentTrainingName || act.name;
         if (locked) b.title = `${xpTip} Spend Cash with a trainer to learn this training.`;
         b.addEventListener("click", () => {
           if (game.addTask(key)) {

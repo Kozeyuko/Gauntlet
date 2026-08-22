@@ -36,8 +36,9 @@ export const CUSTOM_MAX_SKILLS = 3;
 export const SELF_TRAIN_MULT = 1.5;       // rate boost for using an unmastered style
 
 export const DATA_VERSION = 2;
-export const GAME_VERSION = 2.19;
+export const GAME_VERSION = 2.20;
 export const UPDATE_LOG = [
+  { v: 2.20, text: "• Job Board Auto now updates in place and can be toggled without reopening the panel.\n• Street-fight Next Bout now starts the correct next challenger.\n• Restored rival Fighters tabs to rival locations.\n• Restricted default training purchases and Training Gear to City Gym.\n• Shadow Boxing is purchasable and Roadworks purchases can repeat.\n• Death now respawns on the Home plate.\n• Training and queued task names update as tiers advance.\n• Live hover popups no longer rewrite their content while hovered." },
   { v: 2.19, text: "• Road traversal now uses the mapped road corridors as the only route network.\n• Removed direct building-column shortcuts that crossed map blocks.\n• Every destination now exits to a road, follows connected roads, and enters the destination from the road network." },
   { v: 2.18, text: "• Fixed PC PANEL closing so it slides the left panel away without reflowing the map.\n• Preserved the map grid column and prevented map-corner collapse after panel or map clicks." },
   { v: 2.17, text: "• Rebuilt map routing as a shortest-path road graph with no diagonal segments or immediate backtracks.\n• Mobile layout now stacks the right column below the map instead of beside it.\n• PANEL is available on PC and mobile; opening it locks page scrolling.\n• Outside clicks dismiss mobile popups and overlays.\n• News now stays below the header.\n• Live Job Board updates preserve DOM nodes to prevent hover flicker.\n• Locations regenerate 10% max Stamina per second.\n• Auto-job stops immediately when Stamina reaches zero and shows turns remaining." },
@@ -754,8 +755,7 @@ export const GYM_TRAINING = [
   { key: "Pushups",       name: "Pushups (Str)",        cost: 10, unlock: "permanent" },
   { key: "Situps",        name: "Situps (Tou)",         cost: 10, unlock: "permanent" },
   { key: "Squats",        name: "Squats (Spd)",         cost: 15, unlock: "permanent" },
-  { key: "ShadowBoxing",  name: "Shadow Boxing (Int)",  cost: 20, unlock: "permanent",
-    requires: "mat", requiresName: "Old Training Mat" },
+  { key: "ShadowBoxing",  name: "Shadow Boxing (Int)",  cost: 20, unlock: "permanent" },
   { key: "HeavyBag",      name: "Heavy Bag (Str)",      cost: 25, unlock: "permanent",
     home: true },
   { key: "Roadworks",     name: "Roadworks (Spd)",      cost: 8,  unlock: "consumable",

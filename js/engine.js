@@ -855,9 +855,12 @@ export function createGame(state, opts = {}) {
     state.Money = START_MONEY;
     state.AgeDays = START_AGE_DAYS;
     state.Activity = "Rest";
-    state.EntranceSide = R() < 0.5 ? "west" : "east";
-    state.PlayerX = state.EntranceSide === "west" ? 25 : 975;
-    state.PlayerY = 60;
+    state.Location = "home";
+    state.MovingTo = null;
+    state.routePath = null;
+    state.PlayerX = MAP_POS.home[0];
+    state.PlayerY = MAP_POS.home[1];
+    state.EntranceSide = "west";
     logMsg(`Death: ${cause}. The body remembers: aptitudes increased from your training!`, "life");
     updatePotential();
   }
@@ -1534,7 +1537,7 @@ export function createGame(state, opts = {}) {
     if (typeof key !== "string") return null;
     const roamer = getRoamer(key);
     if (!roamer) return null;
-    if (roamerStatus(key) !== "ready") return null;
+    if (roamerStatus(key) !== "ready" && Number(step) <= 1) return null;
     const challengers = roamerChallengers(key);
     const built = challengers[Math.max(0, Math.min(challengers.length - 1, Number(challengerIndex) || 0))] || buildChainedRoamer(roamer, step);
     const me = hydratePlayerCombatant(makeCombatant(currentStats(), activeStyle(), { isPlayer: true }));
@@ -2233,6 +2236,7 @@ export function createGame(state, opts = {}) {
 
   // ---- equipment ----
   function buyGymGear(locKey) {
+    if (locKey !== "gym") return false;
     const item = GYM_GEAR[locKey];
     if (!item) return false;
     if (!Array.isArray(state.OwnedGymGear)) state.OwnedGymGear = [];
